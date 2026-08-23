@@ -17,21 +17,15 @@ function money(value) {
 
 function dateTime(value) {
   if (!value) return '';
-
   return new Date(value).toLocaleString('en-IN');
 }
 
-function calculateOfferAmounts(
-  booking,
-  type,
-  value
-) {
-  const originalTaxable =
-    Number(
-      booking.taxable_amount ??
+function calculateOfferAmounts(booking, type, value) {
+  const originalTaxable = Number(
+    booking.taxable_amount ??
       booking.base_amount ??
       0
-    );
+  );
 
   let discount = 0;
 
@@ -40,14 +34,10 @@ function calculateOfferAmounts(
       originalTaxable *
       (Number(value || 0) / 100);
   } else {
-    discount =
-      Number(value || 0);
+    discount = Number(value || 0);
   }
 
-  if (discount < 0) {
-    discount = 0;
-  }
-
+  if (discount < 0) discount = 0;
   if (discount > originalTaxable) {
     discount = originalTaxable;
   }
@@ -229,29 +219,27 @@ export default function AdminBookingsPage() {
         return;
       }
 
-      const propertyIds =
-        [
-          ...new Set(
-            rows
-              .map(
-                (item) =>
-                  item.property_id
-              )
-              .filter(Boolean)
-          ),
-        ];
+      const propertyIds = [
+        ...new Set(
+          rows
+            .map(
+              (item) =>
+                item.property_id
+            )
+            .filter(Boolean)
+        ),
+      ];
 
-      const guestIds =
-        [
-          ...new Set(
-            rows
-              .map(
-                (item) =>
-                  item.guest_id
-              )
-              .filter(Boolean)
-          ),
-        ];
+      const guestIds = [
+        ...new Set(
+          rows
+            .map(
+              (item) =>
+                item.guest_id
+            )
+            .filter(Boolean)
+        ),
+      ];
 
       const [
         propertyResult,
@@ -309,8 +297,7 @@ export default function AdminBookingsPage() {
         );
       }
 
-      const propertyMap =
-        {};
+      const propertyMap = {};
 
       (
         propertyResult.data ||
@@ -323,8 +310,7 @@ export default function AdminBookingsPage() {
         }
       );
 
-      const guestMap =
-        {};
+      const guestMap = {};
 
       (
         guestResult.data ||
@@ -371,22 +357,15 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function approveBooking(
-    booking
-  ) {
+  async function approveBooking(booking) {
     const confirmed =
       window.confirm(
         `Approve booking ${booking.booking_code}?`
       );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
-    setBusyId(
-      booking.id
-    );
-
+    setBusyId(booking.id);
     setMessage('');
     setPageError('');
 
@@ -407,11 +386,15 @@ export default function AdminBookingsPage() {
               session.user.id,
 
             booking_status:
-              'approved',
+              'confirmed',
 
             payment_status:
               booking.payment_status ||
               'unpaid',
+
+            verification_status:
+              booking.verification_status ||
+              'not_required',
 
             updated_at:
               new Date().toISOString(),
@@ -439,22 +422,15 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function declineBooking(
-    booking
-  ) {
+  async function declineBooking(booking) {
     const confirmed =
       window.confirm(
         `Decline booking ${booking.booking_code}?`
       );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
-    setBusyId(
-      booking.id
-    );
-
+    setBusyId(booking.id);
     setMessage('');
     setPageError('');
 
@@ -475,7 +451,13 @@ export default function AdminBookingsPage() {
               session.user.id,
 
             booking_status:
-              'declined',
+              'cancelled',
+
+            offer_status:
+              booking.offer_status ===
+              'host_offered'
+                ? 'declined'
+                : booking.offer_status,
 
             updated_at:
               new Date().toISOString(),
@@ -503,9 +485,7 @@ export default function AdminBookingsPage() {
     }
   }
 
-  function openOffer(
-    booking
-  ) {
+  function openOffer(booking) {
     setOfferBookingId(
       booking.id
     );
@@ -517,6 +497,7 @@ export default function AdminBookingsPage() {
     setOfferValue('');
 
     setOfferNote('');
+    setPageError('');
   }
 
   function closeOffer() {
@@ -525,13 +506,9 @@ export default function AdminBookingsPage() {
     setOfferNote('');
   }
 
-  async function sendSpecialOffer(
-    booking
-  ) {
+  async function sendSpecialOffer(booking) {
     const value =
-      Number(
-        offerValue
-      );
+      Number(offerValue);
 
     if (
       !value ||
@@ -558,14 +535,9 @@ export default function AdminBookingsPage() {
         )}.`
       );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
-    setBusyId(
-      booking.id
-    );
-
+    setBusyId(booking.id);
     setMessage('');
     setPageError('');
 
@@ -604,7 +576,7 @@ export default function AdminBookingsPage() {
               } discount`,
 
             offer_status:
-              'host_offer',
+              'host_offered',
 
             offer_created_by:
               session.user.id,
@@ -622,7 +594,10 @@ export default function AdminBookingsPage() {
               session.user.id,
 
             booking_status:
-              'approved',
+              'confirmed',
+
+            payment_status:
+              'unpaid',
 
             updated_at:
               new Date().toISOString(),
@@ -1022,8 +997,7 @@ export default function AdminBookingsPage() {
                         {booking.guest_discount_message && (
                           <div
                             style={{
-                              marginTop:
-                                5,
+                              marginTop: 5,
                             }}
                           >
                             {
@@ -1107,20 +1081,11 @@ export default function AdminBookingsPage() {
 
                     {specialOfferOpen && (
                       <div style={styles.offerEditor}>
-                        <h3
-                          style={{
-                            marginTop:
-                              0,
-                          }}
-                        >
+                        <h3 style={{ marginTop: 0 }}>
                           Host Special Offer
                         </h3>
 
-                        <div
-                          style={
-                            styles.offerFields
-                          }
-                        >
+                        <div style={styles.offerFields}>
                           <select
                             value={
                               offerType
@@ -1231,11 +1196,7 @@ export default function AdminBookingsPage() {
                           </div>
                         )}
 
-                        <div
-                          style={
-                            styles.offerActions
-                          }
-                        >
+                        <div style={styles.offerActions}>
                           <button
                             type="button"
                             onClick={() =>
@@ -1305,7 +1266,6 @@ function Amount({
     <div
       style={{
         ...styles.amountRow,
-
         ...(discount
           ? styles.discount
           : {}),
@@ -1316,13 +1276,10 @@ function Amount({
       </span>
 
       <strong>
-        {Number(value || 0) <
-        0
+        {Number(value || 0) < 0
           ? `-${money(
               Math.abs(
-                Number(
-                  value
-                )
+                Number(value)
               )
             )}`
           : money(value)}
@@ -1370,15 +1327,14 @@ function StatusBadge({
     '#fff3d6';
 
   if (
-    status === 'approved' ||
-    status === 'confirmed'
+    status === 'confirmed' ||
+    status === 'completed'
   ) {
     background =
       '#e4f7e9';
   }
 
   if (
-    status === 'declined' ||
     status === 'cancelled'
   ) {
     background =
