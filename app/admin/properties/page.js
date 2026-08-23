@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import PropertyPhotoManager from './PropertyPhotoManager';
+import PropertyDiscountManager from './PropertyDiscountManager';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -43,12 +44,10 @@ const commonAmenities = [
 
 const emptyForm = {
   id: '',
-
   name: '',
   slug: '',
   short_description: '',
   description: '',
-
   location_name: '',
   address: '',
   google_maps_url: '',
@@ -62,7 +61,6 @@ const emptyForm = {
 
   base_price: 2599,
   extra_guest_fee: 699,
-
   cleaning_fee: 0,
   security_deposit: 0,
 
@@ -71,7 +69,6 @@ const emptyForm = {
 
   check_in_time: '14:00',
   check_out_time: '11:00',
-
   late_checkout_hourly_fee: 0,
 
   fridge_available: false,
@@ -83,7 +80,6 @@ const emptyForm = {
   ac_count: 0,
 
   water_heater_count: 0,
-
   sofa_cum_bed_count: 0,
   single_bed_count: 0,
   queen_bed_count: 0,
@@ -99,7 +95,6 @@ const emptyForm = {
   quiet_hours_end: '07:00',
 
   dynamic_pricing_enabled: false,
-
   weekend_markup_percent: 0,
   long_weekend_markup_percent: 0,
   festival_markup_percent: 0,
@@ -133,19 +128,12 @@ function toNumber(value, fallback = 0) {
   return result;
 }
 
-function getFileExtension(filename) {
-  const parts = filename.split('.');
-
-  if (parts.length < 2) return 'jpg';
-
-  return parts.pop().toLowerCase();
-}
-
 export default function AdminPropertiesPage() {
   const [checkingSession, setCheckingSession] =
     useState(true);
 
-  const [session, setSession] = useState(null);
+  const [session, setSession] =
+    useState(null);
 
   const [adminProfile, setAdminProfile] =
     useState(null);
@@ -156,19 +144,7 @@ export default function AdminPropertiesPage() {
   const [form, setForm] =
     useState(emptyForm);
 
-  const [existingPhotos, setExistingPhotos] =
-    useState([]);
-
-  const [selectedFiles, setSelectedFiles] =
-    useState([]);
-
-  const [previewUrls, setPreviewUrls] =
-    useState([]);
-
   const [saving, setSaving] =
-    useState(false);
-
-  const [uploadingPhotos, setUploadingPhotos] =
     useState(false);
 
   const [loadingProperties, setLoadingProperties] =
@@ -183,14 +159,6 @@ export default function AdminPropertiesPage() {
   useEffect(() => {
     startPage();
   }, []);
-
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach((url) =>
-        URL.revokeObjectURL(url)
-      );
-    };
-  }, [previewUrls]);
 
   async function startPage() {
     const {
@@ -218,8 +186,6 @@ export default function AdminPropertiesPage() {
       .single();
 
     if (error || !data) {
-      console.error(error);
-
       setErrorMessage(
         'This account does not have permission to manage properties.'
       );
@@ -245,8 +211,6 @@ export default function AdminPropertiesPage() {
     setLoadingProperties(false);
 
     if (error) {
-      console.error(error);
-
       setErrorMessage(
         `Unable to load properties: ${error.message}`
       );
@@ -255,31 +219,6 @@ export default function AdminPropertiesPage() {
     }
 
     setProperties(data || []);
-  }
-
-  async function loadPropertyPhotos(propertyId) {
-    const { data, error } = await supabase
-      .from('property_photos')
-      .select('*')
-      .eq('property_id', propertyId)
-      .order('is_cover', {
-        ascending: false,
-      })
-      .order('sort_order', {
-        ascending: true,
-      });
-
-    if (error) {
-      console.error(error);
-
-      setErrorMessage(
-        `Unable to load property photos: ${error.message}`
-      );
-
-      return;
-    }
-
-    setExistingPhotos(data || []);
   }
 
   function updateField(field, value) {
@@ -311,21 +250,8 @@ export default function AdminPropertiesPage() {
     });
   }
 
-  function resetPhotoSelection() {
-    previewUrls.forEach((url) =>
-      URL.revokeObjectURL(url)
-    );
-
-    setSelectedFiles([]);
-    setPreviewUrls([]);
-  }
-
   function newProperty() {
-    resetPhotoSelection();
-
     setForm(emptyForm);
-    setExistingPhotos([]);
-
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -335,9 +261,7 @@ export default function AdminPropertiesPage() {
     });
   }
 
-  async function editProperty(property) {
-    resetPhotoSelection();
-
+  function editProperty(property) {
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -390,339 +314,10 @@ export default function AdminPropertiesPage() {
           : '',
     });
 
-    await loadPropertyPhotos(property.id);
-
     window.scrollTo({
       top: 0,
       behavior: 'smooth',
     });
-  }
-
-  function handlePhotoSelection(event) {
-    const files =
-      Array.from(event.target.files || []);
-
-    if (!files.length) {
-      return;
-    }
-
-    const invalidFile =
-      files.find(
-        (file) =>
-          !file.type.startsWith('image/')
-      );
-
-    if (invalidFile) {
-      setErrorMessage(
-        'Please select image files only.'
-      );
-
-      return;
-    }
-
-    const oversized =
-      files.find(
-        (file) =>
-          file.size >
-          10 * 1024 * 1024
-      );
-
-    if (oversized) {
-      setErrorMessage(
-        'Each property photo must be below 10 MB.'
-      );
-
-      return;
-    }
-
-    resetPhotoSelection();
-
-    setSelectedFiles(files);
-
-    setPreviewUrls(
-      files.map((file) =>
-        URL.createObjectURL(file)
-      )
-    );
-  }
-
-  async function uploadSelectedPhotos(
-    propertyId,
-    existingPhotoCount = 0
-  ) {
-    if (!selectedFiles.length) {
-      return true;
-    }
-
-    setUploadingPhotos(true);
-
-    try {
-      const hasCover =
-        existingPhotos.some(
-          (photo) => photo.is_cover
-        );
-
-      for (
-        let index = 0;
-        index < selectedFiles.length;
-        index += 1
-      ) {
-        const file =
-          selectedFiles[index];
-
-        const extension =
-          getFileExtension(file.name);
-
-        const uniqueName =
-          `${Date.now()}-${index}-${crypto.randomUUID()}.${extension}`;
-
-        const storagePath =
-          `${propertyId}/${uniqueName}`;
-
-        const {
-          error: uploadError,
-        } = await supabase.storage
-          .from('property-photos')
-          .upload(
-            storagePath,
-            file,
-            {
-              cacheControl: '3600',
-              upsert: false,
-            }
-          );
-
-        if (uploadError) {
-          throw new Error(
-            `Photo upload failed: ${uploadError.message}`
-          );
-        }
-
-        const {
-          data: publicData,
-        } = supabase.storage
-          .from('property-photos')
-          .getPublicUrl(storagePath);
-
-        const shouldBeCover =
-          !hasCover &&
-          existingPhotoCount === 0 &&
-          index === 0;
-
-        const {
-          error: photoRowError,
-        } = await supabase
-          .from('property_photos')
-          .insert({
-            property_id:
-              propertyId,
-
-            image_url:
-              publicData.publicUrl,
-
-            alt_text:
-              form.name,
-
-            sort_order:
-              existingPhotoCount +
-              index,
-
-            is_cover:
-              shouldBeCover,
-          });
-
-        if (photoRowError) {
-          await supabase.storage
-            .from('property-photos')
-            .remove([
-              storagePath,
-            ]);
-
-          throw new Error(
-            `Photo database save failed: ${photoRowError.message}`
-          );
-        }
-      }
-
-      resetPhotoSelection();
-
-      await loadPropertyPhotos(
-        propertyId
-      );
-
-      return true;
-    } catch (error) {
-      console.error(error);
-
-      setErrorMessage(
-        error.message ||
-          'Unable to upload property photos.'
-      );
-
-      return false;
-    } finally {
-      setUploadingPhotos(false);
-    }
-  }
-
-  async function setCoverPhoto(photo) {
-    if (!form.id) {
-      return;
-    }
-
-    setErrorMessage('');
-
-    const {
-      error: clearError,
-    } = await supabase
-      .from('property_photos')
-      .update({
-        is_cover: false,
-      })
-      .eq(
-        'property_id',
-        form.id
-      );
-
-    if (clearError) {
-      setErrorMessage(
-        `Unable to change cover photo: ${clearError.message}`
-      );
-
-      return;
-    }
-
-    const {
-      error: setError,
-    } = await supabase
-      .from('property_photos')
-      .update({
-        is_cover: true,
-      })
-      .eq('id', photo.id);
-
-    if (setError) {
-      setErrorMessage(
-        `Unable to change cover photo: ${setError.message}`
-      );
-
-      return;
-    }
-
-    await loadPropertyPhotos(
-      form.id
-    );
-
-    setSuccessMessage(
-      'Main / display photo updated.'
-    );
-  }
-
-  function getStoragePathFromPublicUrl(
-    imageUrl
-  ) {
-    const marker =
-      '/storage/v1/object/public/property-photos/';
-
-    const position =
-      imageUrl.indexOf(marker);
-
-    if (position === -1) {
-      return null;
-    }
-
-    return decodeURIComponent(
-      imageUrl.substring(
-        position +
-          marker.length
-      )
-    );
-  }
-
-  async function deletePhoto(photo) {
-    const confirmed =
-      window.confirm(
-        'Delete this property photo?'
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setErrorMessage('');
-
-    const storagePath =
-      getStoragePathFromPublicUrl(
-        photo.image_url
-      );
-
-    const {
-      error: databaseError,
-    } = await supabase
-      .from('property_photos')
-      .delete()
-      .eq('id', photo.id);
-
-    if (databaseError) {
-      setErrorMessage(
-        `Unable to delete photo: ${databaseError.message}`
-      );
-
-      return;
-    }
-
-    if (storagePath) {
-      await supabase.storage
-        .from('property-photos')
-        .remove([storagePath]);
-    }
-
-    await loadPropertyPhotos(
-      form.id
-    );
-
-    if (
-      photo.is_cover
-    ) {
-      const {
-        data: remaining,
-      } = await supabase
-        .from('property_photos')
-        .select('id')
-        .eq(
-          'property_id',
-          form.id
-        )
-        .order(
-          'sort_order',
-          {
-            ascending: true,
-          }
-        )
-        .limit(1);
-
-      if (
-        remaining?.length
-      ) {
-        await supabase
-          .from('property_photos')
-          .update({
-            is_cover: true,
-          })
-          .eq(
-            'id',
-            remaining[0].id
-          );
-
-        await loadPropertyPhotos(
-          form.id
-        );
-      }
-    }
-
-    setSuccessMessage(
-      'Photo deleted.'
-    );
   }
 
   async function saveProperty(event) {
@@ -735,45 +330,29 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Property name is required.'
       );
-
       return;
     }
 
-    if (
-      !form.location_name.trim()
-    ) {
+    if (!form.location_name.trim()) {
       setErrorMessage(
         'Location is required.'
       );
-
       return;
     }
 
     const minGuests =
-      toNumber(
-        form.min_guests,
-        1
-      );
+      toNumber(form.min_guests, 1);
 
     const includedGuests =
-      toNumber(
-        form.included_guests,
-        1
-      );
+      toNumber(form.included_guests, 1);
 
     const maxGuests =
-      toNumber(
-        form.max_guests,
-        1
-      );
+      toNumber(form.max_guests, 1);
 
-    if (
-      minGuests < 1
-    ) {
+    if (minGuests < 1) {
       setErrorMessage(
         'Minimum guests must be at least 1.'
       );
-
       return;
     }
 
@@ -784,7 +363,6 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Guests included in base price cannot be less than minimum guests.'
       );
-
       return;
     }
 
@@ -795,7 +373,6 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Guests included in base price cannot exceed maximum guests.'
       );
-
       return;
     }
 
@@ -806,7 +383,6 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Maximum guests cannot be less than minimum guests.'
       );
-
       return;
     }
 
@@ -828,7 +404,6 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Minimum stay must be at least one night.'
       );
-
       return;
     }
 
@@ -839,20 +414,16 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Maximum stay cannot be lower than minimum stay.'
       );
-
       return;
     }
 
     const slug =
       form.slug?.trim() ||
-      slugify(
-        form.name
-      );
+      slugify(form.name);
 
     const houseRules =
       String(
-        form.house_rules_text ||
-          ''
+        form.house_rules_text || ''
       )
         .split('\n')
         .map((rule) =>
@@ -866,35 +437,23 @@ export default function AdminPropertiesPage() {
 
     if (
       form.wifi_available &&
-      !featureList.includes(
-        'Wi-Fi'
-      )
+      !featureList.includes('Wi-Fi')
     ) {
-      featureList.push(
-        'Wi-Fi'
-      );
+      featureList.push('Wi-Fi');
     }
 
     if (
       form.tv_available &&
-      !featureList.includes(
-        'TV'
-      )
+      !featureList.includes('TV')
     ) {
-      featureList.push(
-        'TV'
-      );
+      featureList.push('TV');
     }
 
     if (
       form.fridge_available &&
-      !featureList.includes(
-        'Fridge'
-      )
+      !featureList.includes('Fridge')
     ) {
-      featureList.push(
-        'Fridge'
-      );
+      featureList.push('Fridge');
     }
 
     if (
@@ -1202,55 +761,54 @@ export default function AdminPropertiesPage() {
           data.id;
       }
 
-      const photoSuccess =
-        await uploadSelectedPhotos(
-          propertyId,
-          existingPhotos.length
-        );
-
-      if (!photoSuccess) {
-        setSaving(false);
-
-        return;
-      }
-
       await loadProperties();
 
-      setSuccessMessage(
-        form.id
-          ? 'Property updated successfully.'
-          : 'Property created successfully.'
-      );
-
       if (form.id) {
-        await loadPropertyPhotos(
-          propertyId
+        setSuccessMessage(
+          'Property updated successfully.'
         );
       } else {
-        setForm(
-          emptyForm
+        setSuccessMessage(
+          'Property created successfully. Click Edit Property to add photos and discounts.'
         );
 
-        setExistingPhotos([]);
+        const createdProperty =
+          properties.find(
+            (item) =>
+              item.id ===
+              propertyId
+          );
+
+        setForm({
+          ...emptyForm,
+          id: propertyId,
+          name:
+            form.name,
+          location_name:
+            form.location_name,
+        });
+
+        if (createdProperty) {
+          editProperty(
+            createdProperty
+          );
+        }
       }
     } catch (error) {
       console.error(error);
 
-      const message =
-        error?.message ||
-        'Unknown property save error';
-
       setErrorMessage(
-        `Unable to save property: ${message}`
+        `Unable to save property: ${
+          error?.message ||
+          'Unknown error'
+        }`
       );
     } finally {
       setSaving(false);
     }
   }
 
-  async function toggleProperty(
-    property
-  ) {
+  async function toggleProperty(property) {
     setErrorMessage('');
 
     const {
@@ -1273,7 +831,6 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         `Unable to update property status: ${error.message}`
       );
-
       return;
     }
 
@@ -1358,7 +915,7 @@ export default function AdminPropertiesPage() {
             </h1>
 
             <p style={styles.muted}>
-              Manage property information, pricing, guest capacity, facilities, rules and photos.
+              Manage property information, pricing, guest capacity, facilities, rules, photos and discounts.
             </p>
           </div>
 
@@ -1407,7 +964,6 @@ export default function AdminPropertiesPage() {
                   value
                 )
               }
-              placeholder="Girivan, Lonavala, Bavdhan..."
             />
 
             <Field
@@ -1637,7 +1193,7 @@ export default function AdminPropertiesPage() {
             />
 
             <div style={styles.infoBox}>
-              Example: ₹
+              ₹
               {toNumber(
                 form.base_price
               ).toLocaleString(
@@ -1647,13 +1203,13 @@ export default function AdminPropertiesPage() {
               <strong>
                 {form.included_guests}
               </strong>{' '}
-              guests. Every additional guest costs ₹
+              guests. Extra guest charge ₹
               {toNumber(
                 form.extra_guest_fee
               ).toLocaleString(
                 'en-IN'
               )}{' '}
-              per night.
+              per person per night.
             </div>
           </Section>
 
@@ -1973,9 +1529,6 @@ export default function AdminPropertiesPage() {
                   value
                 )
               }
-              placeholder={
-                'No loud music after 10 PM\nPlease keep property clean\nNo unauthorized guests'
-              }
             />
           </Section>
 
@@ -1991,7 +1544,6 @@ export default function AdminPropertiesPage() {
                   value
                 )
               }
-              placeholder="Landmarks, gate number, parking instructions, caretaker details..."
             />
           </Section>
 
@@ -2066,171 +1618,6 @@ export default function AdminPropertiesPage() {
             )}
           </Section>
 
-          <Section title="Property Photos">
-            <div style={styles.fullWidth}>
-              <label style={styles.label}>
-                UPLOAD PROPERTY PHOTOS
-              </label>
-
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={
-                  handlePhotoSelection
-                }
-                style={
-                  styles.fileInput
-                }
-              />
-
-              <p style={styles.helpText}>
-                You can select multiple photos together. Maximum 10 MB per image.
-              </p>
-
-              {previewUrls.length >
-                0 && (
-                <>
-                  <h3>
-                    New Photos
-                  </h3>
-
-                  <div style={styles.photoGrid}>
-                    {previewUrls.map(
-                      (
-                        url,
-                        index
-                      ) => (
-                        <div
-                          key={url}
-                          style={
-                            styles.photoCard
-                          }
-                        >
-                          <img
-                            src={
-                              url
-                            }
-                            alt={`New property photo ${
-                              index +
-                              1
-                            }`}
-                            style={
-                              styles.photoImage
-                            }
-                          />
-
-                          {index ===
-                            0 &&
-                            existingPhotos.length ===
-                              0 && (
-                              <div
-                                style={
-                                  styles.coverBadge
-                                }
-                              >
-                                Will become Main Photo
-                              </div>
-                            )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                </>
-              )}
-
-              {form.id &&
-                existingPhotos.length >
-                  0 && (
-                  <>
-                    <h3 style={{ marginTop: 28 }}>
-                      Current Property Photos
-                    </h3>
-
-                    <p style={styles.helpText}>
-                      The Main Photo is used as the property display/cover image.
-                    </p>
-
-                    <div style={styles.photoGrid}>
-                      {existingPhotos.map(
-                        (
-                          photo
-                        ) => (
-                          <div
-                            key={
-                              photo.id
-                            }
-                            style={
-                              styles.photoCard
-                            }
-                          >
-                            <img
-                              src={
-                                photo.image_url
-                              }
-                              alt={
-                                photo.alt_text ||
-                                form.name
-                              }
-                              style={
-                                styles.photoImage
-                              }
-                            />
-
-                            {photo.is_cover && (
-                              <div
-                                style={
-                                  styles.coverBadge
-                                }
-                              >
-                                MAIN / DISPLAY PHOTO
-                              </div>
-                            )}
-
-                            <div
-                              style={
-                                styles.photoActions
-                              }
-                            >
-                              {!photo.is_cover && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setCoverPhoto(
-                                      photo
-                                    )
-                                  }
-                                  style={
-                                    styles.coverButton
-                                  }
-                                >
-                                  Make Main Photo
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  deletePhoto(
-                                    photo
-                                  )
-                                }
-                                style={
-                                  styles.deletePhotoButton
-                                }
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </>
-                )}
-            </div>
-          </Section>
-
           <Section title="Publishing">
             <Toggle
               label="Property Active / Visible to Guests"
@@ -2260,27 +1647,30 @@ export default function AdminPropertiesPage() {
 
           <button
             type="submit"
-            disabled={
-              saving ||
-              uploadingPhotos
-            }
+            disabled={saving}
             style={styles.saveButton}
           >
             {saving
               ? 'Saving Property...'
-              : uploadingPhotos
-              ? 'Uploading Photos...'
               : form.id
               ? 'Update Property'
               : 'Create Property'}
           </button>
         </form>
-{form.id && (
-  <PropertyPhotoManager
-    propertyId={form.id}
-    propertyName={form.name}
-  />
-)}
+
+        {form.id && (
+          <PropertyPhotoManager
+            propertyId={form.id}
+            propertyName={form.name}
+          />
+        )}
+
+        {form.id && (
+          <PropertyDiscountManager
+            propertyId={form.id}
+            propertyName={form.name}
+          />
+        )}
 
         <hr style={styles.separator} />
 
@@ -2291,7 +1681,7 @@ export default function AdminPropertiesPage() {
             </h1>
 
             <p style={styles.muted}>
-              Select a property to edit pricing, rules, photos or facilities.
+              Edit any property to manage details, photos and discounts.
             </p>
           </div>
 
@@ -2318,15 +1708,9 @@ export default function AdminPropertiesPage() {
             No properties found.
           </div>
         ) : (
-          <div
-            style={
-              styles.propertyGrid
-            }
-          >
+          <div style={styles.propertyGrid}>
             {properties.map(
-              (
-                property
-              ) => (
+              (property) => (
                 <div
                   key={
                     property.id
@@ -2397,21 +1781,6 @@ export default function AdminPropertiesPage() {
                     }{' '}
                     guests
                   </div>
-
-                  {toNumber(
-                    property.extra_guest_fee
-                  ) >
-                    0 && (
-                    <div style={styles.small}>
-                      Extra guest ₹
-                      {toNumber(
-                        property.extra_guest_fee
-                      ).toLocaleString(
-                        'en-IN'
-                      )}{' '}
-                      / night
-                    </div>
-                  )}
 
                   <div style={styles.cardButtons}>
                     <button
@@ -2485,7 +1854,6 @@ function Field({
 
       <input
         style={styles.input}
-        type="text"
         value={value || ''}
         placeholder={placeholder}
         onChange={(event) =>
@@ -2514,9 +1882,7 @@ function NumberField({
         type="number"
         min="0"
         step="0.01"
-        value={
-          value ?? 0
-        }
+        value={value ?? 0}
         onChange={(event) =>
           onChange(
             event.target.value
@@ -2556,7 +1922,6 @@ function TextArea({
   label,
   value,
   onChange,
-  placeholder = '',
 }) {
   return (
     <div style={styles.fullWidth}>
@@ -2567,7 +1932,6 @@ function TextArea({
       <textarea
         style={styles.textarea}
         value={value || ''}
-        placeholder={placeholder}
         onChange={(event) =>
           onChange(
             event.target.value
@@ -2627,9 +1991,7 @@ function CheckboxGrid({
                 )
               }
               onChange={() =>
-                onToggle(
-                  item
-                )
+                onToggle(item)
               }
             />
 
@@ -2800,87 +2162,6 @@ const styles = {
     fontWeight: 700,
   },
 
-  fileInput: {
-    display: 'block',
-    marginTop: 8,
-    padding: 12,
-    border:
-      '1px dashed #9ba4af',
-    borderRadius: 10,
-    width: '100%',
-    boxSizing:
-      'border-box',
-  },
-
-  helpText: {
-    fontSize: 13,
-    color: '#69717f',
-  },
-
-  photoGrid: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(210px, 1fr))',
-    gap: 16,
-    marginTop: 16,
-  },
-
-  photoCard: {
-    position: 'relative',
-    background: '#fff',
-    border:
-      '1px solid #ddd',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  photoImage: {
-    width: '100%',
-    aspectRatio: '16 / 9',
-    objectFit: 'cover',
-    display: 'block',
-  },
-
-  coverBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    background: '#163c74',
-    color: '#fff',
-    padding: '6px 9px',
-    borderRadius: 8,
-    fontSize: 10,
-    fontWeight: 800,
-  },
-
-  photoActions: {
-    display: 'flex',
-    gap: 8,
-    padding: 10,
-  },
-
-  coverButton: {
-    flex: 1,
-    padding: 9,
-    border:
-      '1px solid #163c74',
-    borderRadius: 8,
-    background: '#fff',
-    color: '#163c74',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-
-  deletePhotoButton: {
-    padding: 9,
-    border: 0,
-    borderRadius: 8,
-    background: '#ffe8e8',
-    color: '#a11f1f',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-
   error: {
     marginTop: 20,
     padding: 14,
@@ -2913,7 +2194,8 @@ const styles = {
   },
 
   secondaryButton: {
-    padding: '11px 17px',
+    padding:
+      '11px 17px',
     borderRadius: 10,
     background: '#fff',
     border:
