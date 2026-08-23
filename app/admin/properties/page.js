@@ -8,12 +8,46 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
+const commonKitchenFeatures = [
+  'Gas Stove',
+  'Induction',
+  'Microwave',
+  'Electric Kettle',
+  'Tea / Coffee Setup',
+  'Cooking Utensils',
+  'Plates & Cutlery',
+  'Drinking Water',
+  'RO Water Purifier',
+  'Toaster',
+];
+
+const commonAmenities = [
+  'Wi-Fi',
+  'Free Parking',
+  'Covered Parking',
+  'Hot Water',
+  'Power Backup',
+  'Garden',
+  'Balcony',
+  'Terrace',
+  'Swimming Pool',
+  'Gym',
+  'Clubhouse',
+  'Security',
+  'CCTV',
+  'Lift',
+  'Mountain View',
+  'City View',
+];
+
 const emptyForm = {
   id: '',
+
   name: '',
   slug: '',
   short_description: '',
   description: '',
+
   location_name: '',
   address: '',
   google_maps_url: '',
@@ -27,6 +61,7 @@ const emptyForm = {
 
   base_price: 2599,
   extra_guest_fee: 699,
+
   cleaning_fee: 0,
   security_deposit: 0,
 
@@ -35,19 +70,22 @@ const emptyForm = {
 
   check_in_time: '14:00',
   check_out_time: '11:00',
-  late_checkout_hourly_fee: 0,
 
-  features: '',
-  amenities: '',
-  house_rules: '',
-  kitchen_features: '',
-  direction_instructions: '',
+  late_checkout_hourly_fee: 0,
 
   fridge_available: false,
   tv_available: false,
   washing_machine_available: false,
+  wifi_available: false,
+
   ac_available: false,
   ac_count: 0,
+
+  water_heater_count: 0,
+
+  sofa_cum_bed_count: 0,
+  single_bed_count: 0,
+  queen_bed_count: 0,
 
   pets_allowed: false,
   parties_allowed: false,
@@ -60,82 +98,136 @@ const emptyForm = {
   quiet_hours_end: '07:00',
 
   dynamic_pricing_enabled: false,
+
   weekend_markup_percent: 0,
   long_weekend_markup_percent: 0,
   festival_markup_percent: 0,
   season_markup_percent: 0,
 
+  direction_instructions: '',
+
+  features: [],
+  amenities: [],
+  kitchen_features: [],
+  house_rules_text: '',
+
   is_active: true,
 };
 
 function slugify(text) {
-  return text
+  return String(text || '')
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
 
-function arrayToText(value) {
-  if (!Array.isArray(value)) return '';
-  return value.join(', ');
+function toNumber(value, fallback = 0) {
+  const result = Number(value);
+
+  if (Number.isNaN(result)) {
+    return fallback;
+  }
+
+  return result;
 }
 
-function textToArray(value) {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
+function getFileExtension(filename) {
+  const parts = filename.split('.');
+
+  if (parts.length < 2) return 'jpg';
+
+  return parts.pop().toLowerCase();
 }
 
 export default function AdminPropertiesPage() {
+  const [checkingSession, setCheckingSession] =
+    useState(true);
+
   const [session, setSession] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [adminProfile, setAdminProfile] = useState(null);
 
-  const [properties, setProperties] = useState([]);
-  const [form, setForm] = useState(emptyForm);
+  const [adminProfile, setAdminProfile] =
+    useState(null);
 
-  const [saving, setSaving] = useState(false);
-  const [loadingProperties, setLoadingProperties] = useState(false);
+  const [properties, setProperties] =
+    useState([]);
 
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [form, setForm] =
+    useState(emptyForm);
+
+  const [existingPhotos, setExistingPhotos] =
+    useState([]);
+
+  const [selectedFiles, setSelectedFiles] =
+    useState([]);
+
+  const [previewUrls, setPreviewUrls] =
+    useState([]);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [uploadingPhotos, setUploadingPhotos] =
+    useState(false);
+
+  const [loadingProperties, setLoadingProperties] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState('');
+
+  const [successMessage, setSuccessMessage] =
+    useState('');
 
   useEffect(() => {
-    async function start() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    startPage();
+  }, []);
 
-      setSession(session);
-      setCheckingSession(false);
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) =>
+        URL.revokeObjectURL(url)
+      );
+    };
+  }, [previewUrls]);
 
-      if (session) {
-        await verifyAdmin(session.user.id);
-      }
+  async function startPage() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    setSession(session);
+    setCheckingSession(false);
+
+    if (!session) {
+      return;
     }
 
-    start();
-  }, []);
+    await verifyAdmin(session.user.id);
+  }
 
   async function verifyAdmin(userId) {
     const { data, error } = await supabase
       .from('admin_profiles')
-      .select('user_id, full_name, role, is_active')
+      .select(
+        'user_id, full_name, role, is_active'
+      )
       .eq('user_id', userId)
       .eq('is_active', true)
       .single();
 
     if (error || !data) {
-      setAdminProfile(null);
+      console.error(error);
+
       setErrorMessage(
-        'This login does not have permission to manage properties.'
+        'This account does not have permission to manage properties.'
       );
+
       return;
     }
 
     setAdminProfile(data);
+
     await loadProperties();
   }
 
@@ -145,17 +237,48 @@ export default function AdminPropertiesPage() {
     const { data, error } = await supabase
       .from('properties')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', {
+        ascending: false,
+      });
 
     setLoadingProperties(false);
 
     if (error) {
       console.error(error);
-      setErrorMessage('Unable to load properties.');
+
+      setErrorMessage(
+        `Unable to load properties: ${error.message}`
+      );
+
       return;
     }
 
     setProperties(data || []);
+  }
+
+  async function loadPropertyPhotos(propertyId) {
+    const { data, error } = await supabase
+      .from('property_photos')
+      .select('*')
+      .eq('property_id', propertyId)
+      .order('is_cover', {
+        ascending: false,
+      })
+      .order('sort_order', {
+        ascending: true,
+      });
+
+    if (error) {
+      console.error(error);
+
+      setErrorMessage(
+        `Unable to load property photos: ${error.message}`
+      );
+
+      return;
+    }
+
+    setExistingPhotos(data || []);
   }
 
   function updateField(field, value) {
@@ -164,48 +287,441 @@ export default function AdminPropertiesPage() {
       [field]: value,
     }));
 
-    setSuccessMessage('');
     setErrorMessage('');
+    setSuccessMessage('');
+  }
+
+  function toggleListItem(field, item) {
+    setForm((previous) => {
+      const current = previous[field] || [];
+
+      const exists =
+        current.includes(item);
+
+      return {
+        ...previous,
+
+        [field]: exists
+          ? current.filter(
+              (value) => value !== item
+            )
+          : [...current, item],
+      };
+    });
+  }
+
+  function resetPhotoSelection() {
+    previewUrls.forEach((url) =>
+      URL.revokeObjectURL(url)
+    );
+
+    setSelectedFiles([]);
+    setPreviewUrls([]);
   }
 
   function newProperty() {
+    resetPhotoSelection();
+
     setForm(emptyForm);
+    setExistingPhotos([]);
+
     setErrorMessage('');
     setSuccessMessage('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
   }
 
-  function editProperty(property) {
+  async function editProperty(property) {
+    resetPhotoSelection();
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
     setForm({
       ...emptyForm,
       ...property,
 
-      features: arrayToText(property.features),
-      amenities: arrayToText(property.amenities),
-      house_rules: arrayToText(property.house_rules),
-      kitchen_features: arrayToText(
-        property.kitchen_features
-      ),
-
       check_in_time:
-        property.check_in_time?.slice(0, 5) || '14:00',
+        property.check_in_time?.slice(0, 5) ||
+        '14:00',
 
       check_out_time:
-        property.check_out_time?.slice(0, 5) || '11:00',
+        property.check_out_time?.slice(0, 5) ||
+        '11:00',
 
       quiet_hours_start:
-        property.quiet_hours_start?.slice(0, 5) ||
-        '22:00',
+        property.quiet_hours_start?.slice(
+          0,
+          5
+        ) || '22:00',
 
       quiet_hours_end:
-        property.quiet_hours_end?.slice(0, 5) ||
-        '07:00',
+        property.quiet_hours_end?.slice(
+          0,
+          5
+        ) || '07:00',
+
+      features:
+        Array.isArray(property.features)
+          ? property.features
+          : [],
+
+      amenities:
+        Array.isArray(property.amenities)
+          ? property.amenities
+          : [],
+
+      kitchen_features:
+        Array.isArray(
+          property.kitchen_features
+        )
+          ? property.kitchen_features
+          : [],
+
+      house_rules_text:
+        Array.isArray(
+          property.house_rules
+        )
+          ? property.house_rules.join('\n')
+          : '',
     });
 
-    setSuccessMessage('');
+    await loadPropertyPhotos(property.id);
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }
+
+  function handlePhotoSelection(event) {
+    const files =
+      Array.from(event.target.files || []);
+
+    if (!files.length) {
+      return;
+    }
+
+    const invalidFile =
+      files.find(
+        (file) =>
+          !file.type.startsWith('image/')
+      );
+
+    if (invalidFile) {
+      setErrorMessage(
+        'Please select image files only.'
+      );
+
+      return;
+    }
+
+    const oversized =
+      files.find(
+        (file) =>
+          file.size >
+          10 * 1024 * 1024
+      );
+
+    if (oversized) {
+      setErrorMessage(
+        'Each property photo must be below 10 MB.'
+      );
+
+      return;
+    }
+
+    resetPhotoSelection();
+
+    setSelectedFiles(files);
+
+    setPreviewUrls(
+      files.map((file) =>
+        URL.createObjectURL(file)
+      )
+    );
+  }
+
+  async function uploadSelectedPhotos(
+    propertyId,
+    existingPhotoCount = 0
+  ) {
+    if (!selectedFiles.length) {
+      return true;
+    }
+
+    setUploadingPhotos(true);
+
+    try {
+      const hasCover =
+        existingPhotos.some(
+          (photo) => photo.is_cover
+        );
+
+      for (
+        let index = 0;
+        index < selectedFiles.length;
+        index += 1
+      ) {
+        const file =
+          selectedFiles[index];
+
+        const extension =
+          getFileExtension(file.name);
+
+        const uniqueName =
+          `${Date.now()}-${index}-${crypto.randomUUID()}.${extension}`;
+
+        const storagePath =
+          `${propertyId}/${uniqueName}`;
+
+        const {
+          error: uploadError,
+        } = await supabase.storage
+          .from('property-photos')
+          .upload(
+            storagePath,
+            file,
+            {
+              cacheControl: '3600',
+              upsert: false,
+            }
+          );
+
+        if (uploadError) {
+          throw new Error(
+            `Photo upload failed: ${uploadError.message}`
+          );
+        }
+
+        const {
+          data: publicData,
+        } = supabase.storage
+          .from('property-photos')
+          .getPublicUrl(storagePath);
+
+        const shouldBeCover =
+          !hasCover &&
+          existingPhotoCount === 0 &&
+          index === 0;
+
+        const {
+          error: photoRowError,
+        } = await supabase
+          .from('property_photos')
+          .insert({
+            property_id:
+              propertyId,
+
+            image_url:
+              publicData.publicUrl,
+
+            alt_text:
+              form.name,
+
+            sort_order:
+              existingPhotoCount +
+              index,
+
+            is_cover:
+              shouldBeCover,
+          });
+
+        if (photoRowError) {
+          await supabase.storage
+            .from('property-photos')
+            .remove([
+              storagePath,
+            ]);
+
+          throw new Error(
+            `Photo database save failed: ${photoRowError.message}`
+          );
+        }
+      }
+
+      resetPhotoSelection();
+
+      await loadPropertyPhotos(
+        propertyId
+      );
+
+      return true;
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        error.message ||
+          'Unable to upload property photos.'
+      );
+
+      return false;
+    } finally {
+      setUploadingPhotos(false);
+    }
+  }
+
+  async function setCoverPhoto(photo) {
+    if (!form.id) {
+      return;
+    }
+
     setErrorMessage('');
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const {
+      error: clearError,
+    } = await supabase
+      .from('property_photos')
+      .update({
+        is_cover: false,
+      })
+      .eq(
+        'property_id',
+        form.id
+      );
+
+    if (clearError) {
+      setErrorMessage(
+        `Unable to change cover photo: ${clearError.message}`
+      );
+
+      return;
+    }
+
+    const {
+      error: setError,
+    } = await supabase
+      .from('property_photos')
+      .update({
+        is_cover: true,
+      })
+      .eq('id', photo.id);
+
+    if (setError) {
+      setErrorMessage(
+        `Unable to change cover photo: ${setError.message}`
+      );
+
+      return;
+    }
+
+    await loadPropertyPhotos(
+      form.id
+    );
+
+    setSuccessMessage(
+      'Main / display photo updated.'
+    );
+  }
+
+  function getStoragePathFromPublicUrl(
+    imageUrl
+  ) {
+    const marker =
+      '/storage/v1/object/public/property-photos/';
+
+    const position =
+      imageUrl.indexOf(marker);
+
+    if (position === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(
+      imageUrl.substring(
+        position +
+          marker.length
+      )
+    );
+  }
+
+  async function deletePhoto(photo) {
+    const confirmed =
+      window.confirm(
+        'Delete this property photo?'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setErrorMessage('');
+
+    const storagePath =
+      getStoragePathFromPublicUrl(
+        photo.image_url
+      );
+
+    const {
+      error: databaseError,
+    } = await supabase
+      .from('property_photos')
+      .delete()
+      .eq('id', photo.id);
+
+    if (databaseError) {
+      setErrorMessage(
+        `Unable to delete photo: ${databaseError.message}`
+      );
+
+      return;
+    }
+
+    if (storagePath) {
+      await supabase.storage
+        .from('property-photos')
+        .remove([storagePath]);
+    }
+
+    await loadPropertyPhotos(
+      form.id
+    );
+
+    if (
+      photo.is_cover
+    ) {
+      const {
+        data: remaining,
+      } = await supabase
+        .from('property_photos')
+        .select('id')
+        .eq(
+          'property_id',
+          form.id
+        )
+        .order(
+          'sort_order',
+          {
+            ascending: true,
+          }
+        )
+        .limit(1);
+
+      if (
+        remaining?.length
+      ) {
+        await supabase
+          .from('property_photos')
+          .update({
+            is_cover: true,
+          })
+          .eq(
+            'id',
+            remaining[0].id
+          );
+
+        await loadPropertyPhotos(
+          form.id
+        );
+      }
+    }
+
+    setSuccessMessage(
+      'Photo deleted.'
+    );
   }
 
   async function saveProperty(event) {
@@ -215,151 +731,383 @@ export default function AdminPropertiesPage() {
     setSuccessMessage('');
 
     if (!form.name.trim()) {
-      setErrorMessage('Property name is required.');
-      return;
-    }
+      setErrorMessage(
+        'Property name is required.'
+      );
 
-    if (!form.location_name.trim()) {
-      setErrorMessage('Property location is required.');
-      return;
-    }
-
-    if (Number(form.base_price) < 0) {
-      setErrorMessage('Base price cannot be negative.');
       return;
     }
 
     if (
-      Number(form.min_guests) >
-      Number(form.max_guests)
+      !form.location_name.trim()
     ) {
       setErrorMessage(
-        'Minimum guests cannot be greater than maximum guests.'
+        'Location is required.'
       );
+
+      return;
+    }
+
+    const minGuests =
+      toNumber(
+        form.min_guests,
+        1
+      );
+
+    const includedGuests =
+      toNumber(
+        form.included_guests,
+        1
+      );
+
+    const maxGuests =
+      toNumber(
+        form.max_guests,
+        1
+      );
+
+    if (
+      minGuests < 1
+    ) {
+      setErrorMessage(
+        'Minimum guests must be at least 1.'
+      );
+
       return;
     }
 
     if (
-      Number(form.included_guests) >
-      Number(form.max_guests)
+      includedGuests <
+      minGuests
     ) {
       setErrorMessage(
-        'Included guests cannot exceed maximum guests.'
+        'Guests included in base price cannot be less than minimum guests.'
       );
+
       return;
     }
 
     if (
-      Number(form.min_stay_nights) >
-      Number(form.max_stay_nights)
+      includedGuests >
+      maxGuests
     ) {
       setErrorMessage(
-        'Minimum stay cannot be greater than maximum stay.'
+        'Guests included in base price cannot exceed maximum guests.'
       );
+
+      return;
+    }
+
+    if (
+      maxGuests <
+      minGuests
+    ) {
+      setErrorMessage(
+        'Maximum guests cannot be less than minimum guests.'
+      );
+
+      return;
+    }
+
+    const minNights =
+      toNumber(
+        form.min_stay_nights,
+        1
+      );
+
+    const maxNights =
+      toNumber(
+        form.max_stay_nights,
+        30
+      );
+
+    if (
+      minNights < 1
+    ) {
+      setErrorMessage(
+        'Minimum stay must be at least one night.'
+      );
+
+      return;
+    }
+
+    if (
+      maxNights <
+      minNights
+    ) {
+      setErrorMessage(
+        'Maximum stay cannot be lower than minimum stay.'
+      );
+
       return;
     }
 
     const slug =
-      form.slug.trim() || slugify(form.name);
+      form.slug?.trim() ||
+      slugify(
+        form.name
+      );
+
+    const houseRules =
+      String(
+        form.house_rules_text ||
+          ''
+      )
+        .split('\n')
+        .map((rule) =>
+          rule.trim()
+        )
+        .filter(Boolean);
+
+    const featureList = [
+      ...form.features,
+    ];
+
+    if (
+      form.wifi_available &&
+      !featureList.includes(
+        'Wi-Fi'
+      )
+    ) {
+      featureList.push(
+        'Wi-Fi'
+      );
+    }
+
+    if (
+      form.tv_available &&
+      !featureList.includes(
+        'TV'
+      )
+    ) {
+      featureList.push(
+        'TV'
+      );
+    }
+
+    if (
+      form.fridge_available &&
+      !featureList.includes(
+        'Fridge'
+      )
+    ) {
+      featureList.push(
+        'Fridge'
+      );
+    }
+
+    if (
+      form.washing_machine_available &&
+      !featureList.includes(
+        'Washing Machine'
+      )
+    ) {
+      featureList.push(
+        'Washing Machine'
+      );
+    }
+
+    if (
+      form.ac_available &&
+      !featureList.includes(
+        'Air Conditioning'
+      )
+    ) {
+      featureList.push(
+        'Air Conditioning'
+      );
+    }
 
     const payload = {
-      name: form.name.trim(),
+      name:
+        form.name.trim(),
+
       slug,
 
       short_description:
-        form.short_description.trim(),
+        form.short_description?.trim() ||
+        '',
 
-      description: form.description.trim(),
+      description:
+        form.description?.trim() ||
+        '',
 
-      location_name: form.location_name.trim(),
-      address: form.address.trim(),
+      location_name:
+        form.location_name.trim(),
+
+      address:
+        form.address?.trim() ||
+        '',
 
       google_maps_url:
-        form.google_maps_url.trim(),
+        form.google_maps_url?.trim() ||
+        '',
 
-      bedrooms: Number(form.bedrooms),
-      bathrooms: Number(form.bathrooms),
+      bedrooms:
+        toNumber(
+          form.bedrooms,
+          1
+        ),
 
-      min_guests: Number(form.min_guests),
-      included_guests: Number(
-        form.included_guests
-      ),
-      max_guests: Number(form.max_guests),
+      bathrooms:
+        toNumber(
+          form.bathrooms,
+          1
+        ),
 
-      base_price: Number(form.base_price),
+      min_guests:
+        minGuests,
 
-      extra_guest_fee: Number(
-        form.extra_guest_fee
-      ),
+      included_guests:
+        includedGuests,
 
-      cleaning_fee: Number(form.cleaning_fee),
+      max_guests:
+        maxGuests,
 
-      security_deposit: Number(
-        form.security_deposit
-      ),
+      base_price:
+        toNumber(
+          form.base_price,
+          0
+        ),
 
-      min_stay_nights: Number(
-        form.min_stay_nights
-      ),
+      extra_guest_fee:
+        toNumber(
+          form.extra_guest_fee,
+          0
+        ),
 
-      max_stay_nights: Number(
-        form.max_stay_nights
-      ),
+      cleaning_fee:
+        toNumber(
+          form.cleaning_fee,
+          0
+        ),
 
-      check_in_time: form.check_in_time,
-      check_out_time: form.check_out_time,
+      security_deposit:
+        toNumber(
+          form.security_deposit,
+          0
+        ),
 
-      late_checkout_hourly_fee: Number(
-        form.late_checkout_hourly_fee
-      ),
+      min_stay_nights:
+        minNights,
 
-      features: textToArray(form.features),
-      amenities: textToArray(form.amenities),
+      max_stay_nights:
+        maxNights,
 
-      house_rules: textToArray(
-        form.house_rules
-      ),
+      check_in_time:
+        form.check_in_time,
 
-      kitchen_features: textToArray(
-        form.kitchen_features
-      ),
+      check_out_time:
+        form.check_out_time,
+
+      late_checkout_hourly_fee:
+        toNumber(
+          form.late_checkout_hourly_fee,
+          0
+        ),
+
+      features:
+        featureList,
+
+      amenities:
+        form.amenities,
+
+      kitchen_features:
+        form.kitchen_features,
+
+      house_rules:
+        houseRules,
 
       direction_instructions:
-        form.direction_instructions.trim(),
+        form.direction_instructions?.trim() ||
+        '',
 
       fridge_available:
-        form.fridge_available,
+        Boolean(
+          form.fridge_available
+        ),
 
       tv_available:
-        form.tv_available,
+        Boolean(
+          form.tv_available
+        ),
 
       washing_machine_available:
-        form.washing_machine_available,
+        Boolean(
+          form.washing_machine_available
+        ),
+
+      wifi_available:
+        Boolean(
+          form.wifi_available
+        ),
 
       ac_available:
-        form.ac_available,
+        Boolean(
+          form.ac_available
+        ),
 
-      ac_count: form.ac_available
-        ? Number(form.ac_count)
-        : 0,
+      ac_count:
+        form.ac_available
+          ? toNumber(
+              form.ac_count,
+              0
+            )
+          : 0,
+
+      water_heater_count:
+        toNumber(
+          form.water_heater_count,
+          0
+        ),
+
+      sofa_cum_bed_count:
+        toNumber(
+          form.sofa_cum_bed_count,
+          0
+        ),
+
+      single_bed_count:
+        toNumber(
+          form.single_bed_count,
+          0
+        ),
+
+      queen_bed_count:
+        toNumber(
+          form.queen_bed_count,
+          0
+        ),
 
       pets_allowed:
-        form.pets_allowed,
+        Boolean(
+          form.pets_allowed
+        ),
 
       parties_allowed:
-        form.parties_allowed,
+        Boolean(
+          form.parties_allowed
+        ),
 
       couples_allowed:
-        form.couples_allowed,
+        Boolean(
+          form.couples_allowed
+        ),
 
       alcohol_allowed:
-        form.alcohol_allowed,
+        Boolean(
+          form.alcohol_allowed
+        ),
 
       smoking_allowed:
-        form.smoking_allowed,
+        Boolean(
+          form.smoking_allowed
+        ),
 
       quiet_hours_enabled:
-        form.quiet_hours_enabled,
+        Boolean(
+          form.quiet_hours_enabled
+        ),
 
       quiet_hours_start:
         form.quiet_hours_enabled
@@ -372,90 +1120,159 @@ export default function AdminPropertiesPage() {
           : null,
 
       dynamic_pricing_enabled:
-        form.dynamic_pricing_enabled,
+        Boolean(
+          form.dynamic_pricing_enabled
+        ),
 
-      weekend_markup_percent: Number(
-        form.weekend_markup_percent
-      ),
+      weekend_markup_percent:
+        toNumber(
+          form.weekend_markup_percent,
+          0
+        ),
 
-      long_weekend_markup_percent: Number(
-        form.long_weekend_markup_percent
-      ),
+      long_weekend_markup_percent:
+        toNumber(
+          form.long_weekend_markup_percent,
+          0
+        ),
 
-      festival_markup_percent: Number(
-        form.festival_markup_percent
-      ),
+      festival_markup_percent:
+        toNumber(
+          form.festival_markup_percent,
+          0
+        ),
 
-      season_markup_percent: Number(
-        form.season_markup_percent
-      ),
+      season_markup_percent:
+        toNumber(
+          form.season_markup_percent,
+          0
+        ),
 
-      is_active: form.is_active,
+      is_active:
+        Boolean(
+          form.is_active
+        ),
 
-      updated_at: new Date().toISOString(),
+      updated_at:
+        new Date().toISOString(),
     };
 
     setSaving(true);
 
-    let result;
+    try {
+      let propertyId =
+        form.id;
 
-    if (form.id) {
-      result = await supabase
-        .from('properties')
-        .update(payload)
-        .eq('id', form.id);
-    } else {
-      result = await supabase
-        .from('properties')
-        .insert(payload);
-    }
+      if (form.id) {
+        const {
+          data,
+          error,
+        } = await supabase
+          .from('properties')
+          .update(payload)
+          .eq(
+            'id',
+            form.id
+          )
+          .select('id')
+          .single();
 
-    setSaving(false);
+        if (error) {
+          throw error;
+        }
 
-    if (result.error) {
-      console.error(result.error);
-
-      if (
-        result.error.message?.includes('slug')
-      ) {
-        setErrorMessage(
-          'A property with this URL slug already exists.'
-        );
+        propertyId =
+          data.id;
       } else {
-        setErrorMessage(
-          'Unable to save property.'
-        );
+        const {
+          data,
+          error,
+        } = await supabase
+          .from('properties')
+          .insert(payload)
+          .select('id')
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        propertyId =
+          data.id;
       }
 
-      return;
-    }
+      const photoSuccess =
+        await uploadSelectedPhotos(
+          propertyId,
+          existingPhotos.length
+        );
 
-    setSuccessMessage(
-      form.id
-        ? 'Property updated successfully.'
-        : 'Property created successfully.'
-    );
+      if (!photoSuccess) {
+        setSaving(false);
 
-    await loadProperties();
+        return;
+      }
 
-    if (!form.id) {
-      setForm(emptyForm);
+      await loadProperties();
+
+      setSuccessMessage(
+        form.id
+          ? 'Property updated successfully.'
+          : 'Property created successfully.'
+      );
+
+      if (form.id) {
+        await loadPropertyPhotos(
+          propertyId
+        );
+      } else {
+        setForm(
+          emptyForm
+        );
+
+        setExistingPhotos([]);
+      }
+    } catch (error) {
+      console.error(error);
+
+      const message =
+        error?.message ||
+        'Unknown property save error';
+
+      setErrorMessage(
+        `Unable to save property: ${message}`
+      );
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function toggleProperty(property) {
-    const { error } = await supabase
+  async function toggleProperty(
+    property
+  ) {
+    setErrorMessage('');
+
+    const {
+      error,
+    } = await supabase
       .from('properties')
       .update({
-        is_active: !property.is_active,
-        updated_at: new Date().toISOString(),
+        is_active:
+          !property.is_active,
+
+        updated_at:
+          new Date().toISOString(),
       })
-      .eq('id', property.id);
+      .eq(
+        'id',
+        property.id
+      );
 
     if (error) {
       setErrorMessage(
-        'Unable to change property status.'
+        `Unable to update property status: ${error.message}`
       );
+
       return;
     }
 
@@ -469,28 +1286,38 @@ export default function AdminPropertiesPage() {
       '/admin/bookings';
   }
 
-  if (checkingSession) {
+  if (
+    checkingSession
+  ) {
     return (
       <main style={styles.page}>
-        Loading property management...
+        <div style={styles.loading}>
+          Loading property management...
+        </div>
       </main>
     );
   }
 
-  if (!session || !adminProfile) {
+  if (
+    !session ||
+    !adminProfile
+  ) {
     return (
       <main style={styles.page}>
         <div style={styles.notice}>
-          <h2>Admin login required</h2>
+          <h2>
+            Admin login required
+          </h2>
 
           <p>
-            Please log in before managing
-            properties.
+            Please log in before managing properties.
           </p>
 
           <a
             href="/admin/bookings"
-            style={styles.primaryLink}
+            style={
+              styles.primaryLink
+            }
           >
             Go to Admin Login
           </a>
@@ -504,7 +1331,7 @@ export default function AdminPropertiesPage() {
       <header style={styles.header}>
         <div>
           <div style={styles.brand}>
-            NightOutStay
+            NightOutStays
           </div>
 
           <div style={styles.muted}>
@@ -512,35 +1339,12 @@ export default function AdminPropertiesPage() {
           </div>
         </div>
 
-        <div style={styles.navigation}>
-          <a
-            href="/admin/bookings"
-            style={styles.nav}
-          >
-            Bookings
-          </a>
-
-          <a
-            href="/admin/offers"
-            style={styles.nav}
-          >
-            Offers
-          </a>
-
-          <a
-            href="/admin/properties"
-            style={styles.activeNav}
-          >
-            Properties
-          </a>
-
-          <button
-            onClick={logout}
-            style={styles.logout}
-          >
-            Logout
-          </button>
-        </div>
+        <button
+          onClick={logout}
+          style={styles.logout}
+        >
+          Logout
+        </button>
       </header>
 
       <section style={styles.content}>
@@ -549,58 +1353,81 @@ export default function AdminPropertiesPage() {
             <h1>
               {form.id
                 ? 'Edit Property'
-                : 'Add Property'}
+                : 'Add New Property'}
             </h1>
 
             <p style={styles.muted}>
-              Pricing, guest limits, amenities,
-              rules and property settings can
-              be changed anytime.
+              Manage property information, pricing, guest capacity, facilities, rules and photos.
             </p>
           </div>
 
           {form.id && (
             <button
-              onClick={newProperty}
-              style={styles.secondaryButton}
+              type="button"
+              onClick={
+                newProperty
+              }
+              style={
+                styles.secondaryButton
+              }
             >
               + Add New Property
             </button>
           )}
         </div>
 
-        <form onSubmit={saveProperty}>
-          <Section title="Basic Information">
+        <form
+          onSubmit={
+            saveProperty
+          }
+        >
+          <Section title="Basic Property Information">
             <Field
               label="PROPERTY NAME"
-              value={form.name}
-              onChange={(value) =>
-                updateField('name', value)
+              value={
+                form.name
               }
-            />
-
-            <Field
-              label="LOCATION"
-              value={form.location_name}
               onChange={(value) =>
                 updateField(
-                  'location_name',
+                  'name',
                   value
                 )
               }
             />
 
             <Field
-              label="FULL ADDRESS"
-              value={form.address}
-              onChange={(value) =>
-                updateField('address', value)
+              label="LOCATION"
+              value={
+                form.location_name
               }
+              onChange={(value) =>
+                updateField(
+                  'location_name',
+                  value
+                )
+              }
+              placeholder="Girivan, Lonavala, Bavdhan..."
+            />
+
+            <Field
+              label="PROPERTY URL SLUG"
+              value={
+                form.slug
+              }
+              onChange={(value) =>
+                updateField(
+                  'slug',
+                  value
+                )
+              }
+              placeholder="Leave blank to generate automatically"
             />
 
             <Field
               label="GOOGLE MAPS LINK"
-              value={form.google_maps_url}
+              value={
+                form.google_maps_url
+              }
               onChange={(value) =>
                 updateField(
                   'google_maps_url',
@@ -610,8 +1437,23 @@ export default function AdminPropertiesPage() {
             />
 
             <TextArea
+              label="FULL ADDRESS"
+              value={
+                form.address
+              }
+              onChange={(value) =>
+                updateField(
+                  'address',
+                  value
+                )
+              }
+            />
+
+            <TextArea
               label="SHORT DESCRIPTION"
-              value={form.short_description}
+              value={
+                form.short_description
+              }
               onChange={(value) =>
                 updateField(
                   'short_description',
@@ -622,7 +1464,9 @@ export default function AdminPropertiesPage() {
 
             <TextArea
               label="FULL DESCRIPTION"
-              value={form.description}
+              value={
+                form.description
+              }
               onChange={(value) =>
                 updateField(
                   'description',
@@ -632,10 +1476,12 @@ export default function AdminPropertiesPage() {
             />
           </Section>
 
-          <Section title="Rooms & Guest Capacity">
+          <Section title="Rooms, Beds & Capacity">
             <NumberField
               label="BEDROOMS"
-              value={form.bedrooms}
+              value={
+                form.bedrooms
+              }
               onChange={(value) =>
                 updateField(
                   'bedrooms',
@@ -646,7 +1492,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="BATHROOMS"
-              value={form.bathrooms}
+              value={
+                form.bathrooms
+              }
               onChange={(value) =>
                 updateField(
                   'bathrooms',
@@ -656,8 +1504,49 @@ export default function AdminPropertiesPage() {
             />
 
             <NumberField
+              label="QUEEN SIZE BEDS"
+              value={
+                form.queen_bed_count
+              }
+              onChange={(value) =>
+                updateField(
+                  'queen_bed_count',
+                  value
+                )
+              }
+            />
+
+            <NumberField
+              label="SINGLE BEDS"
+              value={
+                form.single_bed_count
+              }
+              onChange={(value) =>
+                updateField(
+                  'single_bed_count',
+                  value
+                )
+              }
+            />
+
+            <NumberField
+              label="SOFA-CUM-BEDS"
+              value={
+                form.sofa_cum_bed_count
+              }
+              onChange={(value) =>
+                updateField(
+                  'sofa_cum_bed_count',
+                  value
+                )
+              }
+            />
+
+            <NumberField
               label="MINIMUM GUESTS"
-              value={form.min_guests}
+              value={
+                form.min_guests
+              }
               onChange={(value) =>
                 updateField(
                   'min_guests',
@@ -668,7 +1557,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="GUESTS INCLUDED IN BASE PRICE"
-              value={form.included_guests}
+              value={
+                form.included_guests
+              }
               onChange={(value) =>
                 updateField(
                   'included_guests',
@@ -679,7 +1570,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="MAXIMUM GUESTS"
-              value={form.max_guests}
+              value={
+                form.max_guests
+              }
               onChange={(value) =>
                 updateField(
                   'max_guests',
@@ -692,7 +1585,9 @@ export default function AdminPropertiesPage() {
           <Section title="Pricing">
             <NumberField
               label="BASE NIGHTLY PRICE ₹"
-              value={form.base_price}
+              value={
+                form.base_price
+              }
               onChange={(value) =>
                 updateField(
                   'base_price',
@@ -702,8 +1597,10 @@ export default function AdminPropertiesPage() {
             />
 
             <NumberField
-              label="EXTRA GUEST FEE ₹ / PERSON / NIGHT"
-              value={form.extra_guest_fee}
+              label="EXTRA GUEST ₹ / PERSON / NIGHT"
+              value={
+                form.extra_guest_fee
+              }
               onChange={(value) =>
                 updateField(
                   'extra_guest_fee',
@@ -714,7 +1611,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="CLEANING FEE ₹"
-              value={form.cleaning_fee}
+              value={
+                form.cleaning_fee
+              }
               onChange={(value) =>
                 updateField(
                   'cleaning_fee',
@@ -725,7 +1624,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="SECURITY DEPOSIT ₹"
-              value={form.security_deposit}
+              value={
+                form.security_deposit
+              }
               onChange={(value) =>
                 updateField(
                   'security_deposit',
@@ -734,25 +1635,33 @@ export default function AdminPropertiesPage() {
               }
             />
 
-            <div style={styles.example}>
+            <div style={styles.infoBox}>
               Example: ₹
-              {Number(
-                form.base_price || 0
-              ).toLocaleString('en-IN')}
-              {' '}includes up to{' '}
-              {form.included_guests} guests.
-              Each extra guest costs ₹
-              {Number(
-                form.extra_guest_fee || 0
-              ).toLocaleString('en-IN')}
-              {' '}per night.
+              {toNumber(
+                form.base_price
+              ).toLocaleString(
+                'en-IN'
+              )}{' '}
+              includes up to{' '}
+              <strong>
+                {form.included_guests}
+              </strong>{' '}
+              guests. Every additional guest costs ₹
+              {toNumber(
+                form.extra_guest_fee
+              ).toLocaleString(
+                'en-IN'
+              )}{' '}
+              per night.
             </div>
           </Section>
 
           <Section title="Stay Duration & Timing">
             <NumberField
               label="MINIMUM STAY NIGHTS"
-              value={form.min_stay_nights}
+              value={
+                form.min_stay_nights
+              }
               onChange={(value) =>
                 updateField(
                   'min_stay_nights',
@@ -763,7 +1672,9 @@ export default function AdminPropertiesPage() {
 
             <NumberField
               label="MAXIMUM STAY NIGHTS"
-              value={form.max_stay_nights}
+              value={
+                form.max_stay_nights
+              }
               onChange={(value) =>
                 updateField(
                   'max_stay_nights',
@@ -774,7 +1685,9 @@ export default function AdminPropertiesPage() {
 
             <TimeField
               label="CHECK-IN TIME"
-              value={form.check_in_time}
+              value={
+                form.check_in_time
+              }
               onChange={(value) =>
                 updateField(
                   'check_in_time',
@@ -785,7 +1698,9 @@ export default function AdminPropertiesPage() {
 
             <TimeField
               label="CHECK-OUT TIME"
-              value={form.check_out_time}
+              value={
+                form.check_out_time
+              }
               onChange={(value) =>
                 updateField(
                   'check_out_time',
@@ -808,60 +1723,41 @@ export default function AdminPropertiesPage() {
             />
           </Section>
 
-          <Section title="Features & Amenities">
-            <TextArea
-              label="FEATURES — separate with commas"
-              value={form.features}
-              onChange={(value) =>
-                updateField(
-                  'features',
-                  value
-                )
-              }
-              placeholder="Garden, mountain view, balcony"
-            />
-
-            <TextArea
-              label="AMENITIES — separate with commas"
-              value={form.amenities}
-              onChange={(value) =>
-                updateField(
-                  'amenities',
-                  value
-                )
-              }
-              placeholder="Free parking, Wi-Fi, hot water"
-            />
-
-            <TextArea
-              label="KITCHEN FEATURES — separate with commas"
-              value={form.kitchen_features}
-              onChange={(value) =>
-                updateField(
-                  'kitchen_features',
-                  value
-                )
-              }
-              placeholder="Gas stove, utensils, kettle"
-            />
-
+          <Section title="Facilities">
             <Toggle
-              label="Fridge Available"
-              checked={form.fridge_available}
+              label="Wi-Fi"
+              checked={
+                form.wifi_available
+              }
               onChange={(value) =>
                 updateField(
-                  'fridge_available',
+                  'wifi_available',
                   value
                 )
               }
             />
 
             <Toggle
-              label="TV Available"
-              checked={form.tv_available}
+              label="TV"
+              checked={
+                form.tv_available
+              }
               onChange={(value) =>
                 updateField(
                   'tv_available',
+                  value
+                )
+              }
+            />
+
+            <Toggle
+              label="Fridge"
+              checked={
+                form.fridge_available
+              }
+              onChange={(value) =>
+                updateField(
+                  'fridge_available',
                   value
                 )
               }
@@ -881,8 +1777,10 @@ export default function AdminPropertiesPage() {
             />
 
             <Toggle
-              label="AC Available"
-              checked={form.ac_available}
+              label="Air Conditioning"
+              checked={
+                form.ac_available
+              }
               onChange={(value) =>
                 updateField(
                   'ac_available',
@@ -894,7 +1792,9 @@ export default function AdminPropertiesPage() {
             {form.ac_available && (
               <NumberField
                 label="NUMBER OF ACs"
-                value={form.ac_count}
+                value={
+                  form.ac_count
+                }
                 onChange={(value) =>
                   updateField(
                     'ac_count',
@@ -903,12 +1803,61 @@ export default function AdminPropertiesPage() {
                 }
               />
             )}
+
+            <NumberField
+              label="WATER HEATERS / GEYSERS"
+              value={
+                form.water_heater_count
+              }
+              onChange={(value) =>
+                updateField(
+                  'water_heater_count',
+                  value
+                )
+              }
+            />
           </Section>
 
-          <Section title="House Rules">
+          <Section title="Kitchen Features">
+            <CheckboxGrid
+              items={
+                commonKitchenFeatures
+              }
+              selected={
+                form.kitchen_features
+              }
+              onToggle={(item) =>
+                toggleListItem(
+                  'kitchen_features',
+                  item
+                )
+              }
+            />
+          </Section>
+
+          <Section title="Amenities">
+            <CheckboxGrid
+              items={
+                commonAmenities
+              }
+              selected={
+                form.amenities
+              }
+              onToggle={(item) =>
+                toggleListItem(
+                  'amenities',
+                  item
+                )
+              }
+            />
+          </Section>
+
+          <Section title="Rules & Permissions">
             <Toggle
               label="Pets Allowed"
-              checked={form.pets_allowed}
+              checked={
+                form.pets_allowed
+              }
               onChange={(value) =>
                 updateField(
                   'pets_allowed',
@@ -918,7 +1867,7 @@ export default function AdminPropertiesPage() {
             />
 
             <Toggle
-              label="Party Allowed"
+              label="Parties Allowed"
               checked={
                 form.parties_allowed
               }
@@ -969,22 +1918,8 @@ export default function AdminPropertiesPage() {
               }
             />
 
-            <TextArea
-              label="HOUSE RULES — separate with commas"
-              value={form.house_rules}
-              onChange={(value) =>
-                updateField(
-                  'house_rules',
-                  value
-                )
-              }
-              placeholder="No loud music after 10 PM, keep property clean"
-            />
-          </Section>
-
-          <Section title="Noise / Quiet Hours">
             <Toggle
-              label="Enable Quiet Hours"
+              label="Noise / Quiet Hours"
               checked={
                 form.quiet_hours_enabled
               }
@@ -999,7 +1934,7 @@ export default function AdminPropertiesPage() {
             {form.quiet_hours_enabled && (
               <>
                 <TimeField
-                  label="QUIET HOURS START"
+                  label="QUIET HOURS FROM"
                   value={
                     form.quiet_hours_start
                   }
@@ -1012,7 +1947,7 @@ export default function AdminPropertiesPage() {
                 />
 
                 <TimeField
-                  label="QUIET HOURS END"
+                  label="QUIET HOURS UNTIL"
                   value={
                     form.quiet_hours_end
                   }
@@ -1025,9 +1960,25 @@ export default function AdminPropertiesPage() {
                 />
               </>
             )}
+
+            <TextArea
+              label="OTHER HOUSE RULES — one rule per line"
+              value={
+                form.house_rules_text
+              }
+              onChange={(value) =>
+                updateField(
+                  'house_rules_text',
+                  value
+                )
+              }
+              placeholder={
+                'No loud music after 10 PM\nPlease keep property clean\nNo unauthorized guests'
+              }
+            />
           </Section>
 
-          <Section title="Directions">
+          <Section title="Directions / Arrival Instructions">
             <TextArea
               label="DIRECTION INSTRUCTIONS"
               value={
@@ -1039,7 +1990,7 @@ export default function AdminPropertiesPage() {
                   value
                 )
               }
-              placeholder="Landmarks, gate instructions, parking directions..."
+              placeholder="Landmarks, gate number, parking instructions, caretaker details..."
             />
           </Section>
 
@@ -1114,10 +2065,177 @@ export default function AdminPropertiesPage() {
             )}
           </Section>
 
+          <Section title="Property Photos">
+            <div style={styles.fullWidth}>
+              <label style={styles.label}>
+                UPLOAD PROPERTY PHOTOS
+              </label>
+
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={
+                  handlePhotoSelection
+                }
+                style={
+                  styles.fileInput
+                }
+              />
+
+              <p style={styles.helpText}>
+                You can select multiple photos together. Maximum 10 MB per image.
+              </p>
+
+              {previewUrls.length >
+                0 && (
+                <>
+                  <h3>
+                    New Photos
+                  </h3>
+
+                  <div style={styles.photoGrid}>
+                    {previewUrls.map(
+                      (
+                        url,
+                        index
+                      ) => (
+                        <div
+                          key={url}
+                          style={
+                            styles.photoCard
+                          }
+                        >
+                          <img
+                            src={
+                              url
+                            }
+                            alt={`New property photo ${
+                              index +
+                              1
+                            }`}
+                            style={
+                              styles.photoImage
+                            }
+                          />
+
+                          {index ===
+                            0 &&
+                            existingPhotos.length ===
+                              0 && (
+                              <div
+                                style={
+                                  styles.coverBadge
+                                }
+                              >
+                                Will become Main Photo
+                              </div>
+                            )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                </>
+              )}
+
+              {form.id &&
+                existingPhotos.length >
+                  0 && (
+                  <>
+                    <h3 style={{ marginTop: 28 }}>
+                      Current Property Photos
+                    </h3>
+
+                    <p style={styles.helpText}>
+                      The Main Photo is used as the property display/cover image.
+                    </p>
+
+                    <div style={styles.photoGrid}>
+                      {existingPhotos.map(
+                        (
+                          photo
+                        ) => (
+                          <div
+                            key={
+                              photo.id
+                            }
+                            style={
+                              styles.photoCard
+                            }
+                          >
+                            <img
+                              src={
+                                photo.image_url
+                              }
+                              alt={
+                                photo.alt_text ||
+                                form.name
+                              }
+                              style={
+                                styles.photoImage
+                              }
+                            />
+
+                            {photo.is_cover && (
+                              <div
+                                style={
+                                  styles.coverBadge
+                                }
+                              >
+                                MAIN / DISPLAY PHOTO
+                              </div>
+                            )}
+
+                            <div
+                              style={
+                                styles.photoActions
+                              }
+                            >
+                              {!photo.is_cover && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCoverPhoto(
+                                      photo
+                                    )
+                                  }
+                                  style={
+                                    styles.coverButton
+                                  }
+                                >
+                                  Make Main Photo
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  deletePhoto(
+                                    photo
+                                  )
+                                }
+                                style={
+                                  styles.deletePhotoButton
+                                }
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </>
+                )}
+            </div>
+          </Section>
+
           <Section title="Publishing">
             <Toggle
               label="Property Active / Visible to Guests"
-              checked={form.is_active}
+              checked={
+                form.is_active
+              }
               onChange={(value) =>
                 updateField(
                   'is_active',
@@ -1141,11 +2259,16 @@ export default function AdminPropertiesPage() {
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={
+              saving ||
+              uploadingPhotos
+            }
             style={styles.saveButton}
           >
             {saving
               ? 'Saving Property...'
+              : uploadingPhotos
+              ? 'Uploading Photos...'
               : form.id
               ? 'Update Property'
               : 'Create Property'}
@@ -1156,93 +2279,167 @@ export default function AdminPropertiesPage() {
 
         <div style={styles.topRow}>
           <div>
-            <h1>Existing Properties</h1>
+            <h1>
+              Existing Properties
+            </h1>
 
             <p style={styles.muted}>
-              Select any property to edit its
-              details anytime.
+              Select a property to edit pricing, rules, photos or facilities.
             </p>
           </div>
 
           <button
-            onClick={newProperty}
-            style={styles.secondaryButton}
+            type="button"
+            onClick={
+              newProperty
+            }
+            style={
+              styles.secondaryButton
+            }
           >
             + Add Property
           </button>
         </div>
 
         {loadingProperties ? (
-          <p>Loading...</p>
+          <p>
+            Loading properties...
+          </p>
+        ) : properties.length ===
+          0 ? (
+          <div style={styles.empty}>
+            No properties found.
+          </div>
         ) : (
-          <div style={styles.propertyGrid}>
-            {properties.map((property) => (
-              <div
-                key={property.id}
-                style={styles.propertyCard}
-              >
-                <div style={styles.cardTop}>
-                  <div>
-                    <h3 style={styles.cardTitle}>
-                      {property.name}
-                    </h3>
+          <div
+            style={
+              styles.propertyGrid
+            }
+          >
+            {properties.map(
+              (
+                property
+              ) => (
+                <div
+                  key={
+                    property.id
+                  }
+                  style={
+                    styles.propertyCard
+                  }
+                >
+                  <div style={styles.cardTop}>
+                    <div>
+                      <h3
+                        style={
+                          styles.cardTitle
+                        }
+                      >
+                        {property.name}
+                      </h3>
 
-                    <div style={styles.muted}>
-                      {property.location_name}
+                      <div style={styles.muted}>
+                        {
+                          property.location_name
+                        }
+                      </div>
                     </div>
+
+                    <span
+                      style={{
+                        ...styles.status,
+
+                        background:
+                          property.is_active
+                            ? '#e7f7ec'
+                            : '#eeeeee',
+                      }}
+                    >
+                      {property.is_active
+                        ? 'Active'
+                        : 'Inactive'}
+                    </span>
                   </div>
 
-                  <span
-                    style={{
-                      ...styles.status,
-                      background:
-                        property.is_active
-                          ? '#e7f7ec'
-                          : '#eeeeee',
-                    }}
-                  >
-                    {property.is_active
-                      ? 'Active'
-                      : 'Inactive'}
-                  </span>
-                </div>
+                  <div style={styles.cardPrice}>
+                    ₹
+                    {toNumber(
+                      property.base_price
+                    ).toLocaleString(
+                      'en-IN'
+                    )}
+                    {' / night'}
+                  </div>
 
-                <div style={styles.cardInfo}>
-                  ₹
-                  {Number(
-                    property.base_price
-                  ).toLocaleString('en-IN')}
-                  {' '}/ night
-                </div>
+                  <div style={styles.small}>
+                    Base rate includes{' '}
+                    {
+                      property.included_guests
+                    }{' '}
+                    guest
+                    {property.included_guests !==
+                    1
+                      ? 's'
+                      : ''}
+                  </div>
 
-                <div style={styles.small}>
-                  Up to {property.max_guests}{' '}
-                  guests
-                </div>
+                  <div style={styles.small}>
+                    Maximum{' '}
+                    {
+                      property.max_guests
+                    }{' '}
+                    guests
+                  </div>
 
-                <div style={styles.cardButtons}>
-                  <button
-                    onClick={() =>
-                      editProperty(property)
-                    }
-                    style={styles.editButton}
-                  >
-                    Edit Property
-                  </button>
+                  {toNumber(
+                    property.extra_guest_fee
+                  ) >
+                    0 && (
+                    <div style={styles.small}>
+                      Extra guest ₹
+                      {toNumber(
+                        property.extra_guest_fee
+                      ).toLocaleString(
+                        'en-IN'
+                      )}{' '}
+                      / night
+                    </div>
+                  )}
 
-                  <button
-                    onClick={() =>
-                      toggleProperty(property)
-                    }
-                    style={styles.statusButton}
-                  >
-                    {property.is_active
-                      ? 'Deactivate'
-                      : 'Activate'}
-                  </button>
+                  <div style={styles.cardButtons}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editProperty(
+                          property
+                        )
+                      }
+                      style={
+                        styles.editButton
+                      }
+                    >
+                      Edit Property
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleProperty(
+                          property
+                        )
+                      }
+                      style={
+                        styles.statusButton
+                      }
+                    >
+                      {property.is_active
+                        ? 'Deactivate'
+                        : 'Activate'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
       </section>
@@ -1250,7 +2447,10 @@ export default function AdminPropertiesPage() {
   );
 }
 
-function Section({ title, children }) {
+function Section({
+  title,
+  children,
+}) {
   return (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>
@@ -1278,10 +2478,13 @@ function Field({
 
       <input
         style={styles.input}
+        type="text"
         value={value || ''}
         placeholder={placeholder}
         onChange={(event) =>
-          onChange(event.target.value)
+          onChange(
+            event.target.value
+          )
         }
       />
     </div>
@@ -1304,9 +2507,13 @@ function NumberField({
         type="number"
         min="0"
         step="0.01"
-        value={value ?? 0}
+        value={
+          value ?? 0
+        }
         onChange={(event) =>
-          onChange(event.target.value)
+          onChange(
+            event.target.value
+          )
         }
       />
     </div>
@@ -1329,7 +2536,9 @@ function TimeField({
         type="time"
         value={value || ''}
         onChange={(event) =>
-          onChange(event.target.value)
+          onChange(
+            event.target.value
+          )
         }
       />
     </div>
@@ -1343,7 +2552,7 @@ function TextArea({
   placeholder = '',
 }) {
   return (
-    <div style={{ gridColumn: '1 / -1' }}>
+    <div style={styles.fullWidth}>
       <label style={styles.label}>
         {label}
       </label>
@@ -1353,7 +2562,9 @@ function TextArea({
         value={value || ''}
         placeholder={placeholder}
         onChange={(event) =>
-          onChange(event.target.value)
+          onChange(
+            event.target.value
+          )
         }
       />
     </div>
@@ -1369,14 +2580,59 @@ function Toggle({
     <label style={styles.toggleRow}>
       <input
         type="checkbox"
-        checked={Boolean(checked)}
+        checked={
+          Boolean(checked)
+        }
         onChange={(event) =>
-          onChange(event.target.checked)
+          onChange(
+            event.target.checked
+          )
         }
       />
 
-      <span>{label}</span>
+      <span>
+        {label}
+      </span>
     </label>
+  );
+}
+
+function CheckboxGrid({
+  items,
+  selected,
+  onToggle,
+}) {
+  return (
+    <div style={styles.fullWidth}>
+      <div style={styles.checkboxGrid}>
+        {items.map((item) => (
+          <label
+            key={item}
+            style={
+              styles.checkboxItem
+            }
+          >
+            <input
+              type="checkbox"
+              checked={
+                selected.includes(
+                  item
+                )
+              }
+              onChange={() =>
+                onToggle(
+                  item
+                )
+              }
+            />
+
+            <span>
+              {item}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1385,67 +2641,55 @@ const styles = {
     minHeight: '100vh',
     background: '#f6f7f9',
     color: '#172033',
-    fontFamily: 'Arial, sans-serif',
+    fontFamily:
+      'Arial, sans-serif',
+  },
+
+  loading: {
+    padding: 40,
   },
 
   header: {
     background: '#ffffff',
     padding: '18px 5vw',
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid #e5e5e5',
-    flexWrap: 'wrap',
-    gap: '14px',
+    gap: 15,
+    borderBottom:
+      '1px solid #e4e6e9',
   },
 
   brand: {
-    fontSize: '24px',
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: 800,
     color: '#163c74',
-  },
-
-  navigation: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flexWrap: 'wrap',
-  },
-
-  nav: {
-    padding: '9px 13px',
-    textDecoration: 'none',
-    color: '#163c74',
-  },
-
-  activeNav: {
-    padding: '9px 14px',
-    background: '#163c74',
-    color: '#ffffff',
-    borderRadius: '20px',
-    textDecoration: 'none',
   },
 
   logout: {
-    padding: '9px 14px',
-    border: '1px solid #ddd',
+    border:
+      '1px solid #ddd',
     background: '#fff',
-    borderRadius: '20px',
+    borderRadius: 20,
+    padding: '9px 15px',
     cursor: 'pointer',
   },
 
   content: {
-    maxWidth: '1350px',
+    maxWidth: 1400,
     margin: 'auto',
-    padding: '35px 5vw 80px',
+    padding:
+      '35px 5vw 80px',
   },
 
   topRow: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
-    gap: '20px',
     flexWrap: 'wrap',
+    gap: 20,
   },
 
   muted: {
@@ -1453,135 +2697,254 @@ const styles = {
   },
 
   section: {
+    marginTop: 22,
     background: '#ffffff',
-    border: '1px solid #e3e5e9',
-    borderRadius: '16px',
-    padding: '24px',
-    marginTop: '22px',
+    padding: 24,
+    border:
+      '1px solid #e2e5e8',
+    borderRadius: 16,
   },
 
   sectionTitle: {
     marginTop: 0,
-    marginBottom: '20px',
+    marginBottom: 20,
   },
 
   formGrid: {
     display: 'grid',
     gridTemplateColumns:
       'repeat(auto-fit, minmax(230px, 1fr))',
-    gap: '18px',
+    gap: 18,
+  },
+
+  fullWidth: {
+    gridColumn:
+      '1 / -1',
   },
 
   label: {
     display: 'block',
-    fontSize: '10px',
-    fontWeight: '800',
-    letterSpacing: '1px',
-    marginBottom: '6px',
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: 1,
+    marginBottom: 6,
   },
 
   input: {
     width: '100%',
-    padding: '12px',
-    border: '1px solid #d4d7dc',
-    borderRadius: '10px',
-    background: '#ffffff',
+    boxSizing:
+      'border-box',
+    padding: 12,
+    border:
+      '1px solid #ccd1d7',
+    borderRadius: 10,
+    background: '#fff',
   },
 
   textarea: {
     width: '100%',
-    minHeight: '90px',
-    padding: '12px',
-    border: '1px solid #d4d7dc',
-    borderRadius: '10px',
+    boxSizing:
+      'border-box',
+    minHeight: 100,
+    padding: 12,
+    border:
+      '1px solid #ccd1d7',
+    borderRadius: 10,
     resize: 'vertical',
   },
 
   toggleRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '12px',
-    border: '1px solid #e1e3e7',
-    borderRadius: '10px',
+    gap: 10,
+    padding: 13,
+    border:
+      '1px solid #e0e3e7',
+    borderRadius: 10,
     background: '#fafafa',
     cursor: 'pointer',
   },
 
-  example: {
-    gridColumn: '1 / -1',
-    padding: '14px',
-    borderRadius: '10px',
-    background: '#fff8e8',
-    fontWeight: '700',
+  checkboxGrid: {
+    display: 'grid',
+    gridTemplateColumns:
+      'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 10,
+  },
+
+  checkboxItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    padding: 11,
+    border:
+      '1px solid #e0e3e7',
+    borderRadius: 10,
+    background: '#fafafa',
+    cursor: 'pointer',
+  },
+
+  infoBox: {
+    gridColumn:
+      '1 / -1',
+    padding: 14,
+    background: '#fff7e5',
+    borderRadius: 10,
+    fontWeight: 700,
+  },
+
+  fileInput: {
+    display: 'block',
+    marginTop: 8,
+    padding: 12,
+    border:
+      '1px dashed #9ba4af',
+    borderRadius: 10,
+    width: '100%',
+    boxSizing:
+      'border-box',
+  },
+
+  helpText: {
+    fontSize: 13,
+    color: '#69717f',
+  },
+
+  photoGrid: {
+    display: 'grid',
+    gridTemplateColumns:
+      'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: 16,
+    marginTop: 16,
+  },
+
+  photoCard: {
+    position: 'relative',
+    background: '#fff',
+    border:
+      '1px solid #ddd',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  photoImage: {
+    width: '100%',
+    aspectRatio: '16 / 9',
+    objectFit: 'cover',
+    display: 'block',
+  },
+
+  coverBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    background: '#163c74',
+    color: '#fff',
+    padding: '6px 9px',
+    borderRadius: 8,
+    fontSize: 10,
+    fontWeight: 800,
+  },
+
+  photoActions: {
+    display: 'flex',
+    gap: 8,
+    padding: 10,
+  },
+
+  coverButton: {
+    flex: 1,
+    padding: 9,
+    border:
+      '1px solid #163c74',
+    borderRadius: 8,
+    background: '#fff',
+    color: '#163c74',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+
+  deletePhotoButton: {
+    padding: 9,
+    border: 0,
+    borderRadius: 8,
+    background: '#ffe8e8',
+    color: '#a11f1f',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+
+  error: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 10,
+    background: '#ffeaea',
+    color: '#8c2020',
+    fontWeight: 700,
+  },
+
+  success: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 10,
+    background: '#eaf8ee',
+    color: '#236339',
+    fontWeight: 700,
   },
 
   saveButton: {
     width: '100%',
-    padding: '16px',
-    marginTop: '25px',
+    marginTop: 25,
+    padding: 16,
     border: 0,
-    borderRadius: '12px',
+    borderRadius: 12,
     background: '#163c74',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: '800',
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 800,
     cursor: 'pointer',
   },
 
   secondaryButton: {
     padding: '11px 17px',
-    borderRadius: '10px',
-    border: '1px solid #163c74',
-    background: '#ffffff',
+    borderRadius: 10,
+    background: '#fff',
+    border:
+      '1px solid #163c74',
     color: '#163c74',
-    fontWeight: '700',
+    fontWeight: 700,
     cursor: 'pointer',
   },
 
-  error: {
-    marginTop: '20px',
-    padding: '14px',
-    borderRadius: '10px',
-    background: '#ffecec',
-    color: '#8b2020',
-    fontWeight: '700',
-  },
-
-  success: {
-    marginTop: '20px',
-    padding: '14px',
-    borderRadius: '10px',
-    background: '#edf9f0',
-    color: '#25663a',
-    fontWeight: '700',
-  },
-
   separator: {
-    margin: '55px 0 30px',
+    margin:
+      '55px 0 30px',
     border: 0,
-    borderTop: '1px solid #ddd',
+    borderTop:
+      '1px solid #ddd',
   },
 
   propertyGrid: {
     display: 'grid',
     gridTemplateColumns:
       'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px',
-    marginTop: '20px',
+    gap: 20,
+    marginTop: 20,
   },
 
   propertyCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e4e8',
-    borderRadius: '16px',
-    padding: '20px',
+    background: '#fff',
+    border:
+      '1px solid #e2e4e8',
+    borderRadius: 16,
+    padding: 20,
   },
 
   cardTop: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: '15px',
+    justifyContent:
+      'space-between',
+    gap: 15,
   },
 
   cardTitle: {
@@ -1589,66 +2952,74 @@ const styles = {
   },
 
   status: {
-    padding: '6px 10px',
     height: 'fit-content',
-    borderRadius: '20px',
-    fontSize: '11px',
-    fontWeight: '800',
+    padding: '6px 10px',
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 800,
   },
 
-  cardInfo: {
-    marginTop: '20px',
-    fontSize: '21px',
-    fontWeight: '800',
+  cardPrice: {
+    marginTop: 20,
     color: '#163c74',
+    fontSize: 21,
+    fontWeight: 800,
   },
 
   small: {
-    fontSize: '13px',
+    marginTop: 5,
+    fontSize: 13,
     color: '#666',
-    marginTop: '6px',
   },
 
   cardButtons: {
     display: 'flex',
-    gap: '10px',
-    marginTop: '20px',
+    gap: 10,
+    marginTop: 20,
   },
 
   editButton: {
     flex: 1,
-    padding: '10px',
+    padding: 10,
     border: 0,
-    borderRadius: '10px',
+    borderRadius: 10,
     background: '#163c74',
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: 700,
     cursor: 'pointer',
   },
 
   statusButton: {
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '10px',
-    background: '#ffffff',
+    padding: 10,
+    border:
+      '1px solid #ccc',
+    borderRadius: 10,
+    background: '#fff',
     cursor: 'pointer',
   },
 
+  empty: {
+    padding: 30,
+    marginTop: 20,
+    background: '#fff',
+    borderRadius: 15,
+  },
+
   notice: {
-    maxWidth: '450px',
+    maxWidth: 450,
     margin: '80px auto',
-    background: '#ffffff',
-    padding: '30px',
-    borderRadius: '16px',
+    background: '#fff',
+    padding: 30,
+    borderRadius: 16,
   },
 
   primaryLink: {
     display: 'inline-block',
-    marginTop: '15px',
+    marginTop: 15,
     padding: '11px 16px',
+    borderRadius: 10,
     background: '#163c74',
-    color: '#ffffff',
-    borderRadius: '10px',
+    color: '#fff',
     textDecoration: 'none',
   },
 };
