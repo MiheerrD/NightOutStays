@@ -8,270 +8,681 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
+function money(value) {
+  return `₹${Number(value || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function dateTime(value) {
+  if (!value) return '';
+
+  return new Date(value).toLocaleString('en-IN');
+}
+
+function calculateOfferAmounts(
+  booking,
+  type,
+  value
+) {
+  const originalTaxable =
+    Number(
+      booking.taxable_amount ??
+      booking.base_amount ??
+      0
+    );
+
+  let discount = 0;
+
+  if (type === 'percent') {
+    discount =
+      originalTaxable *
+      (Number(value || 0) / 100);
+  } else {
+    discount =
+      Number(value || 0);
+  }
+
+  if (discount < 0) {
+    discount = 0;
+  }
+
+  if (discount > originalTaxable) {
+    discount = originalTaxable;
+  }
+
+  const taxable =
+    originalTaxable - discount;
+
+  const gstRate =
+    Number(booking.gst_rate || 18);
+
+  const gst =
+    taxable * (gstRate / 100);
+
+  const amountIncludingGst =
+    taxable + gst;
+
+  const securityDeposit =
+    Number(
+      booking.security_deposit || 0
+    );
+
+  const final =
+    amountIncludingGst +
+    securityDeposit;
+
+  return {
+    discount:
+      Math.round(discount * 100) / 100,
+
+    taxable:
+      Math.round(taxable * 100) / 100,
+
+    gst:
+      Math.round(gst * 100) / 100,
+
+    amountIncludingGst:
+      Math.round(
+        amountIncludingGst * 100
+      ) / 100,
+
+    final:
+      Math.round(final * 100) / 100,
+  };
+}
+
 export default function AdminBookingsPage() {
-  const [session, setSession] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [checkingSession, setCheckingSession] =
+    useState(true);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
+  const [session, setSession] =
+    useState(null);
 
-  const [adminProfile, setAdminProfile] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [loadingBookings, setLoadingBookings] = useState(false);
-  const [pageError, setPageError] = useState('');
+  const [adminProfile, setAdminProfile] =
+    useState(null);
+
+  const [bookings, setBookings] =
+    useState([]);
+
+  const [loadingBookings, setLoadingBookings] =
+    useState(false);
+
+  const [pageError, setPageError] =
+    useState('');
+
+  const [message, setMessage] =
+    useState('');
+
+  const [busyId, setBusyId] =
+    useState('');
+
+  const [offerBookingId, setOfferBookingId] =
+    useState('');
+
+  const [offerType, setOfferType] =
+    useState('percent');
+
+  const [offerValue, setOfferValue] =
+    useState('');
+
+  const [offerNote, setOfferNote] =
+    useState('');
 
   useEffect(() => {
-    async function loadSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      setSession(session);
-      setCheckingSession(false);
-
-      if (session) {
-        await verifyAdmin(session.user.id);
-      }
-    }
-
-    loadSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-
-      if (session) {
-        await verifyAdmin(session.user.id);
-      } else {
-        setAdminProfile(null);
-        setBookings([]);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    initialize();
   }, []);
 
-  async function verifyAdmin(userId) {
+  async function initialize() {
+    setCheckingSession(true);
     setPageError('');
 
-    const { data, error } = await supabase
-      .from('admin_profiles')
-      .select('user_id, full_name, role, is_active')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single();
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } =
+        await supabase.auth.getSession();
 
-    if (error || !data) {
-      setAdminProfile(null);
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      setSession(session);
+
+      if (!session) {
+        return;
+      }
+
+      const {
+        data: profile,
+        error: profileError,
+      } =
+        await supabase
+          .from('admin_profiles')
+          .select(
+            'user_id, full_name, role, is_active'
+          )
+          .eq(
+            'user_id',
+            session.user.id
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .single();
+
+      if (
+        profileError ||
+        !profile
+      ) {
+        throw new Error(
+          'Admin access not available for this login.'
+        );
+      }
+
+      setAdminProfile(profile);
+
+      await loadBookings();
+    } catch (error) {
+      console.error(error);
+
       setPageError(
-        'This login does not have permission to access the admin dashboard.'
+        error.message ||
+          'Unable to load admin dashboard.'
       );
-      return;
+    } finally {
+      setCheckingSession(false);
     }
-
-    setAdminProfile(data);
-    await loadBookings();
-  }
-
-  async function login(event) {
-    event.preventDefault();
-
-    setLoginError('');
-    setLoginLoading(true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    setLoginLoading(false);
-
-    if (error) {
-      setLoginError('Invalid email or password.');
-      return;
-    }
-
-    if (data.session) {
-      setSession(data.session);
-      await verifyAdmin(data.session.user.id);
-    }
-  }
-
-  async function logout() {
-    await supabase.auth.signOut();
-    setSession(null);
-    setAdminProfile(null);
-    setBookings([]);
   }
 
   async function loadBookings() {
     setLoadingBookings(true);
     setPageError('');
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        id,
-        booking_code,
-        check_in,
-        check_out,
-        guests_count,
-        nights,
-        nightly_rate,
-        cleaning_fee,
-        security_deposit,
-        total_amount,
-        booking_status,
-        payment_status,
-        notes,
-        created_at,
-        properties (
-          name,
-          location_name
-        ),
-        guests (
-          full_name,
-          phone,
-          email
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const {
+        data: bookingRows,
+        error: bookingError,
+      } =
+        await supabase
+          .from('bookings')
+          .select('*')
+          .order(
+            'created_at',
+            {
+              ascending: false,
+            }
+          );
 
-    setLoadingBookings(false);
+      if (bookingError) {
+        throw bookingError;
+      }
 
-    if (error) {
+      const rows =
+        bookingRows || [];
+
+      if (!rows.length) {
+        setBookings([]);
+        return;
+      }
+
+      const propertyIds =
+        [
+          ...new Set(
+            rows
+              .map(
+                (item) =>
+                  item.property_id
+              )
+              .filter(Boolean)
+          ),
+        ];
+
+      const guestIds =
+        [
+          ...new Set(
+            rows
+              .map(
+                (item) =>
+                  item.guest_id
+              )
+              .filter(Boolean)
+          ),
+        ];
+
+      const [
+        propertyResult,
+        guestResult,
+      ] =
+        await Promise.all([
+          propertyIds.length
+            ? supabase
+                .from(
+                  'properties'
+                )
+                .select(
+                  'id, name, location_name'
+                )
+                .in(
+                  'id',
+                  propertyIds
+                )
+            : Promise.resolve({
+                data: [],
+                error: null,
+              }),
+
+          guestIds.length
+            ? supabase
+                .from(
+                  'guests'
+                )
+                .select(
+                  'id, full_name, phone, email'
+                )
+                .in(
+                  'id',
+                  guestIds
+                )
+            : Promise.resolve({
+                data: [],
+                error: null,
+              }),
+        ]);
+
+      if (
+        propertyResult.error
+      ) {
+        console.error(
+          propertyResult.error
+        );
+      }
+
+      if (
+        guestResult.error
+      ) {
+        console.error(
+          guestResult.error
+        );
+      }
+
+      const propertyMap =
+        {};
+
+      (
+        propertyResult.data ||
+        []
+      ).forEach(
+        (property) => {
+          propertyMap[
+            property.id
+          ] = property;
+        }
+      );
+
+      const guestMap =
+        {};
+
+      (
+        guestResult.data ||
+        []
+      ).forEach(
+        (guest) => {
+          guestMap[
+            guest.id
+          ] = guest;
+        }
+      );
+
+      const enriched =
+        rows.map(
+          (booking) => ({
+            ...booking,
+
+            property:
+              propertyMap[
+                booking.property_id
+              ] || null,
+
+            guest:
+              guestMap[
+                booking.guest_id
+              ] || null,
+          })
+        );
+
+      setBookings(
+        enriched
+      );
+    } catch (error) {
       console.error(error);
-      setPageError('Unable to load bookings.');
+
+      setPageError(
+        `Unable to load bookings: ${
+          error.message ||
+          'Unknown error'
+        }`
+      );
+    } finally {
+      setLoadingBookings(false);
+    }
+  }
+
+  async function approveBooking(
+    booking
+  ) {
+    const confirmed =
+      window.confirm(
+        `Approve booking ${booking.booking_code}?`
+      );
+
+    if (!confirmed) {
       return;
     }
 
-    setBookings(data || []);
-  }
+    setBusyId(
+      booking.id
+    );
 
-  async function updateBookingStatus(bookingId, newStatus) {
+    setMessage('');
     setPageError('');
 
-    const { error } = await supabase
-      .from('bookings')
-      .update({
-        booking_status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId);
+    try {
+      const {
+        error,
+      } =
+        await supabase
+          .from('bookings')
+          .update({
+            host_decision:
+              'approved',
 
-    if (error) {
-      console.error(error);
-      setPageError('Unable to update booking status.');
+            host_decision_at:
+              new Date().toISOString(),
+
+            host_decision_by:
+              session.user.id,
+
+            booking_status:
+              'approved',
+
+            payment_status:
+              booking.payment_status ||
+              'unpaid',
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            'id',
+            booking.id
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      setMessage(
+        `${booking.booking_code} approved successfully.`
+      );
+
+      await loadBookings();
+    } catch (error) {
+      setPageError(
+        `Unable to approve booking: ${error.message}`
+      );
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function declineBooking(
+    booking
+  ) {
+    const confirmed =
+      window.confirm(
+        `Decline booking ${booking.booking_code}?`
+      );
+
+    if (!confirmed) {
       return;
     }
 
-    await loadBookings();
-  }
+    setBusyId(
+      booking.id
+    );
 
-  async function updatePaymentStatus(bookingId, newStatus) {
+    setMessage('');
     setPageError('');
 
-    const { error } = await supabase
-      .from('bookings')
-      .update({
-        payment_status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId);
+    try {
+      const {
+        error,
+      } =
+        await supabase
+          .from('bookings')
+          .update({
+            host_decision:
+              'declined',
 
-    if (error) {
-      console.error(error);
-      setPageError('Unable to update payment status.');
+            host_decision_at:
+              new Date().toISOString(),
+
+            host_decision_by:
+              session.user.id,
+
+            booking_status:
+              'declined',
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            'id',
+            booking.id
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      setMessage(
+        `${booking.booking_code} declined.`
+      );
+
+      await loadBookings();
+    } catch (error) {
+      setPageError(
+        `Unable to decline booking: ${error.message}`
+      );
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  function openOffer(
+    booking
+  ) {
+    setOfferBookingId(
+      booking.id
+    );
+
+    setOfferType(
+      'percent'
+    );
+
+    setOfferValue('');
+
+    setOfferNote('');
+  }
+
+  function closeOffer() {
+    setOfferBookingId('');
+    setOfferValue('');
+    setOfferNote('');
+  }
+
+  async function sendSpecialOffer(
+    booking
+  ) {
+    const value =
+      Number(
+        offerValue
+      );
+
+    if (
+      !value ||
+      value <= 0
+    ) {
+      setPageError(
+        'Enter a valid discount amount.'
+      );
+
       return;
     }
 
-    await loadBookings();
+    const amounts =
+      calculateOfferAmounts(
+        booking,
+        offerType,
+        value
+      );
+
+    const confirmed =
+      window.confirm(
+        `Send special offer? Final payable will be ${money(
+          amounts.final
+        )}.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyId(
+      booking.id
+    );
+
+    setMessage('');
+    setPageError('');
+
+    try {
+      const {
+        error,
+      } =
+        await supabase
+          .from('bookings')
+          .update({
+            host_discount_amount:
+              amounts.discount,
+
+            taxable_amount:
+              amounts.taxable,
+
+            gst_amount:
+              amounts.gst,
+
+            amount_including_gst:
+              amounts.amountIncludingGst,
+
+            final_payable_amount:
+              amounts.final,
+
+            total_amount:
+              amounts.final,
+
+            offer_note:
+              offerNote.trim() ||
+              `Host special ${
+                offerType ===
+                'percent'
+                  ? `${value}%`
+                  : money(value)
+              } discount`,
+
+            offer_status:
+              'host_offer',
+
+            offer_created_by:
+              session.user.id,
+
+            offer_created_at:
+              new Date().toISOString(),
+
+            host_decision:
+              'approved',
+
+            host_decision_at:
+              new Date().toISOString(),
+
+            host_decision_by:
+              session.user.id,
+
+            booking_status:
+              'approved',
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            'id',
+            booking.id
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      setMessage(
+        `Special offer sent for ${booking.booking_code}.`
+      );
+
+      closeOffer();
+
+      await loadBookings();
+    } catch (error) {
+      setPageError(
+        `Unable to send special offer: ${error.message}`
+      );
+    } finally {
+      setBusyId('');
+    }
   }
 
-  if (checkingSession) {
+  async function logout() {
+    await supabase.auth.signOut();
+
+    window.location.href =
+      '/admin/bookings';
+  }
+
+  if (
+    checkingSession
+  ) {
     return (
-      <main style={styles.page}>
-        <p>Loading admin dashboard...</p>
+      <main style={styles.loading}>
+        Loading admin dashboard...
       </main>
     );
   }
 
-  if (!session || !adminProfile) {
+  if (
+    !session ||
+    !adminProfile
+  ) {
     return (
-      <main style={styles.loginPage}>
+      <main style={styles.page}>
         <div style={styles.loginBox}>
-          <div style={styles.brand}>NightOutStays</div>
+          <h2>
+            Admin login required
+          </h2>
 
-          <h1 style={styles.loginTitle}>
-            Admin Login
-          </h1>
-
-          <p style={styles.muted}>
-            Sign in to manage bookings.
+          <p>
+            Please login to manage bookings.
           </p>
-
-          <form onSubmit={login}>
-            <label style={styles.label}>
-              EMAIL
-            </label>
-
-            <input
-              style={styles.input}
-              type="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(event.target.value)
-              }
-              placeholder="Admin email"
-              required
-            />
-
-            <label style={styles.label}>
-              PASSWORD
-            </label>
-
-            <input
-              style={styles.input}
-              type="password"
-              value={password}
-              onChange={(event) =>
-                setPassword(event.target.value)
-              }
-              placeholder="Password"
-              required
-            />
-
-            {loginError && (
-              <div style={styles.errorBox}>
-                {loginError}
-              </div>
-            )}
-
-            {pageError && (
-              <div style={styles.errorBox}>
-                {pageError}
-              </div>
-            )}
-
-            <button
-              style={styles.primaryButton}
-              disabled={loginLoading}
-              type="submit"
-            >
-              {loginLoading
-                ? 'Signing in...'
-                : 'Login'}
-            </button>
-          </form>
-
-          <a href="/" style={styles.backLink}>
-            ← Back to website
-          </a>
         </div>
       </main>
     );
@@ -285,25 +696,27 @@ export default function AdminBookingsPage() {
             NightOutStays
           </div>
 
-          <div style={styles.muted}>
+          <div style={styles.subBrand}>
             Booking Administration
           </div>
         </div>
 
-        <div style={styles.headerRight}>
+        <div style={styles.userArea}>
           <div>
             <strong>
-              {adminProfile.full_name || 'Admin'}
+              {adminProfile.full_name ||
+                'Administrator'}
             </strong>
 
-            <div style={styles.smallText}>
+            <div style={styles.role}>
               {adminProfile.role}
             </div>
           </div>
 
           <button
+            type="button"
             onClick={logout}
-            style={styles.logoutButton}
+            style={styles.logout}
           >
             Logout
           </button>
@@ -318,228 +731,547 @@ export default function AdminBookingsPage() {
             </h1>
 
             <p style={styles.muted}>
-              Manage guest bookings and payment status.
+              Review requests, discounts, GST,
+              payments and verification.
             </p>
           </div>
 
           <button
-            onClick={loadBookings}
-            style={styles.refreshButton}
+            type="button"
+            onClick={
+              loadBookings
+            }
+            disabled={
+              loadingBookings
+            }
+            style={styles.refresh}
           >
-            Refresh
+            {loadingBookings
+              ? 'Loading...'
+              : 'Refresh'}
           </button>
         </div>
 
         {pageError && (
-          <div style={styles.errorBox}>
+          <div style={styles.error}>
             {pageError}
           </div>
         )}
 
-        {loadingBookings ? (
-          <p>Loading bookings...</p>
-        ) : bookings.length === 0 ? (
-          <div style={styles.emptyBox}>
+        {message && (
+          <div style={styles.success}>
+            {message}
+          </div>
+        )}
+
+        {loadingBookings &&
+        bookings.length === 0 ? (
+          <div style={styles.empty}>
+            Loading bookings...
+          </div>
+        ) : bookings.length ===
+          0 ? (
+          <div style={styles.empty}>
             No bookings found.
           </div>
         ) : (
-          <div style={styles.bookingGrid}>
-            {bookings.map((booking) => (
-              <div
-                key={booking.id}
-                style={styles.bookingCard}
-              >
-                <div style={styles.cardTop}>
-                  <div>
-                    <div style={styles.bookingCode}>
-                      {booking.booking_code}
-                    </div>
+          <div style={styles.grid}>
+            {bookings.map(
+              (booking) => {
+                const specialOfferOpen =
+                  offerBookingId ===
+                  booking.id;
 
-                    <div style={styles.smallText}>
-                      {new Date(
-                        booking.created_at
-                      ).toLocaleString('en-IN')}
-                    </div>
-                  </div>
+                const preview =
+                  specialOfferOpen &&
+                  offerValue
+                    ? calculateOfferAmounts(
+                        booking,
+                        offerType,
+                        offerValue
+                      )
+                    : null;
 
-                  <div
-                    style={{
-                      ...styles.statusBadge,
-                      background:
-                        booking.booking_status ===
-                        'confirmed'
-                          ? '#e7f7ec'
-                          : booking.booking_status ===
-                            'cancelled'
-                          ? '#ffeaea'
-                          : booking.booking_status ===
-                            'completed'
-                          ? '#e8eef9'
-                          : '#fff4dc',
-                    }}
+                return (
+                  <article
+                    key={
+                      booking.id
+                    }
+                    style={
+                      styles.card
+                    }
                   >
-                    {booking.booking_status}
-                  </div>
-                </div>
+                    <div style={styles.cardTop}>
+                      <div>
+                        <div
+                          style={
+                            styles.bookingCode
+                          }
+                        >
+                          {
+                            booking.booking_code
+                          }
+                        </div>
 
-                <h2 style={styles.propertyName}>
-                  {booking.properties?.name ||
-                    'Property'}
-                </h2>
+                        <div
+                          style={
+                            styles.created
+                          }
+                        >
+                          {dateTime(
+                            booking.created_at
+                          )}
+                        </div>
+                      </div>
 
-                <div style={styles.location}>
-                  {booking.properties?.location_name}
-                </div>
+                      <StatusBadge
+                        value={
+                          booking.booking_status
+                        }
+                      />
+                    </div>
 
-                <div style={styles.divider} />
+                    <h2 style={styles.propertyName}>
+                      {booking.property?.name ||
+                        'Property'}
+                    </h2>
 
-                <div style={styles.infoGrid}>
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Guest
-                    </span>
+                    <div style={styles.location}>
+                      {booking.property
+                        ?.location_name ||
+                        ''}
+                    </div>
 
-                    <strong>
-                      {booking.guests?.full_name}
-                    </strong>
-                  </div>
+                    <hr style={styles.line} />
 
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Mobile
-                    </span>
+                    <div style={styles.detailsGrid}>
+                      <Detail
+                        label="Guest"
+                        value={
+                          booking.guest
+                            ?.full_name ||
+                          '—'
+                        }
+                      />
 
-                    <strong>
-                      {booking.guests?.phone}
-                    </strong>
-                  </div>
+                      <Detail
+                        label="Mobile"
+                        value={
+                          booking.guest
+                            ?.phone ||
+                          '—'
+                        }
+                      />
 
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Check-in
-                    </span>
+                      <Detail
+                        label="Email"
+                        value={
+                          booking.guest
+                            ?.email ||
+                          '—'
+                        }
+                      />
 
-                    <strong>
-                      {booking.check_in}
-                    </strong>
-                  </div>
+                      <Detail
+                        label="Guests"
+                        value={
+                          booking.guests_count
+                        }
+                      />
 
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Check-out
-                    </span>
+                      <Detail
+                        label="Check-in"
+                        value={
+                          booking.check_in
+                        }
+                      />
 
-                    <strong>
-                      {booking.check_out}
-                    </strong>
-                  </div>
+                      <Detail
+                        label="Check-out"
+                        value={
+                          booking.check_out
+                        }
+                      />
 
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Guests
-                    </span>
+                      <Detail
+                        label="Nights"
+                        value={
+                          booking.nights
+                        }
+                      />
+                    </div>
 
-                    <strong>
-                      {booking.guests_count}
-                    </strong>
-                  </div>
+                    <div style={styles.amountBox}>
+                      <Amount
+                        label="Base amount"
+                        value={
+                          booking.base_amount
+                        }
+                      />
 
-                  <div>
-                    <span style={styles.infoLabel}>
-                      Nights
-                    </span>
+                      {Number(
+                        booking.auto_discount_amount
+                      ) > 0 && (
+                        <Amount
+                          label="Pre-approved discount"
+                          value={
+                            -Number(
+                              booking.auto_discount_amount
+                            )
+                          }
+                          discount
+                        />
+                      )}
 
-                    <strong>
-                      {booking.nights}
-                    </strong>
-                  </div>
-                </div>
+                      {Number(
+                        booking.host_discount_amount
+                      ) > 0 && (
+                        <Amount
+                          label="Host special discount"
+                          value={
+                            -Number(
+                              booking.host_discount_amount
+                            )
+                          }
+                          discount
+                        />
+                      )}
 
-                <div style={styles.amountBox}>
-                  <span>Total Amount</span>
+                      <Amount
+                        label="Taxable amount"
+                        value={
+                          booking.taxable_amount
+                        }
+                      />
 
-                  <strong>
-                    ₹
-                    {Number(
-                      booking.total_amount
-                    ).toLocaleString('en-IN')}
-                  </strong>
-                </div>
+                      <Amount
+                        label={`GST @ ${
+                          booking.gst_rate ||
+                          18
+                        }%`}
+                        value={
+                          booking.gst_amount
+                        }
+                      />
 
-                <label style={styles.label}>
-                  BOOKING STATUS
-                </label>
+                      {Number(
+                        booking.security_deposit
+                      ) > 0 && (
+                        <Amount
+                          label="Security deposit"
+                          value={
+                            booking.security_deposit
+                          }
+                        />
+                      )}
 
-                <select
-                  style={styles.input}
-                  value={booking.booking_status}
-                  onChange={(event) =>
-                    updateBookingStatus(
-                      booking.id,
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="pending">
-                    Pending
-                  </option>
+                      <div style={styles.total}>
+                        <span>
+                          Final Payable
+                        </span>
 
-                  <option value="confirmed">
-                    Confirmed
-                  </option>
+                        <strong>
+                          {money(
+                            booking.final_payable_amount ??
+                              booking.total_amount
+                          )}
+                        </strong>
+                      </div>
+                    </div>
 
-                  <option value="cancelled">
-                    Cancelled
-                  </option>
+                    <div style={styles.statusGrid}>
+                      <MiniStatus
+                        label="HOST DECISION"
+                        value={
+                          booking.host_decision
+                        }
+                      />
 
-                  <option value="completed">
-                    Completed
-                  </option>
-                </select>
+                      <MiniStatus
+                        label="PAYMENT"
+                        value={
+                          booking.payment_status
+                        }
+                      />
 
-                <label style={styles.label}>
-                  PAYMENT STATUS
-                </label>
+                      <MiniStatus
+                        label="VERIFICATION"
+                        value={
+                          booking.verification_status
+                        }
+                      />
+                    </div>
 
-                <select
-                  style={styles.input}
-                  value={
-                    booking.payment_status ||
-                    'unpaid'
-                  }
-                  onChange={(event) =>
-                    updatePaymentStatus(
-                      booking.id,
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="unpaid">
-                    Unpaid
-                  </option>
+                    {booking.offer_note && (
+                      <div style={styles.offerNotice}>
+                        <strong>
+                          Offer:
+                        </strong>{' '}
+                        {
+                          booking.offer_note
+                        }
+                      </div>
+                    )}
 
-                  <option value="partial">
-                    Partial
-                  </option>
+                    {booking.guest_discount_requested && (
+                      <div style={styles.discountRequest}>
+                        <strong>
+                          Guest requested a discount
+                        </strong>
 
-                  <option value="paid">
-                    Paid
-                  </option>
+                        {booking.guest_discount_message && (
+                          <div
+                            style={{
+                              marginTop:
+                                5,
+                            }}
+                          >
+                            {
+                              booking.guest_discount_message
+                            }
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  <option value="refunded">
-                    Refunded
-                  </option>
-                </select>
+                    {booking.notes && (
+                      <div style={styles.notes}>
+                        <strong>
+                          Guest note:
+                        </strong>
 
-                {booking.notes && (
-                  <div style={styles.notes}>
-                    <strong>Guest note:</strong>
-                    <br />
-                    {booking.notes}
-                  </div>
-                )}
-              </div>
-            ))}
+                        <div>
+                          {booking.notes}
+                        </div>
+                      </div>
+                    )}
+
+                    {booking.host_decision ===
+                      'pending' && (
+                      <div style={styles.actionGrid}>
+                        <button
+                          type="button"
+                          disabled={
+                            busyId ===
+                            booking.id
+                          }
+                          onClick={() =>
+                            approveBooking(
+                              booking
+                            )
+                          }
+                          style={
+                            styles.approve
+                          }
+                        >
+                          Approve
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            busyId ===
+                            booking.id
+                          }
+                          onClick={() =>
+                            openOffer(
+                              booking
+                            )
+                          }
+                          style={
+                            styles.offerButton
+                          }
+                        >
+                          Special Offer
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            busyId ===
+                            booking.id
+                          }
+                          onClick={() =>
+                            declineBooking(
+                              booking
+                            )
+                          }
+                          style={
+                            styles.decline
+                          }
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
+
+                    {specialOfferOpen && (
+                      <div style={styles.offerEditor}>
+                        <h3
+                          style={{
+                            marginTop:
+                              0,
+                          }}
+                        >
+                          Host Special Offer
+                        </h3>
+
+                        <div
+                          style={
+                            styles.offerFields
+                          }
+                        >
+                          <select
+                            value={
+                              offerType
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              setOfferType(
+                                event.target
+                                  .value
+                              )
+                            }
+                            style={
+                              styles.input
+                            }
+                          >
+                            <option value="percent">
+                              Percentage %
+                            </option>
+
+                            <option value="flat">
+                              Flat ₹
+                            </option>
+                          </select>
+
+                          <input
+                            type="number"
+                            min="0"
+                            value={
+                              offerValue
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              setOfferValue(
+                                event.target
+                                  .value
+                              )
+                            }
+                            placeholder={
+                              offerType ===
+                              'percent'
+                                ? 'Example: 10'
+                                : 'Example: 500'
+                            }
+                            style={
+                              styles.input
+                            }
+                          />
+                        </div>
+
+                        <textarea
+                          value={
+                            offerNote
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            setOfferNote(
+                              event.target
+                                .value
+                            )
+                          }
+                          placeholder="Optional offer message to guest"
+                          style={
+                            styles.textarea
+                          }
+                        />
+
+                        {preview && (
+                          <div style={styles.preview}>
+                            <Amount
+                              label="Host discount"
+                              value={
+                                -preview.discount
+                              }
+                              discount
+                            />
+
+                            <Amount
+                              label="New taxable amount"
+                              value={
+                                preview.taxable
+                              }
+                            />
+
+                            <Amount
+                              label={`GST @ ${
+                                booking.gst_rate ||
+                                18
+                              }%`}
+                              value={
+                                preview.gst
+                              }
+                            />
+
+                            <div style={styles.total}>
+                              <span>
+                                New Final Payable
+                              </span>
+
+                              <strong>
+                                {money(
+                                  preview.final
+                                )}
+                              </strong>
+                            </div>
+                          </div>
+                        )}
+
+                        <div
+                          style={
+                            styles.offerActions
+                          }
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              sendSpecialOffer(
+                                booking
+                              )
+                            }
+                            disabled={
+                              busyId ===
+                              booking.id
+                            }
+                            style={
+                              styles.sendOffer
+                            }
+                          >
+                            Approve & Send Offer
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={
+                              closeOffer
+                            }
+                            style={
+                              styles.cancel
+                            }
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              }
+            )}
           </div>
         )}
       </section>
@@ -547,233 +1279,510 @@ export default function AdminBookingsPage() {
   );
 }
 
+function Detail({
+  label,
+  value,
+}) {
+  return (
+    <div>
+      <div style={styles.detailLabel}>
+        {label}
+      </div>
+
+      <div style={styles.detailValue}>
+        {value ?? '—'}
+      </div>
+    </div>
+  );
+}
+
+function Amount({
+  label,
+  value,
+  discount = false,
+}) {
+  return (
+    <div
+      style={{
+        ...styles.amountRow,
+
+        ...(discount
+          ? styles.discount
+          : {}),
+      }}
+    >
+      <span>
+        {label}
+      </span>
+
+      <strong>
+        {Number(value || 0) <
+        0
+          ? `-${money(
+              Math.abs(
+                Number(
+                  value
+                )
+              )
+            )}`
+          : money(value)}
+      </strong>
+    </div>
+  );
+}
+
+function MiniStatus({
+  label,
+  value,
+}) {
+  return (
+    <div style={styles.miniStatus}>
+      <div style={styles.detailLabel}>
+        {label}
+      </div>
+
+      <strong
+        style={{
+          textTransform:
+            'capitalize',
+        }}
+      >
+        {String(
+          value || '—'
+        ).replaceAll(
+          '_',
+          ' '
+        )}
+      </strong>
+    </div>
+  );
+}
+
+function StatusBadge({
+  value,
+}) {
+  const status =
+    String(
+      value || ''
+    ).toLowerCase();
+
+  let background =
+    '#fff3d6';
+
+  if (
+    status === 'approved' ||
+    status === 'confirmed'
+  ) {
+    background =
+      '#e4f7e9';
+  }
+
+  if (
+    status === 'declined' ||
+    status === 'cancelled'
+  ) {
+    background =
+      '#ffe8e8';
+  }
+
+  return (
+    <span
+      style={{
+        ...styles.badge,
+        background,
+      }}
+    >
+      {String(
+        value || 'pending'
+      ).replaceAll(
+        '_',
+        ' '
+      )}
+    </span>
+  );
+}
+
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#f6f7f9',
-    color: '#172033',
-    fontFamily: 'Arial, sans-serif',
+    background:
+      '#f6f7f9',
+    color: '#11213c',
+    fontFamily:
+      'Arial, sans-serif',
   },
 
-  loginPage: {
-    minHeight: '100vh',
-    background: '#f6f7f9',
+  loading: {
+    padding: 30,
+    fontFamily:
+      'Arial, sans-serif',
+  },
+
+  header: {
     display: 'flex',
-    justifyContent: 'center',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-  },
-
-  loginBox: {
-    width: '100%',
-    maxWidth: '420px',
-    background: '#ffffff',
-    padding: '32px',
-    borderRadius: '18px',
-    boxShadow: '0 15px 40px rgba(0,0,0,0.08)',
+    flexWrap: 'wrap',
+    gap: 20,
+    background: '#fff',
+    borderBottom:
+      '1px solid #e3e6ea',
+    padding:
+      '18px 3vw',
   },
 
   brand: {
-    fontSize: '24px',
-    fontWeight: '800',
-    color: '#163c74',
+    fontSize: 25,
+    fontWeight: 900,
+    color: '#17457f',
   },
 
-  loginTitle: {
-    marginBottom: '5px',
+  subBrand: {
+    color: '#687080',
+  },
+
+  userArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 20,
+  },
+
+  role: {
+    fontSize: 12,
+    color: '#687080',
+    textTransform:
+      'capitalize',
+  },
+
+  logout: {
+    background: '#fff',
+    border:
+      '1px solid #d8dce2',
+    borderRadius: 22,
+    padding: '9px 15px',
+    cursor: 'pointer',
+  },
+
+  content: {
+    padding:
+      '35px 3vw 80px',
+  },
+
+  titleRow: {
+    display: 'flex',
+    justifyContent:
+      'space-between',
+    alignItems: 'center',
+    gap: 20,
+    flexWrap: 'wrap',
+    marginBottom: 25,
+  },
+
+  title: {
+    fontSize: 34,
+    marginBottom: 5,
   },
 
   muted: {
     color: '#687080',
   },
 
-  label: {
-    display: 'block',
-    fontSize: '10px',
-    fontWeight: '800',
-    letterSpacing: '1px',
-    marginTop: '16px',
-    marginBottom: '6px',
-  },
-
-  input: {
-    width: '100%',
-    padding: '12px',
-    borderRadius: '10px',
-    border: '1px solid #d4d7dc',
-    background: '#ffffff',
-  },
-
-  primaryButton: {
-    width: '100%',
-    marginTop: '20px',
-    padding: '14px',
-    background: '#163c74',
-    color: '#ffffff',
-    border: 0,
-    borderRadius: '10px',
-    fontWeight: '800',
-    cursor: 'pointer',
-  },
-
-  backLink: {
-    display: 'block',
-    textAlign: 'center',
-    marginTop: '20px',
-    color: '#163c74',
-    textDecoration: 'none',
-  },
-
-  errorBox: {
-    padding: '12px',
-    background: '#ffecec',
-    borderRadius: '10px',
-    marginTop: '15px',
-    color: '#8b2020',
-    fontWeight: '700',
-  },
-
-  header: {
-    background: '#ffffff',
-    padding: '18px 5vw',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottom: '1px solid #e5e5e5',
-  },
-
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '18px',
-  },
-
-  smallText: {
-    color: '#777',
-    fontSize: '12px',
-  },
-
-  logoutButton: {
-    border: '1px solid #ddd',
-    background: '#ffffff',
-    padding: '9px 14px',
-    borderRadius: '20px',
-    cursor: 'pointer',
-  },
-
-  content: {
-    padding: '35px 5vw 70px',
-    maxWidth: '1500px',
-    margin: 'auto',
-  },
-
-  titleRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '25px',
-  },
-
-  title: {
-    marginBottom: '5px',
-  },
-
-  refreshButton: {
-    background: '#163c74',
+  refresh: {
+    background: '#17457f',
     color: '#fff',
     border: 0,
-    borderRadius: '10px',
-    padding: '10px 18px',
+    borderRadius: 10,
+    padding: '11px 18px',
+    fontWeight: 800,
     cursor: 'pointer',
-    fontWeight: '700',
   },
 
-  bookingGrid: {
+  error: {
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+    background: '#ffeaea',
+    color: '#8b2020',
+    fontWeight: 700,
+  },
+
+  success: {
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+    background: '#e9f8ee',
+    color: '#23653a',
+    fontWeight: 700,
+  },
+
+  empty: {
+    background: '#fff',
+    padding: 30,
+    borderRadius: 15,
+  },
+
+  grid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(320px, 1fr))',
-    gap: '20px',
+      'repeat(auto-fit, minmax(390px, 1fr))',
+    gap: 20,
   },
 
-  bookingCard: {
-    background: '#ffffff',
-    padding: '22px',
-    borderRadius: '16px',
-    border: '1px solid #e2e4e8',
+  card: {
+    background: '#fff',
+    border:
+      '1px solid #dfe3e8',
+    borderRadius: 17,
+    padding: 22,
   },
 
   cardTop: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: '15px',
+    justifyContent:
+      'space-between',
+    alignItems:
+      'flex-start',
+    gap: 15,
   },
 
   bookingCode: {
-    color: '#163c74',
-    fontSize: '18px',
-    fontWeight: '800',
+    color: '#17457f',
+    fontSize: 20,
+    fontWeight: 900,
   },
 
-  statusBadge: {
-    height: 'fit-content',
-    borderRadius: '20px',
-    padding: '7px 12px',
-    textTransform: 'capitalize',
-    fontSize: '12px',
-    fontWeight: '800',
+  created: {
+    fontSize: 12,
+    color: '#687080',
+    marginTop: 4,
+  },
+
+  badge: {
+    padding: '8px 13px',
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: 900,
+    textTransform:
+      'capitalize',
   },
 
   propertyName: {
-    fontSize: '19px',
-    marginBottom: '5px',
+    fontSize: 20,
+    marginBottom: 4,
   },
 
   location: {
-    color: '#777',
-    fontSize: '13px',
+    color: '#687080',
   },
 
-  divider: {
-    height: '1px',
-    background: '#eeeeee',
+  line: {
+    border: 0,
+    borderTop:
+      '1px solid #e7e9ed',
     margin: '18px 0',
   },
 
-  infoGrid: {
+  detailsGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
+    gridTemplateColumns:
+      'repeat(2, 1fr)',
+    gap: 15,
   },
 
-  infoLabel: {
-    display: 'block',
-    color: '#777',
-    fontSize: '11px',
-    marginBottom: '4px',
+  detailLabel: {
+    fontSize: 10,
+    color: '#687080',
+    marginBottom: 4,
+    textTransform:
+      'uppercase',
+    letterSpacing:
+      '0.5px',
+  },
+
+  detailValue: {
+    fontWeight: 800,
   },
 
   amountBox: {
-    background: '#f5f7fa',
-    borderRadius: '10px',
-    padding: '14px',
+    background: '#f7f8fa',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 18,
+  },
+
+  amountRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: '20px',
-    fontSize: '17px',
+    justifyContent:
+      'space-between',
+    gap: 15,
+    marginBottom: 9,
+  },
+
+  discount: {
+    color: '#208142',
+  },
+
+  total: {
+    display: 'flex',
+    justifyContent:
+      'space-between',
+    gap: 15,
+    paddingTop: 12,
+    marginTop: 6,
+    borderTop:
+      '1px solid #d9dde3',
+    fontSize: 18,
+  },
+
+  statusGrid: {
+    display: 'grid',
+    gridTemplateColumns:
+      'repeat(3, 1fr)',
+    gap: 8,
+    marginTop: 15,
+  },
+
+  miniStatus: {
+    background: '#f8f9fb',
+    borderRadius: 9,
+    padding: 10,
+  },
+
+  offerNotice: {
+    background: '#fff7dd',
+    padding: 12,
+    marginTop: 14,
+    borderRadius: 10,
+  },
+
+  discountRequest: {
+    background: '#fff0dc',
+    padding: 12,
+    marginTop: 14,
+    borderRadius: 10,
   },
 
   notes: {
     background: '#fff8e9',
-    borderRadius: '10px',
-    padding: '12px',
-    marginTop: '16px',
-    fontSize: '13px',
+    padding: 12,
+    marginTop: 14,
+    borderRadius: 10,
   },
 
-  emptyBox: {
-    background: '#ffffff',
-    padding: '30px',
-    borderRadius: '15px',
+  actionGrid: {
+    display: 'grid',
+    gridTemplateColumns:
+      '1fr 1fr 1fr',
+    gap: 8,
+    marginTop: 18,
+  },
+
+  approve: {
+    border: 0,
+    background: '#18753c',
+    color: '#fff',
+    padding: 11,
+    borderRadius: 9,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  offerButton: {
+    border:
+      '1px solid #17457f',
+    background: '#fff',
+    color: '#17457f',
+    padding: 11,
+    borderRadius: 9,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  decline: {
+    border: 0,
+    background: '#a83232',
+    color: '#fff',
+    padding: 11,
+    borderRadius: 9,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  offerEditor: {
+    background: '#f3f6fb',
+    padding: 16,
+    marginTop: 15,
+    borderRadius: 12,
+  },
+
+  offerFields: {
+    display: 'grid',
+    gridTemplateColumns:
+      '1fr 1fr',
+    gap: 10,
+  },
+
+  input: {
+    width: '100%',
+    boxSizing:
+      'border-box',
+    border:
+      '1px solid #ccd1d8',
+    borderRadius: 9,
+    padding: 11,
+  },
+
+  textarea: {
+    width: '100%',
+    boxSizing:
+      'border-box',
+    minHeight: 70,
+    marginTop: 10,
+    border:
+      '1px solid #ccd1d8',
+    borderRadius: 9,
+    padding: 11,
+  },
+
+  preview: {
+    marginTop: 12,
+    background: '#fff',
+    padding: 13,
+    borderRadius: 10,
+  },
+
+  offerActions: {
+    display: 'flex',
+    gap: 10,
+    marginTop: 12,
+  },
+
+  sendOffer: {
+    flex: 1,
+    border: 0,
+    background: '#17457f',
+    color: '#fff',
+    padding: 11,
+    borderRadius: 9,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  cancel: {
+    border:
+      '1px solid #ccd1d8',
+    background: '#fff',
+    padding: '11px 17px',
+    borderRadius: 9,
+    cursor: 'pointer',
+  },
+
+  loginBox: {
+    maxWidth: 450,
+    margin: '80px auto',
+    background: '#fff',
+    padding: 30,
+    borderRadius: 15,
   },
 };
