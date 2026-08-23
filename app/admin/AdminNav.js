@@ -11,10 +11,6 @@ export default function AdminNav() {
       href: '/admin/bookings',
     },
     {
-      label: 'Offers',
-      href: '/admin/offers',
-    },
-    {
       label: 'Properties',
       href: '/admin/properties',
     },
@@ -37,9 +33,7 @@ export default function AdminNav() {
       {items.map((item) => {
         const active =
           pathname === item.href ||
-          pathname.startsWith(
-            item.href + '/'
-          );
+          pathname.startsWith(item.href + '/');
 
         return (
           <a
@@ -47,9 +41,7 @@ export default function AdminNav() {
             href={item.href}
             style={{
               ...styles.link,
-              ...(active
-                ? styles.activeLink
-                : {}),
+              ...(active ? styles.activeLink : {}),
             }}
           >
             {item.label}
@@ -70,16 +62,16 @@ const styles = {
 
   link: {
     textDecoration: 'none',
-    color: '#163c74',
-    padding: '9px 13px',
-    borderRadius: '20px',
-    fontWeight: '700',
+    color: '#0b3f82',
     fontSize: '14px',
-    border: '1px solid transparent',
+    fontWeight: '700',
+    padding: '10px 14px',
+    borderRadius: '999px',
+    transition: 'all 0.2s ease',
   },
 
   activeLink: {
-    background: '#163c74',
+    background: '#0b3f82',
     color: '#ffffff',
   },
 };
