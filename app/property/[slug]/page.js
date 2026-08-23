@@ -9,6 +9,23 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+
+    document.body.appendChild(script);
+  });
+}
+
 export default function PropertyPage() {
   const params = useParams();
   const slug = params.slug;
@@ -33,6 +50,11 @@ export default function PropertyPage() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState(null);
+
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentId, setPaymentId] = useState('');
 
   useEffect(() => {
     async function loadProperty() {
@@ -72,6 +94,9 @@ export default function PropertyPage() {
     setAvailabilityMessage('');
     setBookingError('');
     setBookingSuccess(null);
+    setPaymentError('');
+    setPaymentSuccess(false);
+    setPaymentId('');
   }
 
   function calculateNights() {
@@ -109,6 +134,8 @@ export default function PropertyPage() {
     setAvailabilityMessage('');
     setBookingError('');
     setBookingSuccess(null);
+    setPaymentError('');
+    setPaymentSuccess(false);
 
     if (!checkIn || !checkOut) {
       setAvailabilityMessage(
@@ -146,19 +173,23 @@ export default function PropertyPage() {
 
     if (error) {
       console.error(error);
+
       setAvailabilityMessage(
         'Unable to check availability. Please try again.'
       );
+
       return;
     }
 
     if (data === true) {
       setIsAvailable(true);
+
       setAvailabilityMessage(
         'Available for your selected dates.'
       );
     } else {
       setIsAvailable(false);
+
       setAvailabilityMessage(
         'Sorry, this property is not available for those dates.'
       );
@@ -170,6 +201,7 @@ export default function PropertyPage() {
 
     setBookingError('');
     setBookingSuccess(null);
+    setPaymentError('');
 
     if (!guestName.trim()) {
       setBookingError('Please enter your full name.');
@@ -201,9 +233,11 @@ export default function PropertyPage() {
 
     if (error) {
       console.error(error);
+
       setBookingError(
         error.message || 'Unable to create booking.'
       );
+
       return;
     }
 
@@ -213,10 +247,168 @@ export default function PropertyPage() {
       setBookingError(
         'Booking could not be created. Please try again.'
       );
+
       return;
     }
 
     setBookingSuccess(booking);
+  }
+
+  async function startPayment() {
+    if (!bookingSuccess?.booking_code) {
+      setPaymentError('Booking reference is missing.');
+      return;
+    }
+
+    setPaymentLoading(true);
+    setPaymentError('');
+
+    const razorpayLoaded = await loadRazorpayScript();
+
+    if (!razorpayLoaded) {
+      setPaymentLoading(false);
+
+      setPaymentError(
+        'Unable to load payment gateway. Please check your internet connection.'
+      );
+
+      return;
+    }
+
+    try {
+      const orderResponse = await fetch(
+        '/api/razorpay/create-order',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            bookingCode: bookingSuccess.booking_code,
+          }),
+        }
+      );
+
+      const orderData = await orderResponse.json();
+
+      if (!orderResponse.ok) {
+        throw new Error(
+          orderData.error || 'Unable to create payment order.'
+        );
+      }
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'NightOutStay',
+        description: property.name,
+        order_id: orderData.orderId,
+
+        prefill: {
+          name: guestName,
+          email: guestEmail,
+          contact: guestPhone,
+        },
+
+        notes: {
+          booking_code: bookingSuccess.booking_code,
+        },
+
+        theme: {
+          color: '#163c74',
+        },
+
+        handler: async function (response) {
+          setPaymentLoading(true);
+          setPaymentError('');
+
+          try {
+            const verifyResponse = await fetch(
+              '/api/razorpay/verify',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  bookingCode:
+                    bookingSuccess.booking_code,
+
+                  razorpay_order_id:
+                    response.razorpay_order_id,
+
+                  razorpay_payment_id:
+                    response.razorpay_payment_id,
+
+                  razorpay_signature:
+                    response.razorpay_signature,
+                }),
+              }
+            );
+
+            const verifyData =
+              await verifyResponse.json();
+
+            if (!verifyResponse.ok) {
+              throw new Error(
+                verifyData.error ||
+                  'Payment verification failed.'
+              );
+            }
+
+            setPaymentSuccess(true);
+
+            setPaymentId(
+              verifyData.paymentId ||
+                response.razorpay_payment_id
+            );
+          } catch (error) {
+            console.error(error);
+
+            setPaymentError(
+              error.message ||
+                'Payment was received but verification failed. Please contact us with your booking reference.'
+            );
+          } finally {
+            setPaymentLoading(false);
+          }
+        },
+
+        modal: {
+          ondismiss: function () {
+            setPaymentLoading(false);
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+
+      razorpay.on(
+        'payment.failed',
+        function (response) {
+          setPaymentLoading(false);
+
+          setPaymentError(
+            response.error?.description ||
+              'Payment failed. Please try again.'
+          );
+        }
+      );
+
+      razorpay.open();
+
+      setPaymentLoading(false);
+    } catch (error) {
+      console.error(error);
+
+      setPaymentLoading(false);
+
+      setPaymentError(
+        error.message ||
+          'Unable to start payment. Please try again.'
+      );
+    }
   }
 
   if (loading) {
@@ -231,7 +423,10 @@ export default function PropertyPage() {
     return (
       <main className="detail">
         <h1>Property not found</h1>
-        <a href="/">← Back to all stays</a>
+
+        <a href="/">
+          ← Back to all stays
+        </a>
       </main>
     );
   }
@@ -280,11 +475,13 @@ export default function PropertyPage() {
           <h2>Amenities</h2>
 
           <div className="amenities">
-            {(property.amenities || []).map((amenity) => (
-              <div key={amenity}>
-                ✓ {amenity}
-              </div>
-            ))}
+            {(property.amenities || []).map(
+              (amenity) => (
+                <div key={amenity}>
+                  ✓ {amenity}
+                </div>
+              )
+            )}
           </div>
 
           {property.google_maps_url && (
@@ -300,7 +497,7 @@ export default function PropertyPage() {
         </section>
 
         <aside>
-          {bookingSuccess ? (
+          {paymentSuccess ? (
             <div
               style={{
                 padding: '20px',
@@ -309,14 +506,20 @@ export default function PropertyPage() {
               }}
             >
               <h2 style={{ marginTop: 0 }}>
-                Booking request received ✓
+                Payment successful ✓
               </h2>
 
-              <p>Your booking reference:</p>
+              <p>
+                Your booking is confirmed.
+              </p>
+
+              <p>
+                Booking reference:
+              </p>
 
               <div
                 style={{
-                  fontSize: '25px',
+                  fontSize: '24px',
                   fontWeight: '800',
                   color: '#163c74',
                   margin: '12px 0',
@@ -326,39 +529,136 @@ export default function PropertyPage() {
               </div>
 
               <p>
-                Check-in: <strong>{checkIn}</strong>
+                Payment ID:
               </p>
 
-              <p>
-                Check-out: <strong>{checkOut}</strong>
-              </p>
+              <div
+                style={{
+                  wordBreak: 'break-all',
+                  fontWeight: '700',
+                }}
+              >
+                {paymentId}
+              </div>
 
               <p>
-                Guests: <strong>{guests}</strong>
-              </p>
-
-              <p>
-                Total:{' '}
+                Total paid:{' '}
                 <strong>
-                  ₹{totalAmount.toLocaleString('en-IN')}
+                  ₹
+                  {totalAmount.toLocaleString(
+                    'en-IN'
+                  )}
                 </strong>
               </p>
 
               <p>
-                Booking status: <strong>Pending</strong>
+                Check-in:{' '}
+                <strong>{checkIn}</strong>
               </p>
 
               <p>
-                We will add online payment next.
+                Check-out:{' '}
+                <strong>{checkOut}</strong>
+              </p>
+            </div>
+          ) : bookingSuccess ? (
+            <div
+              style={{
+                padding: '20px',
+                background: '#edf9f0',
+                borderRadius: '14px',
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>
+                Booking request created ✓
+              </h2>
+
+              <p>Your booking reference:</p>
+
+              <div
+                style={{
+                  fontSize: '24px',
+                  fontWeight: '800',
+                  color: '#163c74',
+                  margin: '12px 0',
+                }}
+              >
+                {bookingSuccess.booking_code}
+              </div>
+
+              <p>
+                Check-in:{' '}
+                <strong>{checkIn}</strong>
+              </p>
+
+              <p>
+                Check-out:{' '}
+                <strong>{checkOut}</strong>
+              </p>
+
+              <p>
+                Guests:{' '}
+                <strong>{guests}</strong>
+              </p>
+
+              <p>
+                Amount payable:{' '}
+                <strong>
+                  ₹
+                  {totalAmount.toLocaleString(
+                    'en-IN'
+                  )}
+                </strong>
+              </p>
+
+              <button
+                onClick={startPayment}
+                disabled={paymentLoading}
+                style={{
+                  background: '#b07b12',
+                  marginTop: '12px',
+                }}
+              >
+                {paymentLoading
+                  ? 'Opening payment...'
+                  : `Pay ₹${totalAmount.toLocaleString(
+                      'en-IN'
+                    )}`}
+              </button>
+
+              {paymentError && (
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    background: '#fff0f0',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                  }}
+                >
+                  {paymentError}
+                </div>
+              )}
+
+              <p
+                style={{
+                  marginTop: '14px',
+                  fontSize: '12px',
+                  color: '#666',
+                }}
+              >
+                Your booking will be confirmed after
+                successful payment.
               </p>
             </div>
           ) : (
             <>
               <div className="price">
                 ₹
-                {Number(property.base_price).toLocaleString(
-                  'en-IN'
-                )}
+                {Number(
+                  property.base_price
+                ).toLocaleString('en-IN')}
+
                 <small> / night</small>
               </div>
 
@@ -392,7 +692,10 @@ export default function PropertyPage() {
                 max={property.max_guests}
                 value={guests}
                 onChange={(event) => {
-                  setGuests(Number(event.target.value));
+                  setGuests(
+                    Number(event.target.value)
+                  );
+
                   resetSelection();
                 }}
               />
@@ -409,10 +712,30 @@ export default function PropertyPage() {
                     ₹
                     {Number(
                       property.base_price
-                    ).toLocaleString('en-IN')}{' '}
+                    ).toLocaleString(
+                      'en-IN'
+                    )}{' '}
                     × {nights} night
                     {nights > 1 ? 's' : ''}
                   </div>
+
+                  {cleaningFee > 0 && (
+                    <div style={{ marginTop: '6px' }}>
+                      Cleaning fee ₹
+                      {cleaningFee.toLocaleString(
+                        'en-IN'
+                      )}
+                    </div>
+                  )}
+
+                  {securityDeposit > 0 && (
+                    <div style={{ marginTop: '6px' }}>
+                      Security deposit ₹
+                      {securityDeposit.toLocaleString(
+                        'en-IN'
+                      )}
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -422,7 +745,9 @@ export default function PropertyPage() {
                     }}
                   >
                     Total ₹
-                    {totalAmount.toLocaleString('en-IN')}
+                    {totalAmount.toLocaleString(
+                      'en-IN'
+                    )}
                   </div>
                 </div>
               )}
@@ -467,40 +792,52 @@ export default function PropertyPage() {
                   <h3>Guest details</h3>
 
                   <label>FULL NAME</label>
+
                   <input
                     type="text"
                     value={guestName}
                     onChange={(event) =>
-                      setGuestName(event.target.value)
+                      setGuestName(
+                        event.target.value
+                      )
                     }
                     placeholder="Your full name"
                   />
 
                   <label>MOBILE NUMBER</label>
+
                   <input
                     type="tel"
                     value={guestPhone}
                     onChange={(event) =>
-                      setGuestPhone(event.target.value)
+                      setGuestPhone(
+                        event.target.value
+                      )
                     }
                     placeholder="10 digit mobile number"
                   />
 
                   <label>EMAIL</label>
+
                   <input
                     type="email"
                     value={guestEmail}
                     onChange={(event) =>
-                      setGuestEmail(event.target.value)
+                      setGuestEmail(
+                        event.target.value
+                      )
                     }
                     placeholder="Optional"
                   />
 
                   <label>SPECIAL REQUEST</label>
+
                   <textarea
                     value={guestNotes}
                     onChange={(event) =>
-                      setGuestNotes(event.target.value)
+                      setGuestNotes(
+                        event.target.value
+                      )
                     }
                     placeholder="Optional"
                     style={{
@@ -536,7 +873,7 @@ export default function PropertyPage() {
                   >
                     {bookingLoading
                       ? 'Creating booking...'
-                      : 'Confirm Booking Request'}
+                      : 'Continue to Payment'}
                   </button>
                 </form>
               )}
