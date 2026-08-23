@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import PropertyPhotoManager from './PropertyPhotoManager';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -2274,6 +2275,12 @@ export default function AdminPropertiesPage() {
               : 'Create Property'}
           </button>
         </form>
+{form.id && (
+  <PropertyPhotoManager
+    propertyId={form.id}
+    propertyName={form.name}
+  />
+)}
 
         <hr style={styles.separator} />
 
