@@ -12,7 +12,8 @@ const supabase = createClient(
 
 function formatMoney(value) {
   return `₹${Number(value || 0).toLocaleString('en-IN', {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 }
 
@@ -33,11 +34,12 @@ function formatTime(value) {
 
 function todayString() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
 
-  return `${year}-${month}-${day}`;
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 function addDays(dateString, days) {
@@ -102,7 +104,11 @@ export default function PropertyPage() {
 
     if (propertyError || !propertyData) {
       console.error(propertyError);
-      setPageError('Property not found or currently unavailable.');
+
+      setPageError(
+        'Property not found or currently unavailable.'
+      );
+
       setLoading(false);
       return;
     }
@@ -150,7 +156,9 @@ export default function PropertyPage() {
 
       supabase
         .from('bookings')
-        .select('check_in, check_out, booking_status, payment_status')
+        .select(
+          'check_in, check_out, booking_status, payment_status'
+        )
         .eq('property_id', propertyData.id)
         .not(
           'booking_status',
@@ -159,55 +167,25 @@ export default function PropertyPage() {
         ),
     ]);
 
-    if (photoResult.error) {
-      console.error(photoResult.error);
-    }
-
     setPhotos(photoResult.data || []);
-
-    if (offerResult.error) {
-      console.error(offerResult.error);
-    }
-
     setOffers(offerResult.data || []);
+    setBlockedDates(blockedResult.data || []);
+    setExistingBookings(bookingResult.data || []);
 
-    if (pricingResult.error) {
-      console.error(pricingResult.error);
-    }
-
-    const mappedPricingRules = (pricingResult.data || []).map(
-      (rule) => ({
+    const mappedPricingRules =
+      (pricingResult.data || []).map((rule) => ({
         ...rule,
-
         type: rule.rule_type,
-
         percent:
           rule.adjustment_type === 'percent'
             ? Number(rule.adjustment_value || 0)
             : undefined,
-
         value: Number(rule.adjustment_value || 0),
-
         label: rule.name,
-
-        adjustmentType:
-          rule.adjustment_type,
-      })
-    );
+        adjustmentType: rule.adjustment_type,
+      }));
 
     setPricingRules(mappedPricingRules);
-
-    if (blockedResult.error) {
-      console.error(blockedResult.error);
-    }
-
-    setBlockedDates(blockedResult.data || []);
-
-    if (bookingResult.error) {
-      console.error(bookingResult.error);
-    }
-
-    setExistingBookings(bookingResult.data || []);
 
     setLoading(false);
   }
@@ -219,16 +197,22 @@ export default function PropertyPage() {
     const end = new Date(`${checkOut}T12:00:00`);
 
     return Math.round(
-      (end - start) / (1000 * 60 * 60 * 24)
+      (end - start) /
+        (1000 * 60 * 60 * 24)
     );
   }, [checkIn, checkOut]);
 
   const applicableOffer = useMemo(() => {
-    if (!checkIn || !checkOut || nights <= 0) {
+    if (
+      !property ||
+      !checkIn ||
+      !checkOut ||
+      nights <= 0
+    ) {
       return null;
     }
 
-    const availableOffers = offers.filter((offer) => {
+    const eligible = offers.filter((offer) => {
       const dateEligible =
         checkIn >= offer.start_date &&
         checkIn <= offer.end_date;
@@ -239,38 +223,43 @@ export default function PropertyPage() {
       return dateEligible && stayEligible;
     });
 
-    if (!availableOffers.length) {
+    if (!eligible.length) {
       return null;
     }
 
-    const amountBeforeDiscount =
-      Number(property?.base_price || 0) * nights;
+    const simpleBase =
+      Number(property.base_price || 0) *
+      nights;
 
-    return [...availableOffers].sort((a, b) => {
+    return [...eligible].sort((a, b) => {
       const discountA =
         a.discount_type === 'percent'
-          ? amountBeforeDiscount *
-            (Number(a.discount_value) / 100)
-          : Number(a.discount_value);
+          ? simpleBase *
+            (Number(a.discount_value || 0) / 100)
+          : Number(a.discount_value || 0);
 
       const discountB =
         b.discount_type === 'percent'
-          ? amountBeforeDiscount *
-            (Number(b.discount_value) / 100)
-          : Number(b.discount_value);
+          ? simpleBase *
+            (Number(b.discount_value || 0) / 100)
+          : Number(b.discount_value || 0);
 
       return discountB - discountA;
     })[0];
   }, [
+    property,
     offers,
     checkIn,
     checkOut,
     nights,
-    property,
   ]);
 
   const pricing = useMemo(() => {
-    if (!property || !checkIn || !checkOut) {
+    if (
+      !property ||
+      !checkIn ||
+      !checkOut
+    ) {
       return null;
     }
 
@@ -281,6 +270,7 @@ export default function PropertyPage() {
       checkOut,
       pricingRules,
       offer: applicableOffer,
+      gstRate: 18,
     });
   }, [
     property,
@@ -302,48 +292,51 @@ export default function PropertyPage() {
     if (checkOut <= checkIn) {
       return {
         available: false,
-        message: 'Check-out must be after check-in.',
+        message:
+          'Check-out must be after check-in.',
       };
     }
 
-    const manuallyBlocked = blockedDates.some((block) =>
-      rangesOverlap(
-        checkIn,
-        checkOut,
-        block.start_date,
-        addDays(block.end_date, 1)
-      )
-    );
+    const manuallyBlocked =
+      blockedDates.some((block) =>
+        rangesOverlap(
+          checkIn,
+          checkOut,
+          block.start_date,
+          addDays(block.end_date, 1)
+        )
+      );
 
     if (manuallyBlocked) {
       return {
         available: false,
         message:
-          'These dates are unavailable. Please choose different dates.',
+          'These dates are unavailable. Please select different dates.',
       };
     }
 
-    const bookingConflict = existingBookings.some(
-      (booking) =>
+    const bookingConflict =
+      existingBookings.some((booking) =>
         rangesOverlap(
           checkIn,
           checkOut,
           booking.check_in,
           booking.check_out
         )
-    );
+      );
 
     if (bookingConflict) {
       return {
         available: false,
         message:
-          'These dates already have a booking/request. Please select different dates.',
+          'These dates already have a booking/request.',
       };
     }
 
     return {
       available: true,
-      message: 'Dates are currently available.',
+      message:
+        'Dates are currently available.',
     };
   }, [
     checkIn,
@@ -360,31 +353,42 @@ export default function PropertyPage() {
 
     if (!pricing?.valid) {
       setBookingError(
-        pricing?.error || 'Please check your booking details.'
+        pricing?.error ||
+          'Please check your booking details.'
       );
       return;
     }
 
     if (!availability.available) {
-      setBookingError(availability.message);
+      setBookingError(
+        availability.message
+      );
       return;
     }
 
     if (!guestName.trim()) {
-      setBookingError('Please enter your full name.');
+      setBookingError(
+        'Please enter your full name.'
+      );
       return;
     }
 
     if (!guestPhone.trim()) {
-      setBookingError('Please enter your contact number.');
+      setBookingError(
+        'Please enter your contact number.'
+      );
       return;
     }
 
     if (
       guestEmail &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        guestEmail
+      )
     ) {
-      setBookingError('Please enter a valid email address.');
+      setBookingError(
+        'Please enter a valid email address.'
+      );
       return;
     }
 
@@ -399,7 +403,8 @@ export default function PropertyPage() {
         .insert({
           full_name: guestName.trim(),
           phone: guestPhone.trim(),
-          email: guestEmail.trim() || null,
+          email:
+            guestEmail.trim() || null,
         })
         .select('id')
         .single();
@@ -412,35 +417,63 @@ export default function PropertyPage() {
 
       const averageNightlyRate =
         pricing.nights > 0
-          ? pricing.staySubtotal / pricing.nights
+          ? pricing.staySubtotal /
+            pricing.nights
           : 0;
 
       const {
         data: bookingData,
-        error: bookingInsertError,
+        error: bookingError,
       } = await supabase
         .from('bookings')
         .insert({
-          property_id: property.id,
-          guest_id: guestData.id,
+          property_id:
+            property.id,
 
-          check_in: checkIn,
-          check_out: checkOut,
+          guest_id:
+            guestData.id,
 
-          guests_count: Number(guestCount),
-          nights: pricing.nights,
+          check_in:
+            checkIn,
 
-          nightly_rate: averageNightlyRate,
+          check_out:
+            checkOut,
 
-          cleaning_fee: pricing.cleaningFee,
-          security_deposit: pricing.securityDeposit,
+          guests_count:
+            Number(guestCount),
 
-          base_amount: pricing.baseAmount,
+          nights:
+            pricing.nights,
+
+          nightly_rate:
+            averageNightlyRate,
+
+          cleaning_fee:
+            pricing.cleaningFee,
+
+          security_deposit:
+            pricing.securityDeposit,
+
+          base_amount:
+            pricing.baseAmount,
 
           auto_discount_amount:
             pricing.autoDiscountAmount,
 
-          host_discount_amount: 0,
+          host_discount_amount:
+            0,
+
+          taxable_amount:
+            pricing.taxableAmount,
+
+          gst_rate:
+            pricing.gstRate,
+
+          gst_amount:
+            pricing.gstAmount,
+
+          amount_including_gst:
+            pricing.amountIncludingGst,
 
           final_payable_amount:
             pricing.totalPayable,
@@ -448,35 +481,49 @@ export default function PropertyPage() {
           total_amount:
             pricing.totalPayable,
 
-          booking_status: 'pending',
-          host_decision: 'pending',
-          payment_status: 'unpaid',
+          booking_status:
+            'pending',
 
-          offer_status: applicableOffer
-            ? 'auto_applied'
-            : 'none',
+          host_decision:
+            'pending',
 
-          offer_note: applicableOffer
-            ? applicableOffer.title
-            : null,
+          payment_status:
+            'unpaid',
 
-          notes: notes.trim() || null,
+          verification_status:
+            'not_required',
+
+          offer_status:
+            applicableOffer
+              ? 'auto_applied'
+              : 'none',
+
+          offer_note:
+            applicableOffer
+              ? applicableOffer.title
+              : null,
+
+          notes:
+            notes.trim() || null,
         })
-        .select('id, booking_code')
+        .select(
+          'id, booking_code'
+        )
         .single();
 
-      if (bookingInsertError) {
+      if (bookingError) {
         throw new Error(
-          `Unable to create booking request: ${bookingInsertError.message}`
+          `Unable to create booking request: ${bookingError.message}`
         );
       }
 
       setBookingSuccess({
-        bookingCode: bookingData.booking_code,
-        amount: pricing.totalPayable,
-      });
+        bookingCode:
+          bookingData.booking_code,
 
-      setNotes('');
+        amount:
+          pricing.totalPayable,
+      });
     } catch (error) {
       console.error(error);
 
@@ -507,11 +554,13 @@ export default function PropertyPage() {
   }
 
   const coverPhoto =
-    photos.find((photo) => photo.is_cover) ||
-    photos[0];
+    photos.find(
+      (photo) => photo.is_cover
+    ) || photos[0];
 
   const selectedPhoto =
-    photos[activePhoto] || coverPhoto;
+    photos[activePhoto] ||
+    coverPhoto;
 
   return (
     <main style={styles.page}>
@@ -533,16 +582,24 @@ export default function PropertyPage() {
 
           <div style={styles.headerPrice}>
             <div style={styles.price}>
-              {formatMoney(property.base_price)}
+              {formatMoney(
+                property.base_price
+              )}
             </div>
 
             <div style={styles.smallMuted}>
-              per night
+              base rate / night
             </div>
 
             <div style={styles.smallMuted}>
-              includes up to{' '}
-              {property.included_guests} guests
+              includes{' '}
+              {property.included_guests}{' '}
+              guest
+              {Number(
+                property.included_guests
+              ) === 1
+                ? ''
+                : 's'}
             </div>
           </div>
         </div>
@@ -550,34 +607,46 @@ export default function PropertyPage() {
         {selectedPhoto && (
           <div style={styles.gallery}>
             <img
-              src={selectedPhoto.image_url}
-              alt={selectedPhoto.alt_text || property.name}
+              src={
+                selectedPhoto.image_url
+              }
+              alt={
+                selectedPhoto.alt_text ||
+                property.name
+              }
               style={styles.mainPhoto}
             />
 
             {photos.length > 1 && (
               <div style={styles.thumbnails}>
-                {photos.map((photo, index) => (
-                  <button
-                    type="button"
-                    key={photo.id}
-                    onClick={() =>
-                      setActivePhoto(index)
-                    }
-                    style={{
-                      ...styles.thumbnailButton,
-                      ...(index === activePhoto
-                        ? styles.activeThumbnail
-                        : {}),
-                    }}
-                  >
-                    <img
-                      src={photo.image_url}
-                      alt=""
-                      style={styles.thumbnail}
-                    />
-                  </button>
-                ))}
+                {photos.map(
+                  (photo, index) => (
+                    <button
+                      type="button"
+                      key={photo.id}
+                      onClick={() =>
+                        setActivePhoto(index)
+                      }
+                      style={{
+                        ...styles.thumbnailButton,
+
+                        ...(index === activePhoto
+                          ? styles.activeThumbnail
+                          : {}),
+                      }}
+                    >
+                      <img
+                        src={
+                          photo.image_url
+                        }
+                        alt=""
+                        style={
+                          styles.thumbnail
+                        }
+                      />
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -594,24 +663,31 @@ export default function PropertyPage() {
               <div style={styles.factGrid}>
                 <Fact
                   label="Bedrooms"
-                  value={property.bedrooms}
+                  value={
+                    property.bedrooms
+                  }
                 />
 
                 <Fact
                   label="Bathrooms"
-                  value={property.bathrooms}
+                  value={
+                    property.bathrooms
+                  }
                 />
 
                 <Fact
                   label="Maximum Guests"
-                  value={property.max_guests}
+                  value={
+                    property.max_guests
+                  }
                 />
 
                 <Fact
                   label="Minimum Stay"
                   value={`${property.min_stay_nights} night${
-                    Number(property.min_stay_nights) ===
-                    1
+                    Number(
+                      property.min_stay_nights
+                    ) === 1
                       ? ''
                       : 's'
                   }`}
@@ -621,27 +697,46 @@ export default function PropertyPage() {
 
             <Section title="Sleeping arrangement">
               <div style={styles.tickGrid}>
-                {Number(property.queen_bed_count) > 0 && (
+                {Number(
+                  property.queen_bed_count
+                ) > 0 && (
                   <Feature>
-                    {property.queen_bed_count} Queen Size Bed
-                    {Number(property.queen_bed_count) > 1
+                    {
+                      property.queen_bed_count
+                    }{' '}
+                    Queen Size Bed
+                    {Number(
+                      property.queen_bed_count
+                    ) > 1
                       ? 's'
                       : ''}
                   </Feature>
                 )}
 
-                {Number(property.single_bed_count) > 0 && (
+                {Number(
+                  property.single_bed_count
+                ) > 0 && (
                   <Feature>
-                    {property.single_bed_count} Single Bed
-                    {Number(property.single_bed_count) > 1
+                    {
+                      property.single_bed_count
+                    }{' '}
+                    Single Bed
+                    {Number(
+                      property.single_bed_count
+                    ) > 1
                       ? 's'
                       : ''}
                   </Feature>
                 )}
 
-                {Number(property.sofa_cum_bed_count) > 0 && (
+                {Number(
+                  property.sofa_cum_bed_count
+                ) > 0 && (
                   <Feature>
-                    {property.sofa_cum_bed_count} Sofa-cum-Bed
+                    {
+                      property.sofa_cum_bed_count
+                    }{' '}
+                    Sofa-cum-Bed
                   </Feature>
                 )}
               </div>
@@ -650,35 +745,49 @@ export default function PropertyPage() {
             <Section title="Facilities & Amenities">
               <div style={styles.tickGrid}>
                 {property.wifi_available && (
-                  <Feature>Wi-Fi</Feature>
+                  <Feature>
+                    Wi-Fi
+                  </Feature>
                 )}
 
                 {property.tv_available && (
-                  <Feature>TV</Feature>
+                  <Feature>
+                    TV
+                  </Feature>
                 )}
 
                 {property.fridge_available && (
-                  <Feature>Fridge</Feature>
+                  <Feature>
+                    Fridge
+                  </Feature>
                 )}
 
                 {property.washing_machine_available && (
-                  <Feature>Washing Machine</Feature>
+                  <Feature>
+                    Washing Machine
+                  </Feature>
                 )}
 
                 {property.ac_available && (
                   <Feature>
                     Air Conditioning
-                    {Number(property.ac_count) > 0
+                    {Number(
+                      property.ac_count
+                    ) > 0
                       ? ` (${property.ac_count})`
                       : ''}
                   </Feature>
                 )}
 
-                {Number(property.water_heater_count) >
-                  0 && (
+                {Number(
+                  property.water_heater_count
+                ) > 0 && (
                   <Feature>
                     Water Heater / Geyser (
-                    {property.water_heater_count})
+                    {
+                      property.water_heater_count
+                    }
+                    )
                   </Feature>
                 )}
 
@@ -692,9 +801,9 @@ export default function PropertyPage() {
               </div>
             </Section>
 
-            {(property.kitchen_features || []).length >
-              0 && (
-              <Section title="Kitchen">
+            {(property.kitchen_features ||
+              []).length > 0 && (
+              <Section title="Kitchen Features">
                 <div style={styles.tickGrid}>
                   {property.kitchen_features.map(
                     (feature) => (
@@ -710,27 +819,37 @@ export default function PropertyPage() {
             <Section title="Stay Rules">
               <div style={styles.tickGrid}>
                 <Rule
-                  allowed={property.pets_allowed}
+                  allowed={
+                    property.pets_allowed
+                  }
                   label="Pets"
                 />
 
                 <Rule
-                  allowed={property.parties_allowed}
+                  allowed={
+                    property.parties_allowed
+                  }
                   label="Parties"
                 />
 
                 <Rule
-                  allowed={property.couples_allowed}
+                  allowed={
+                    property.couples_allowed
+                  }
                   label="Couples"
                 />
 
                 <Rule
-                  allowed={property.alcohol_allowed}
+                  allowed={
+                    property.alcohol_allowed
+                  }
                   label="Alcohol"
                 />
 
                 <Rule
-                  allowed={property.smoking_allowed}
+                  allowed={
+                    property.smoking_allowed
+                  }
                   label="Smoking"
                 />
               </div>
@@ -738,18 +857,14 @@ export default function PropertyPage() {
               {property.quiet_hours_enabled && (
                 <div style={styles.ruleNotice}>
                   Quiet hours:{' '}
-                  {formatTime(property.quiet_hours_start)} –{' '}
-                  {formatTime(property.quiet_hours_end)}
+                  {formatTime(
+                    property.quiet_hours_start
+                  )}{' '}
+                  –{' '}
+                  {formatTime(
+                    property.quiet_hours_end
+                  )}
                 </div>
-              )}
-
-              {(property.house_rules || []).length >
-                0 && (
-                <ul>
-                  {property.house_rules.map((rule) => (
-                    <li key={rule}>{rule}</li>
-                  ))}
-                </ul>
               )}
             </Section>
 
@@ -791,10 +906,17 @@ export default function PropertyPage() {
             </div>
 
             <div style={styles.basePriceText}>
-              {formatMoney(property.base_price)} / night
+              {formatMoney(
+                property.base_price
+              )}{' '}
+              / base night
             </div>
 
-            <form onSubmit={submitBookingRequest}>
+            <form
+              onSubmit={
+                submitBookingRequest
+              }
+            >
               <div style={styles.twoColumns}>
                 <InputGroup label="CHECK-IN">
                   <input
@@ -802,7 +924,8 @@ export default function PropertyPage() {
                     min={todayString()}
                     value={checkIn}
                     onChange={(event) => {
-                      const value = event.target.value;
+                      const value =
+                        event.target.value;
 
                       setCheckIn(value);
 
@@ -810,7 +933,12 @@ export default function PropertyPage() {
                         checkOut &&
                         checkOut <= value
                       ) {
-                        setCheckOut(addDays(value, 1));
+                        setCheckOut(
+                          addDays(
+                            value,
+                            1
+                          )
+                        );
                       }
                     }}
                     style={styles.input}
@@ -822,12 +950,17 @@ export default function PropertyPage() {
                     type="date"
                     min={
                       checkIn
-                        ? addDays(checkIn, 1)
+                        ? addDays(
+                            checkIn,
+                            1
+                          )
                         : todayString()
                     }
                     value={checkOut}
                     onChange={(event) =>
-                      setCheckOut(event.target.value)
+                      setCheckOut(
+                        event.target.value
+                      )
                     }
                     style={styles.input}
                   />
@@ -839,7 +972,9 @@ export default function PropertyPage() {
                   value={guestCount}
                   onChange={(event) =>
                     setGuestCount(
-                      Number(event.target.value)
+                      Number(
+                        event.target.value
+                      )
                     )
                   }
                   style={styles.input}
@@ -847,68 +982,94 @@ export default function PropertyPage() {
                   {Array.from(
                     {
                       length:
-                        Number(property.max_guests) -
-                        Number(property.min_guests) +
+                        Number(
+                          property.max_guests
+                        ) -
+                        Number(
+                          property.min_guests
+                        ) +
                         1,
                     },
                     (_, index) =>
-                      Number(property.min_guests) +
-                      index
+                      Number(
+                        property.min_guests
+                      ) + index
                   ).map((count) => (
                     <option
                       key={count}
                       value={count}
                     >
                       {count} guest
-                      {count === 1 ? '' : 's'}
+                      {count === 1
+                        ? ''
+                        : 's'}
                     </option>
                   ))}
                 </select>
               </InputGroup>
 
-              {Number(property.extra_guest_fee) > 0 && (
+              {Number(
+                property.extra_guest_fee
+              ) > 0 && (
                 <div style={styles.info}>
                   Base price includes{' '}
                   <strong>
-                    {property.included_guests} guests
+                    {
+                      property.included_guests
+                    }{' '}
+                    guests
                   </strong>
-                  . Additional guests:{' '}
+                  . Additional guests cost{' '}
                   <strong>
                     {formatMoney(
                       property.extra_guest_fee
-                    )} / person / night
+                    )}{' '}
+                    / person / night
                   </strong>
                   .
                 </div>
               )}
 
-              {checkIn && checkOut && (
-                <>
-                  <div
-                    style={
-                      availability.available
-                        ? styles.available
-                        : styles.unavailable
-                    }
-                  >
-                    {availability.message}
-                  </div>
-
-                  {pricing && !pricing.valid && (
-                    <div style={styles.unavailable}>
-                      {pricing.error}
+              {checkIn &&
+                checkOut && (
+                  <>
+                    <div
+                      style={
+                        availability.available
+                          ? styles.available
+                          : styles.unavailable
+                      }
+                    >
+                      {
+                        availability.message
+                      }
                     </div>
-                  )}
-                </>
-              )}
+
+                    {pricing &&
+                      !pricing.valid && (
+                        <div
+                          style={
+                            styles.unavailable
+                          }
+                        >
+                          {pricing.error}
+                        </div>
+                      )}
+                  </>
+                )}
 
               {pricing?.valid && (
                 <div style={styles.priceBox}>
                   <div style={styles.priceRow}>
                     <span>
-                      Stay subtotal ({pricing.nights}{' '}
+                      Stay subtotal (
+                      {pricing.nights}{' '}
                       night
-                      {pricing.nights === 1 ? '' : 's'})
+                      {pricing.nights ===
+                      1
+                        ? ''
+                        : 's'}
+                      )
                     </span>
 
                     <strong>
@@ -918,9 +1079,12 @@ export default function PropertyPage() {
                     </strong>
                   </div>
 
-                  {pricing.cleaningFee > 0 && (
+                  {pricing.cleaningFee >
+                    0 && (
                     <div style={styles.priceRow}>
-                      <span>Cleaning fee</span>
+                      <span>
+                        Cleaning fee
+                      </span>
 
                       <strong>
                         {formatMoney(
@@ -930,11 +1094,16 @@ export default function PropertyPage() {
                     </div>
                   )}
 
-                  {pricing.autoDiscountAmount > 0 && (
-                    <div style={styles.discountRow}>
+                  {pricing.autoDiscountAmount >
+                    0 && (
+                    <div
+                      style={
+                        styles.discountRow
+                      }
+                    >
                       <span>
                         {applicableOffer?.title ||
-                          'Special offer'}
+                          'Offer Discount'}
                       </span>
 
                       <strong>
@@ -946,9 +1115,49 @@ export default function PropertyPage() {
                     </div>
                   )}
 
-                  {pricing.securityDeposit > 0 && (
+                  <div style={styles.priceRow}>
+                    <span>
+                      Taxable amount
+                    </span>
+
+                    <strong>
+                      {formatMoney(
+                        pricing.taxableAmount
+                      )}
+                    </strong>
+                  </div>
+
+                  <div style={styles.priceRow}>
+                    <span>
+                      GST @{' '}
+                      {pricing.gstRate}%
+                    </span>
+
+                    <strong>
+                      {formatMoney(
+                        pricing.gstAmount
+                      )}
+                    </strong>
+                  </div>
+
+                  <div style={styles.priceRow}>
+                    <span>
+                      Amount incl. GST
+                    </span>
+
+                    <strong>
+                      {formatMoney(
+                        pricing.amountIncludingGst
+                      )}
+                    </strong>
+                  </div>
+
+                  {pricing.securityDeposit >
+                    0 && (
                     <div style={styles.priceRow}>
-                      <span>Security deposit</span>
+                      <span>
+                        Refundable security deposit
+                      </span>
 
                       <strong>
                         {formatMoney(
@@ -959,7 +1168,9 @@ export default function PropertyPage() {
                   )}
 
                   <div style={styles.totalRow}>
-                    <span>Final payable</span>
+                    <span>
+                      Final Payable
+                    </span>
 
                     <strong>
                       {formatMoney(
@@ -968,27 +1179,44 @@ export default function PropertyPage() {
                     </strong>
                   </div>
 
+                  <div style={styles.taxNote}>
+                    GST is calculated after applicable
+                    automatic discounts. Refundable
+                    security deposit is shown separately.
+                  </div>
+
                   {pricing.nightlyBreakdown.some(
                     (night) =>
-                      night.adjustments.length > 0
+                      night.adjustments
+                        .length > 0
                   ) && (
-                    <details style={styles.breakdown}>
+                    <details
+                      style={
+                        styles.breakdown
+                      }
+                    >
                       <summary>
-                        View nightly price details
+                        View nightly rate details
                       </summary>
 
                       {pricing.nightlyBreakdown.map(
                         (night) => (
                           <div
-                            key={night.date}
+                            key={
+                              night.date
+                            }
                             style={
                               styles.nightBreakdown
                             }
                           >
-                            <span>{night.date}</span>
+                            <span>
+                              {night.date}
+                            </span>
 
                             <span>
-                              {formatMoney(night.rate)}
+                              {formatMoney(
+                                night.rate
+                              )}
                             </span>
                           </div>
                         )
@@ -1004,7 +1232,9 @@ export default function PropertyPage() {
                 <input
                   value={guestName}
                   onChange={(event) =>
-                    setGuestName(event.target.value)
+                    setGuestName(
+                      event.target.value
+                    )
                   }
                   style={styles.input}
                   placeholder="Your full name"
@@ -1015,7 +1245,9 @@ export default function PropertyPage() {
                 <input
                   value={guestPhone}
                   onChange={(event) =>
-                    setGuestPhone(event.target.value)
+                    setGuestPhone(
+                      event.target.value
+                    )
                   }
                   style={styles.input}
                   placeholder="Mobile number"
@@ -1027,7 +1259,9 @@ export default function PropertyPage() {
                   type="email"
                   value={guestEmail}
                   onChange={(event) =>
-                    setGuestEmail(event.target.value)
+                    setGuestEmail(
+                      event.target.value
+                    )
                   }
                   style={styles.input}
                   placeholder="Email address"
@@ -1038,10 +1272,12 @@ export default function PropertyPage() {
                 <textarea
                   value={notes}
                   onChange={(event) =>
-                    setNotes(event.target.value)
+                    setNotes(
+                      event.target.value
+                    )
                   }
                   style={styles.textarea}
-                  placeholder="Questions, requests or any special requirements..."
+                  placeholder="Questions, special requests, discount request, etc."
                 />
               </InputGroup>
 
@@ -1054,18 +1290,42 @@ export default function PropertyPage() {
               {bookingSuccess && (
                 <div style={styles.successBox}>
                   <strong>
-                    Booking request sent!
+                    Booking request sent successfully.
                   </strong>
 
-                  <div style={{ marginTop: 6 }}>
-                    Reference:{' '}
-                    {bookingSuccess.bookingCode}
+                  <div
+                    style={{
+                      marginTop: 7,
+                    }}
+                  >
+                    Booking reference:{' '}
+                    <strong>
+                      {
+                        bookingSuccess.bookingCode
+                      }
+                    </strong>
                   </div>
 
-                  <div style={{ marginTop: 6 }}>
-                    The host will review your request.
-                    Payment will be requested only after
-                    approval.
+                  <div
+                    style={{
+                      marginTop: 7,
+                    }}
+                  >
+                    Current booking total:{' '}
+                    <strong>
+                      {formatMoney(
+                        bookingSuccess.amount
+                      )}
+                    </strong>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 7,
+                    }}
+                  >
+                    The host will review your request
+                    before payment is requested.
                   </div>
                 </div>
               )}
@@ -1094,8 +1354,8 @@ export default function PropertyPage() {
               </button>
 
               <div style={styles.paymentNote}>
-                No payment now. The host will approve
-                your request first.
+                No payment is collected until the host
+                approves the booking request.
               </div>
             </form>
           </aside>
@@ -1108,7 +1368,10 @@ export default function PropertyPage() {
 function Section({ title, children }) {
   return (
     <section style={styles.section}>
-      <h2 style={styles.sectionHeading}>{title}</h2>
+      <h2 style={styles.sectionHeading}>
+        {title}
+      </h2>
+
       {children}
     </section>
   );
@@ -1117,8 +1380,13 @@ function Section({ title, children }) {
 function Fact({ label, value }) {
   return (
     <div style={styles.fact}>
-      <div style={styles.factLabel}>{label}</div>
-      <div style={styles.factValue}>{value}</div>
+      <div style={styles.factLabel}>
+        {label}
+      </div>
+
+      <div style={styles.factValue}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -1135,10 +1403,15 @@ function Feature({ children }) {
 function Rule({ allowed, label }) {
   return (
     <div style={styles.feature}>
-      <span>{allowed ? '✓' : '✕'}</span>
+      <span>
+        {allowed ? '✓' : '✕'}
+      </span>
 
       <span>
-        {label} {allowed ? 'Allowed' : 'Not Allowed'}
+        {label}{' '}
+        {allowed
+          ? 'Allowed'
+          : 'Not Allowed'}
       </span>
     </div>
   );
@@ -1147,7 +1420,10 @@ function Rule({ allowed, label }) {
 function InputGroup({ label, children }) {
   return (
     <div style={styles.inputGroup}>
-      <label style={styles.label}>{label}</label>
+      <label style={styles.label}>
+        {label}
+      </label>
+
       {children}
     </div>
   );
@@ -1337,7 +1613,8 @@ const styles = {
     border: '1px solid #dfe3e8',
     borderRadius: 18,
     padding: 22,
-    boxShadow: '0 8px 28px rgba(16,24,40,0.08)',
+    boxShadow:
+      '0 8px 28px rgba(16,24,40,0.08)',
   },
 
   bookingHeading: {
@@ -1444,6 +1721,13 @@ const styles = {
     paddingTop: 12,
     marginTop: 5,
     fontSize: 18,
+  },
+
+  taxNote: {
+    marginTop: 11,
+    fontSize: 11,
+    lineHeight: 1.5,
+    color: '#667085',
   },
 
   breakdown: {
