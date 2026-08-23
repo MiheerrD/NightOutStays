@@ -17,10 +17,23 @@ function money(value) {
 
 function dateTime(value) {
   if (!value) return '';
-  return new Date(value).toLocaleString('en-IN');
+
+  return new Date(value).toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }
 
 function calculateOfferAmounts(booking, type, value) {
+  /*
+    IMPORTANT:
+    booking.taxable_amount is already after the
+    guest-selected regular/property discount.
+
+    Therefore Host Special Offer is applied ON TOP
+    of the one regular discount, exactly as required.
+  */
+
   const originalTaxable = Number(
     booking.taxable_amount ??
       booking.base_amount ??
@@ -37,7 +50,10 @@ function calculateOfferAmounts(booking, type, value) {
     discount = Number(value || 0);
   }
 
-  if (discount < 0) discount = 0;
+  if (discount < 0) {
+    discount = 0;
+  }
+
   if (discount > originalTaxable) {
     discount = originalTaxable;
   }
@@ -96,29 +112,60 @@ export default function AdminBookingsPage() {
   const [bookings, setBookings] =
     useState([]);
 
-  const [loadingBookings, setLoadingBookings] =
-    useState(false);
+  const [
+    messagesByBooking,
+    setMessagesByBooking,
+  ] = useState({});
 
-  const [pageError, setPageError] =
-    useState('');
+  const [
+    replyByBooking,
+    setReplyByBooking,
+  ] = useState({});
 
-  const [message, setMessage] =
-    useState('');
+  const [
+    loadingBookings,
+    setLoadingBookings,
+  ] = useState(false);
 
-  const [busyId, setBusyId] =
-    useState('');
+  const [
+    pageError,
+    setPageError,
+  ] = useState('');
 
-  const [offerBookingId, setOfferBookingId] =
-    useState('');
+  const [
+    message,
+    setMessage,
+  ] = useState('');
 
-  const [offerType, setOfferType] =
-    useState('percent');
+  const [
+    busyId,
+    setBusyId,
+  ] = useState('');
 
-  const [offerValue, setOfferValue] =
-    useState('');
+  const [
+    sendingMessageId,
+    setSendingMessageId,
+  ] = useState('');
 
-  const [offerNote, setOfferNote] =
-    useState('');
+  const [
+    offerBookingId,
+    setOfferBookingId,
+  ] = useState('');
+
+  const [
+    offerType,
+    setOfferType,
+  ] = useState('percent');
+
+  const [
+    offerValue,
+    setOfferValue,
+  ] = useState('');
+
+  const [
+    offerNote,
+    setOfferNote,
+  ] = useState('');
 
   useEffect(() => {
     initialize();
@@ -216,6 +263,7 @@ export default function AdminBookingsPage() {
 
       if (!rows.length) {
         setBookings([]);
+        setMessagesByBooking({});
         return;
       }
 
@@ -241,9 +289,16 @@ export default function AdminBookingsPage() {
         ),
       ];
 
+      const bookingIds =
+        rows.map(
+          (item) =>
+            item.id
+        );
+
       const [
         propertyResult,
         guestResult,
+        messageResult,
       ] =
         await Promise.all([
           propertyIds.length
@@ -279,6 +334,27 @@ export default function AdminBookingsPage() {
                 data: [],
                 error: null,
               }),
+
+          bookingIds.length
+            ? supabase
+                .from(
+                  'booking_messages'
+                )
+                .select('*')
+                .in(
+                  'booking_id',
+                  bookingIds
+                )
+                .order(
+                  'created_at',
+                  {
+                    ascending: true,
+                  }
+                )
+            : Promise.resolve({
+                data: [],
+                error: null,
+              }),
         ]);
 
       if (
@@ -294,6 +370,14 @@ export default function AdminBookingsPage() {
       ) {
         console.error(
           guestResult.error
+        );
+      }
+
+      if (
+        messageResult.error
+      ) {
+        console.error(
+          messageResult.error
         );
       }
 
@@ -323,6 +407,29 @@ export default function AdminBookingsPage() {
         }
       );
 
+      const messageMap = {};
+
+      (
+        messageResult.data ||
+        []
+      ).forEach(
+        (item) => {
+          if (
+            !messageMap[
+              item.booking_id
+            ]
+          ) {
+            messageMap[
+              item.booking_id
+            ] = [];
+          }
+
+          messageMap[
+            item.booking_id
+          ].push(item);
+        }
+      );
+
       const enriched =
         rows.map(
           (booking) => ({
@@ -343,6 +450,10 @@ export default function AdminBookingsPage() {
       setBookings(
         enriched
       );
+
+      setMessagesByBooking(
+        messageMap
+      );
     } catch (error) {
       console.error(error);
 
@@ -357,15 +468,180 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function approveBooking(booking) {
+  async function reloadBookingMessages(
+    bookingId
+  ) {
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from(
+          'booking_messages'
+        )
+        .select('*')
+        .eq(
+          'booking_id',
+          bookingId
+        )
+        .order(
+          'created_at',
+          {
+            ascending: true,
+          }
+        );
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setMessagesByBooking(
+      (previous) => ({
+        ...previous,
+        [bookingId]:
+          data || [],
+      })
+    );
+  }
+
+  async function addSystemMessage(
+    bookingId,
+    text,
+    messageType = 'system'
+  ) {
+    const {
+      error,
+    } =
+      await supabase
+        .from(
+          'booking_messages'
+        )
+        .insert({
+          booking_id:
+            bookingId,
+
+          sender_type:
+            'system',
+
+          sender_name:
+            'NightOutStays',
+
+          message:
+            text,
+
+          message_type:
+            messageType,
+
+          is_read:
+            false,
+        });
+
+    if (error) {
+      console.error(
+        'System message error:',
+        error
+      );
+    }
+  }
+
+  async function sendHostReply(
+    booking
+  ) {
+    const text =
+      String(
+        replyByBooking[
+          booking.id
+        ] || ''
+      ).trim();
+
+    if (!text) {
+      setPageError(
+        'Type a reply before sending.'
+      );
+      return;
+    }
+
+    setSendingMessageId(
+      booking.id
+    );
+
+    setPageError('');
+    setMessage('');
+
+    try {
+      const {
+        error,
+      } =
+        await supabase
+          .from(
+            'booking_messages'
+          )
+          .insert({
+            booking_id:
+              booking.id,
+
+            sender_type:
+              'host',
+
+            sender_name:
+              adminProfile.full_name ||
+              'Host',
+
+            message:
+              text,
+
+            message_type:
+              'message',
+
+            is_read:
+              false,
+          });
+
+      if (error) {
+        throw error;
+      }
+
+      setReplyByBooking(
+        (previous) => ({
+          ...previous,
+          [booking.id]:
+            '',
+        })
+      );
+
+      setMessage(
+        `Reply sent for ${booking.booking_code}.`
+      );
+
+      await reloadBookingMessages(
+        booking.id
+      );
+    } catch (error) {
+      setPageError(
+        `Unable to send reply: ${error.message}`
+      );
+    } finally {
+      setSendingMessageId('');
+    }
+  }
+
+  async function approveBooking(
+    booking
+  ) {
     const confirmed =
       window.confirm(
         `Approve booking ${booking.booking_code}?`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
-    setBusyId(booking.id);
+    setBusyId(
+      booking.id
+    );
+
     setMessage('');
     setPageError('');
 
@@ -408,6 +684,12 @@ export default function AdminBookingsPage() {
         throw error;
       }
 
+      await addSystemMessage(
+        booking.id,
+        `Booking ${booking.booking_code} was approved by the host. Awaiting payment.`,
+        'approval'
+      );
+
       setMessage(
         `${booking.booking_code} approved successfully.`
       );
@@ -422,15 +704,22 @@ export default function AdminBookingsPage() {
     }
   }
 
-  async function declineBooking(booking) {
+  async function declineBooking(
+    booking
+  ) {
     const confirmed =
       window.confirm(
         `Decline booking ${booking.booking_code}?`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
-    setBusyId(booking.id);
+    setBusyId(
+      booking.id
+    );
+
     setMessage('');
     setPageError('');
 
@@ -471,6 +760,12 @@ export default function AdminBookingsPage() {
         throw error;
       }
 
+      await addSystemMessage(
+        booking.id,
+        `Booking ${booking.booking_code} was declined by the host.`,
+        'decline'
+      );
+
       setMessage(
         `${booking.booking_code} declined.`
       );
@@ -485,7 +780,9 @@ export default function AdminBookingsPage() {
     }
   }
 
-  function openOffer(booking) {
+  function openOffer(
+    booking
+  ) {
     setOfferBookingId(
       booking.id
     );
@@ -497,6 +794,7 @@ export default function AdminBookingsPage() {
     setOfferValue('');
 
     setOfferNote('');
+
     setPageError('');
   }
 
@@ -506,9 +804,13 @@ export default function AdminBookingsPage() {
     setOfferNote('');
   }
 
-  async function sendSpecialOffer(booking) {
+  async function sendSpecialOffer(
+    booking
+  ) {
     const value =
-      Number(offerValue);
+      Number(
+        offerValue
+      );
 
     if (
       !value ||
@@ -535,13 +837,27 @@ export default function AdminBookingsPage() {
         )}.`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
-    setBusyId(booking.id);
+    setBusyId(
+      booking.id
+    );
+
     setMessage('');
     setPageError('');
 
     try {
+      const specialOfferText =
+        offerNote.trim() ||
+        `Host special ${
+          offerType ===
+          'percent'
+            ? `${value}%`
+            : money(value)
+        } discount`;
+
       const {
         error,
       } =
@@ -567,13 +883,7 @@ export default function AdminBookingsPage() {
               amounts.final,
 
             offer_note:
-              offerNote.trim() ||
-              `Host special ${
-                offerType ===
-                'percent'
-                  ? `${value}%`
-                  : money(value)
-              } discount`,
+              specialOfferText,
 
             offer_status:
               'host_offered',
@@ -610,6 +920,14 @@ export default function AdminBookingsPage() {
       if (error) {
         throw error;
       }
+
+      await addSystemMessage(
+        booking.id,
+        `${specialOfferText}. New final payable amount: ${money(
+          amounts.final
+        )}.`,
+        'special_offer'
+      );
 
       setMessage(
         `Special offer sent for ${booking.booking_code}.`
@@ -706,8 +1024,9 @@ export default function AdminBookingsPage() {
             </h1>
 
             <p style={styles.muted}>
-              Review requests, discounts, GST,
-              payments and verification.
+              Review requests, chat with guests,
+              manage discounts, GST, payment and
+              verification.
             </p>
           </div>
 
@@ -753,6 +1072,11 @@ export default function AdminBookingsPage() {
           <div style={styles.grid}>
             {bookings.map(
               (booking) => {
+                const thread =
+                  messagesByBooking[
+                    booking.id
+                  ] || [];
+
                 const specialOfferOpen =
                   offerBookingId ===
                   booking.id;
@@ -778,21 +1102,11 @@ export default function AdminBookingsPage() {
                   >
                     <div style={styles.cardTop}>
                       <div>
-                        <div
-                          style={
-                            styles.bookingCode
-                          }
-                        >
-                          {
-                            booking.booking_code
-                          }
+                        <div style={styles.bookingCode}>
+                          {booking.booking_code}
                         </div>
 
-                        <div
-                          style={
-                            styles.created
-                          }
-                        >
+                        <div style={styles.created}>
                           {dateTime(
                             booking.created_at
                           )}
@@ -888,7 +1202,7 @@ export default function AdminBookingsPage() {
                         booking.auto_discount_amount
                       ) > 0 && (
                         <Amount
-                          label="Pre-approved discount"
+                          label="Regular property discount"
                           value={
                             -Number(
                               booking.auto_discount_amount
@@ -982,9 +1296,7 @@ export default function AdminBookingsPage() {
                         <strong>
                           Offer:
                         </strong>{' '}
-                        {
-                          booking.offer_note
-                        }
+                        {booking.offer_note}
                       </div>
                     )}
 
@@ -995,11 +1307,7 @@ export default function AdminBookingsPage() {
                         </strong>
 
                         {booking.guest_discount_message && (
-                          <div
-                            style={{
-                              marginTop: 5,
-                            }}
-                          >
+                          <div style={{ marginTop: 5 }}>
                             {
                               booking.guest_discount_message
                             }
@@ -1008,17 +1316,109 @@ export default function AdminBookingsPage() {
                       </div>
                     )}
 
-                    {booking.notes && (
-                      <div style={styles.notes}>
-                        <strong>
-                          Guest note:
-                        </strong>
-
+                    <div style={styles.chatBox}>
+                      <div style={styles.chatHeader}>
                         <div>
-                          {booking.notes}
+                          <strong>
+                            Guest Conversation
+                          </strong>
+
+                          <div style={styles.chatHelp}>
+                            Booking-linked chat
+                          </div>
                         </div>
+
+                        <a
+                          href={`/admin/messages?booking=${booking.id}`}
+                          style={
+                            styles.fullChatLink
+                          }
+                        >
+                          Open Full Conversation
+                        </a>
                       </div>
-                    )}
+
+                      {booking.notes && (
+                        <div style={styles.guestBubble}>
+                          <div style={styles.messageSender}>
+                            {booking.guest
+                              ?.full_name ||
+                              'Guest'}
+                          </div>
+
+                          <div>
+                            {booking.notes}
+                          </div>
+
+                          <div style={styles.messageTime}>
+                            Original booking message
+                          </div>
+                        </div>
+                      )}
+
+                      {thread.length > 0 ? (
+                        <div style={styles.thread}>
+                          {thread.map(
+                            (chatMessage) => (
+                              <ChatMessage
+                                key={
+                                  chatMessage.id
+                                }
+                                item={
+                                  chatMessage
+                                }
+                              />
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        !booking.notes && (
+                          <div style={styles.noMessages}>
+                            No messages yet.
+                          </div>
+                        )
+                      )}
+
+                      <div style={styles.replyArea}>
+                        <textarea
+                          value={
+                            replyByBooking[
+                              booking.id
+                            ] || ''
+                          }
+                          onChange={(event) =>
+                            setReplyByBooking(
+                              (previous) => ({
+                                ...previous,
+                                [booking.id]:
+                                  event.target.value,
+                              })
+                            )
+                          }
+                          placeholder="Type your reply to the guest..."
+                          style={styles.replyInput}
+                        />
+
+                        <button
+                          type="button"
+                          disabled={
+                            sendingMessageId ===
+                            booking.id
+                          }
+                          onClick={() =>
+                            sendHostReply(
+                              booking
+                            )
+                          }
+                          style={styles.sendReply}
+                        >
+                          {sendingMessageId ===
+                          booking.id
+                            ? 'Sending...'
+                            : 'Send Reply'}
+                        </button>
+                      </div>
+                    </div>
 
                     {booking.host_decision ===
                       'pending' && (
@@ -1240,6 +1640,61 @@ export default function AdminBookingsPage() {
   );
 }
 
+function ChatMessage({
+  item,
+}) {
+  const isHost =
+    item.sender_type ===
+    'host';
+
+  const isSystem =
+    item.sender_type ===
+    'system';
+
+  if (isSystem) {
+    return (
+      <div style={styles.systemMessage}>
+        <div>
+          {item.message}
+        </div>
+
+        <div style={styles.messageTime}>
+          {dateTime(
+            item.created_at
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={
+        isHost
+          ? styles.hostBubble
+          : styles.guestBubble
+      }
+    >
+      <div style={styles.messageSender}>
+        {item.sender_name ||
+          (isHost
+            ? 'Host'
+            : 'Guest')}
+      </div>
+
+      <div>
+        {item.message}
+      </div>
+
+      <div style={styles.messageTime}>
+        {dateTime(
+          item.created_at
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Detail({
   label,
   value,
@@ -1361,8 +1816,7 @@ function StatusBadge({
 const styles = {
   page: {
     minHeight: '100vh',
-    background:
-      '#f6f7f9',
+    background: '#f6f7f9',
     color: '#11213c',
     fontFamily:
       'Arial, sans-serif',
@@ -1481,7 +1935,7 @@ const styles = {
   grid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(390px, 1fr))',
+      'repeat(auto-fit, minmax(420px, 1fr))',
     gap: 20,
   },
 
@@ -1619,11 +2073,128 @@ const styles = {
     borderRadius: 10,
   },
 
-  notes: {
-    background: '#fff8e9',
+  chatBox: {
+    marginTop: 18,
+    padding: 15,
+    border:
+      '1px solid #dbe2ea',
+    borderRadius: 14,
+    background: '#f8fafc',
+  },
+
+  chatHeader: {
+    display: 'flex',
+    justifyContent:
+      'space-between',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+
+  chatHelp: {
+    marginTop: 3,
+    fontSize: 11,
+    color: '#687080',
+  },
+
+  fullChatLink: {
+    fontSize: 12,
+    fontWeight: 800,
+    color: '#17457f',
+    textDecoration: 'none',
+  },
+
+  thread: {
+    display: 'grid',
+    gap: 8,
+    maxHeight: 300,
+    overflowY: 'auto',
+    padding: '4px 0',
+  },
+
+  guestBubble: {
+    maxWidth: '85%',
+    padding: 11,
+    borderRadius:
+      '12px 12px 12px 3px',
+    background: '#ffffff',
+    border:
+      '1px solid #dfe3e8',
+    marginBottom: 8,
+  },
+
+  hostBubble: {
+    maxWidth: '85%',
+    marginLeft: 'auto',
+    padding: 11,
+    borderRadius:
+      '12px 12px 3px 12px',
+    background: '#eaf2ff',
+    border:
+      '1px solid #c8daf5',
+    marginBottom: 8,
+  },
+
+  systemMessage: {
+    textAlign: 'center',
+    padding: '8px 10px',
+    borderRadius: 9,
+    background: '#fff7dd',
+    color: '#68521d',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+
+  messageSender: {
+    fontSize: 11,
+    fontWeight: 900,
+    marginBottom: 5,
+    color: '#17457f',
+  },
+
+  messageTime: {
+    marginTop: 5,
+    color: '#87909d',
+    fontSize: 10,
+  },
+
+  noMessages: {
     padding: 12,
-    marginTop: 14,
-    borderRadius: 10,
+    textAlign: 'center',
+    color: '#87909d',
+    fontSize: 12,
+  },
+
+  replyArea: {
+    display: 'grid',
+    gridTemplateColumns:
+      '1fr auto',
+    gap: 9,
+    alignItems: 'end',
+    marginTop: 10,
+  },
+
+  replyInput: {
+    width: '100%',
+    boxSizing: 'border-box',
+    minHeight: 65,
+    resize: 'vertical',
+    padding: 10,
+    border:
+      '1px solid #ccd1d8',
+    borderRadius: 9,
+    background: '#fff',
+  },
+
+  sendReply: {
+    border: 0,
+    background: '#17457f',
+    color: '#fff',
+    borderRadius: 9,
+    padding: '12px 16px',
+    fontWeight: 800,
+    cursor: 'pointer',
   },
 
   actionGrid: {
