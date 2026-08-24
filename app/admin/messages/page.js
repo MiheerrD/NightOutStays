@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useSearchParams } from 'next/navigation';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -19,39 +18,26 @@ function formatDateTime(value) {
 }
 
 export default function AdminMessagesPage() {
-  const searchParams = useSearchParams();
+  const [session, setSession] = useState(null);
+  const [adminProfile, setAdminProfile] = useState(null);
 
-  const requestedBookingId =
-    searchParams.get('booking');
+  const [loading, setLoading] = useState(true);
 
-  const [session, setSession] =
-    useState(null);
-
-  const [adminProfile, setAdminProfile] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [bookings, setBookings] =
-    useState([]);
-
-  const [messages, setMessages] =
-    useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [messages, setMessages] = useState([]);
 
   const [
     selectedBookingId,
     setSelectedBookingId,
   ] = useState('');
 
-  const [reply, setReply] =
-    useState('');
+  const [reply, setReply] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const [sending, setSending] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState('');
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
 
   useEffect(() => {
     initialize();
@@ -65,8 +51,7 @@ export default function AdminMessagesPage() {
       const {
         data: { session },
         error: sessionError,
-      } =
-        await supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
       if (sessionError) {
         throw sessionError;
@@ -81,21 +66,20 @@ export default function AdminMessagesPage() {
       const {
         data: profile,
         error: profileError,
-      } =
-        await supabase
-          .from('admin_profiles')
-          .select(
-            'user_id, full_name, role, is_active'
-          )
-          .eq(
-            'user_id',
-            session.user.id
-          )
-          .eq(
-            'is_active',
-            true
-          )
-          .single();
+      } = await supabase
+        .from('admin_profiles')
+        .select(
+          'user_id, full_name, role, is_active'
+        )
+        .eq(
+          'user_id',
+          session.user.id
+        )
+        .eq(
+          'is_active',
+          true
+        )
+        .single();
 
       if (
         profileError ||
@@ -108,7 +92,24 @@ export default function AdminMessagesPage() {
 
       setAdminProfile(profile);
 
-      await loadInbox();
+      let requestedBookingId = '';
+
+      if (
+        typeof window !==
+        'undefined'
+      ) {
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
+
+        requestedBookingId =
+          params.get('booking') || '';
+      }
+
+      await loadInbox(
+        requestedBookingId
+      );
     } catch (error) {
       console.error(error);
 
@@ -121,20 +122,21 @@ export default function AdminMessagesPage() {
     }
   }
 
-  async function loadInbox() {
+  async function loadInbox(
+    requestedBookingId = ''
+  ) {
     const {
       data: bookingRows,
       error: bookingError,
-    } =
-      await supabase
-        .from('bookings')
-        .select('*')
-        .order(
-          'created_at',
-          {
-            ascending: false,
-          }
-        );
+    } = await supabase
+      .from('bookings')
+      .select('*')
+      .order(
+        'created_at',
+        {
+          ascending: false,
+        }
+      );
 
     if (bookingError) {
       throw bookingError;
@@ -146,6 +148,7 @@ export default function AdminMessagesPage() {
     if (!rows.length) {
       setBookings([]);
       setMessages([]);
+      setSelectedBookingId('');
       return;
     }
 
@@ -181,69 +184,74 @@ export default function AdminMessagesPage() {
       propertiesResult,
       guestsResult,
       messagesResult,
-    ] =
-      await Promise.all([
-        propertyIds.length
-          ? supabase
-              .from('properties')
-              .select(
-                'id, name, location_name'
-              )
-              .in(
-                'id',
-                propertyIds
-              )
-          : Promise.resolve({
-              data: [],
-              error: null,
-            }),
+    ] = await Promise.all([
+      propertyIds.length
+        ? supabase
+            .from('properties')
+            .select(
+              'id, name, location_name'
+            )
+            .in(
+              'id',
+              propertyIds
+            )
+        : Promise.resolve({
+            data: [],
+            error: null,
+          }),
 
-        guestIds.length
-          ? supabase
-              .from('guests')
-              .select(
-                'id, full_name, phone, email'
-              )
-              .in(
-                'id',
-                guestIds
-              )
-          : Promise.resolve({
-              data: [],
-              error: null,
-            }),
+      guestIds.length
+        ? supabase
+            .from('guests')
+            .select(
+              'id, full_name, phone, email'
+            )
+            .in(
+              'id',
+              guestIds
+            )
+        : Promise.resolve({
+            data: [],
+            error: null,
+          }),
 
-        bookingIds.length
-          ? supabase
-              .from(
-                'booking_messages'
-              )
-              .select('*')
-              .in(
-                'booking_id',
-                bookingIds
-              )
-              .order(
-                'created_at',
-                {
-                  ascending: true,
-                }
-              )
-          : Promise.resolve({
-              data: [],
-              error: null,
-            }),
-      ]);
+      bookingIds.length
+        ? supabase
+            .from(
+              'booking_messages'
+            )
+            .select('*')
+            .in(
+              'booking_id',
+              bookingIds
+            )
+            .order(
+              'created_at',
+              {
+                ascending: true,
+              }
+            )
+        : Promise.resolve({
+            data: [],
+            error: null,
+          }),
+    ]);
 
-    if (propertiesResult.error) {
+    if (
+      propertiesResult.error
+    ) {
       throw propertiesResult.error;
     }
 
-    if (guestsResult.error) {
+    if (
+      guestsResult.error
+    ) {
       throw guestsResult.error;
     }
 
-    if (messagesResult.error) {
+    if (
+      messagesResult.error
+    ) {
       throw messagesResult.error;
     }
 
@@ -299,7 +307,7 @@ export default function AdminMessagesPage() {
         []
     );
 
-    const validRequestedBooking =
+    const requestedExists =
       requestedBookingId &&
       enrichedBookings.some(
         (booking) =>
@@ -307,52 +315,94 @@ export default function AdminMessagesPage() {
           requestedBookingId
       );
 
-    if (validRequestedBooking) {
+    if (requestedExists) {
       setSelectedBookingId(
         requestedBookingId
       );
-    } else if (
-      !selectedBookingId &&
-      enrichedBookings.length
-    ) {
-      setSelectedBookingId(
-        enrichedBookings[0].id
+
+      await markThreadReadOnly(
+        requestedBookingId
       );
+
+      return;
     }
+
+    setSelectedBookingId(
+      (previous) => {
+        const previousExists =
+          previous &&
+          enrichedBookings.some(
+            (booking) =>
+              booking.id ===
+              previous
+          );
+
+        if (
+          previousExists
+        ) {
+          return previous;
+        }
+
+        return (
+          enrichedBookings[0]
+            ?.id || ''
+        );
+      }
+    );
   }
 
   const threads =
     useMemo(() => {
-      return bookings.map(
-        (booking) => {
-          const bookingMessages =
-            messages.filter(
-              (item) =>
-                item.booking_id ===
-                booking.id
-            );
+      return bookings
+        .map(
+          (booking) => {
+            const bookingMessages =
+              messages.filter(
+                (item) =>
+                  item.booking_id ===
+                  booking.id
+              );
 
-          const lastMessage =
-            bookingMessages.length
-              ? bookingMessages[
-                  bookingMessages.length -
-                    1
-                ]
-              : null;
+            const lastMessage =
+              bookingMessages.length
+                ? bookingMessages[
+                    bookingMessages.length -
+                      1
+                  ]
+                : null;
 
-          return {
-            booking,
-            messages:
-              bookingMessages,
+            const unread =
+              bookingMessages.filter(
+                (item) =>
+                  item.sender_type ===
+                    'guest' &&
+                  !item.is_read
+              ).length;
 
-            lastMessage,
+            return {
+              booking,
+              messages:
+                bookingMessages,
 
-            displayTime:
-              lastMessage?.created_at ||
-              booking.created_at,
-          };
-        }
-      );
+              lastMessage,
+              unread,
+
+              displayTime:
+                lastMessage
+                  ?.created_at ||
+                booking.created_at,
+            };
+          }
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              b.displayTime || 0
+            ) -
+            new Date(
+              a.displayTime || 0
+            )
+        );
     }, [
       bookings,
       messages,
@@ -370,6 +420,89 @@ export default function AdminMessagesPage() {
       selectedBookingId,
     ]);
 
+  async function markThreadReadOnly(
+    bookingId
+  ) {
+    const {
+      error,
+    } = await supabase
+      .from(
+        'booking_messages'
+      )
+      .update({
+        is_read: true,
+      })
+      .eq(
+        'booking_id',
+        bookingId
+      )
+      .eq(
+        'sender_type',
+        'guest'
+      )
+      .eq(
+        'is_read',
+        false
+      );
+
+    if (error) {
+      console.error(
+        error
+      );
+    }
+  }
+
+  async function openThread(
+    bookingId
+  ) {
+    setSelectedBookingId(
+      bookingId
+    );
+
+    setReply('');
+
+    await markThreadReadOnly(
+      bookingId
+    );
+
+    setMessages(
+      (previous) =>
+        previous.map(
+          (item) =>
+            item.booking_id ===
+              bookingId &&
+            item.sender_type ===
+              'guest'
+              ? {
+                  ...item,
+                  is_read: true,
+                }
+              : item
+        )
+    );
+
+    if (
+      typeof window !==
+      'undefined'
+    ) {
+      const url =
+        new URL(
+          window.location.href
+        );
+
+      url.searchParams.set(
+        'booking',
+        bookingId
+      );
+
+      window.history.replaceState(
+        {},
+        '',
+        url
+      );
+    }
+  }
+
   async function sendReply() {
     const text =
       reply.trim();
@@ -386,33 +519,34 @@ export default function AdminMessagesPage() {
 
     try {
       const {
+        data,
         error,
-      } =
-        await supabase
-          .from(
-            'booking_messages'
-          )
-          .insert({
-            booking_id:
-              selectedThread.booking
-                .id,
+      } = await supabase
+        .from(
+          'booking_messages'
+        )
+        .insert({
+          booking_id:
+            selectedThread.booking
+              .id,
 
-            sender_type:
-              'host',
+          sender_type:
+            'host',
 
-            sender_name:
-              adminProfile?.full_name ||
-              'Host',
+          sender_name:
+            adminProfile?.full_name ||
+            'Host',
 
-            message:
-              text,
+          message: text,
 
-            message_type:
-              'message',
+          message_type:
+            'message',
 
-            is_read:
-              false,
-          });
+          is_read:
+            false,
+        })
+        .select('*')
+        .single();
 
       if (error) {
         throw error;
@@ -420,60 +554,50 @@ export default function AdminMessagesPage() {
 
       setReply('');
 
-      await loadInbox();
+      setMessages(
+        (previous) => [
+          ...previous,
+          data,
+        ]
+      );
     } catch (error) {
+      console.error(error);
+
       setErrorMessage(
-        `Unable to send message: ${error.message}`
+        `Unable to send message: ${
+          error.message ||
+          'Unknown error'
+        }`
       );
     } finally {
       setSending(false);
     }
   }
 
-  async function markThreadRead(
-    bookingId
-  ) {
-    setSelectedBookingId(
-      bookingId
-    );
+  async function refreshInbox() {
+    try {
+      setErrorMessage('');
 
-    await supabase
-      .from(
-        'booking_messages'
-      )
-      .update({
-        is_read:
-          true,
-      })
-      .eq(
-        'booking_id',
-        bookingId
-      )
-      .eq(
-        'sender_type',
-        'guest'
-      )
-      .eq(
-        'is_read',
-        false
+      await loadInbox(
+        selectedBookingId
       );
+    } catch (error) {
+      console.error(error);
 
-    setMessages(
-      (previous) =>
-        previous.map(
-          (item) =>
-            item.booking_id ===
-              bookingId &&
-            item.sender_type ===
-              'guest'
-              ? {
-                  ...item,
-                  is_read:
-                    true,
-                }
-              : item
-        )
-    );
+      setErrorMessage(
+        `Unable to refresh messages: ${
+          error.message ||
+          'Unknown error'
+        }`
+      );
+    }
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+
+    window.location.href =
+      '/admin/bookings';
   }
 
   if (loading) {
@@ -490,13 +614,62 @@ export default function AdminMessagesPage() {
   ) {
     return (
       <main style={styles.loading}>
-        Admin login required.
+        <h2>
+          Admin login required
+        </h2>
+
+        <p>
+          Please login through the admin area.
+        </p>
+
+        <a
+          href="/admin/bookings"
+          style={
+            styles.adminLink
+          }
+        >
+          Go to Admin
+        </a>
       </main>
     );
   }
 
   return (
     <main style={styles.page}>
+      <header style={styles.header}>
+        <div>
+          <div style={styles.brand}>
+            NightOutStays
+          </div>
+
+          <div style={styles.subBrand}>
+            Guest Messages
+          </div>
+        </div>
+
+        <div style={styles.headerRight}>
+          <div>
+            <strong>
+              {adminProfile.full_name ||
+                'Administrator'}
+            </strong>
+
+            <div style={styles.role}>
+              {adminProfile.role ||
+                'admin'}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            style={styles.logout}
+          >
+            Logout
+          </button>
+        </div>
+      </header>
+
       <section style={styles.container}>
         <div style={styles.headingRow}>
           <div>
@@ -505,14 +678,14 @@ export default function AdminMessagesPage() {
             </h1>
 
             <p style={styles.muted}>
-              All guest conversations linked to booking requests.
+              All booking-linked guest conversations in one place.
             </p>
           </div>
 
           <button
             type="button"
             onClick={
-              loadInbox
+              refreshInbox
             }
             style={
               styles.refreshButton
@@ -530,26 +703,27 @@ export default function AdminMessagesPage() {
 
         <div style={styles.messagingLayout}>
           <aside style={styles.threadList}>
-            {threads.length === 0 ? (
+            <div style={styles.inboxTitle}>
+              Conversations
+              <span style={styles.inboxCount}>
+                {threads.length}
+              </span>
+            </div>
+
+            {threads.length ===
+            0 ? (
               <div style={styles.empty}>
                 No conversations yet.
               </div>
             ) : (
               threads.map(
-                ({
-                  booking,
-                  lastMessage,
-                  displayTime,
-                  messages:
-                    threadMessages,
-                }) => {
-                  const unread =
-                    threadMessages.filter(
-                      (item) =>
-                        item.sender_type ===
-                          'guest' &&
-                        !item.is_read
-                    ).length;
+                (thread) => {
+                  const {
+                    booking,
+                    lastMessage,
+                    displayTime,
+                    unread,
+                  } = thread;
 
                   const selected =
                     booking.id ===
@@ -562,7 +736,7 @@ export default function AdminMessagesPage() {
                       }
                       type="button"
                       onClick={() =>
-                        markThreadRead(
+                        openThread(
                           booking.id
                         )
                       }
@@ -622,7 +796,7 @@ export default function AdminMessagesPage() {
           <section style={styles.conversation}>
             {!selectedThread ? (
               <div style={styles.noSelection}>
-                Select a conversation.
+                Select a conversation to view messages.
               </div>
             ) : (
               <>
@@ -630,26 +804,28 @@ export default function AdminMessagesPage() {
                   <div>
                     <h2 style={styles.guestName}>
                       {selectedThread.booking
-                        .guest?.full_name ||
+                        .guest
+                        ?.full_name ||
                         'Guest'}
                     </h2>
 
-                    <div style={styles.muted}>
+                    <div style={styles.bookingInfo}>
                       {
                         selectedThread.booking
                           .booking_code
                       }
                       {' · '}
                       {selectedThread.booking
-                        .property?.name ||
-                        ''}
+                        .property
+                        ?.name ||
+                        'Property'}
                     </div>
 
-                    <div style={styles.muted}>
-                      {
-                        selectedThread.booking
-                          .guest?.phone
-                      }
+                    <div style={styles.contactInfo}>
+                      {selectedThread.booking
+                        .guest?.phone ||
+                        ''}
+
                       {selectedThread.booking
                         .guest?.email
                         ? ` · ${selectedThread.booking.guest.email}`
@@ -658,30 +834,46 @@ export default function AdminMessagesPage() {
                   </div>
 
                   <a
-                    href={`/admin/bookings`}
+                    href="/admin/bookings"
                     style={styles.bookingLink}
                   >
-                    View Booking
+                    View Bookings
                   </a>
                 </div>
 
                 <div style={styles.messagesArea}>
                   {selectedThread.booking
-                    .notes && (
-                    <MessageBubble
-                      senderType="guest"
-                      senderName={
-                        selectedThread.booking
-                          .guest?.full_name ||
-                        'Guest'
-                      }
-                      message={
-                        selectedThread.booking
-                          .notes
-                      }
-                      time="Original booking message"
-                    />
-                  )}
+                    .notes &&
+                    selectedThread.messages
+                      .length ===
+                      0 && (
+                      <MessageBubble
+                        senderType="guest"
+                        senderName={
+                          selectedThread
+                            .booking
+                            .guest
+                            ?.full_name ||
+                          'Guest'
+                        }
+                        message={
+                          selectedThread
+                            .booking
+                            .notes
+                        }
+                        time="Original booking message"
+                      />
+                    )}
+
+                  {selectedThread.messages
+                    .length ===
+                    0 &&
+                    !selectedThread.booking
+                      .notes && (
+                      <div style={styles.emptyConversation}>
+                        No messages yet.
+                      </div>
+                    )}
 
                   {selectedThread.messages.map(
                     (item) => (
@@ -716,7 +908,7 @@ export default function AdminMessagesPage() {
                         event.target.value
                       )
                     }
-                    placeholder="Type your reply..."
+                    placeholder="Type your reply to the guest..."
                     style={styles.textarea}
                   />
 
@@ -729,11 +921,19 @@ export default function AdminMessagesPage() {
                       sending ||
                       !reply.trim()
                     }
-                    style={styles.sendButton}
+                    style={{
+                      ...styles.sendButton,
+
+                      opacity:
+                        sending ||
+                        !reply.trim()
+                          ? 0.55
+                          : 1,
+                    }}
                   >
                     {sending
                       ? 'Sending...'
-                      : 'Send'}
+                      : 'Send Reply'}
                   </button>
                 </div>
               </>
@@ -787,7 +987,7 @@ function MessageBubble({
             : 'Guest')}
       </div>
 
-      <div>
+      <div style={styles.messageText}>
         {message}
       </div>
 
@@ -803,25 +1003,75 @@ const styles = {
     minHeight: '100vh',
     background: '#f5f7fa',
     color: '#11213c',
-    fontFamily: 'Arial, sans-serif',
+    fontFamily:
+      'Arial, sans-serif',
   },
 
   loading: {
     padding: 40,
-    fontFamily: 'Arial, sans-serif',
+    fontFamily:
+      'Arial, sans-serif',
+  },
+
+  header: {
+    background: '#ffffff',
+    borderBottom:
+      '1px solid #e1e5ea',
+    padding: '17px 3vw',
+    display: 'flex',
+    justifyContent:
+      'space-between',
+    alignItems: 'center',
+    gap: 20,
+  },
+
+  brand: {
+    fontSize: 25,
+    fontWeight: 900,
+    color: '#17457f',
+  },
+
+  subBrand: {
+    marginTop: 2,
+    color: '#687080',
+  },
+
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 18,
+  },
+
+  role: {
+    color: '#687080',
+    fontSize: 11,
+    textTransform:
+      'capitalize',
+  },
+
+  logout: {
+    border:
+      '1px solid #d6dae0',
+    background: '#ffffff',
+    padding: '9px 14px',
+    borderRadius: 20,
+    cursor: 'pointer',
   },
 
   container: {
-    padding: '35px 3vw 70px',
+    maxWidth: 1500,
+    margin: '0 auto',
+    padding: '32px 3vw 70px',
   },
 
   headingRow: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
     gap: 20,
     flexWrap: 'wrap',
-    marginBottom: 22,
+    marginBottom: 20,
   },
 
   heading: {
@@ -855,25 +1105,56 @@ const styles = {
 
   messagingLayout: {
     display: 'grid',
-    gridTemplateColumns: '360px minmax(0, 1fr)',
-    minHeight: '70vh',
+    gridTemplateColumns:
+      '360px minmax(0, 1fr)',
+    minHeight: '72vh',
     background: '#ffffff',
-    border: '1px solid #dde2e7',
+    border:
+      '1px solid #dde2e7',
     borderRadius: 16,
     overflow: 'hidden',
   },
 
   threadList: {
-    borderRight: '1px solid #e2e5e8',
+    borderRight:
+      '1px solid #e2e5e8',
     overflowY: 'auto',
-    maxHeight: '75vh',
+    maxHeight: '78vh',
+  },
+
+  inboxTitle: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
+    background: '#ffffff',
+    borderBottom:
+      '1px solid #e5e7eb',
+    padding: 16,
+    fontWeight: 900,
+    display: 'flex',
+    justifyContent:
+      'space-between',
+    alignItems: 'center',
+  },
+
+  inboxCount: {
+    display: 'inline-flex',
+    minWidth: 25,
+    height: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    background: '#edf3fb',
+    color: '#17457f',
+    fontSize: 11,
   },
 
   threadButton: {
     width: '100%',
     textAlign: 'left',
     border: 0,
-    borderBottom: '1px solid #e8eaed',
+    borderBottom:
+      '1px solid #e8eaed',
     background: '#ffffff',
     padding: 16,
     cursor: 'pointer',
@@ -881,11 +1162,14 @@ const styles = {
 
   selectedThread: {
     background: '#edf4ff',
+    borderLeft:
+      '4px solid #17457f',
   },
 
   threadTop: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     gap: 10,
   },
 
@@ -931,16 +1215,19 @@ const styles = {
   },
 
   conversation: {
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
-    minWidth: 0,
   },
 
   conversationHeader: {
+    background: '#ffffff',
+    borderBottom:
+      '1px solid #e2e5e8',
     padding: 18,
-    borderBottom: '1px solid #e2e5e8',
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     alignItems: 'center',
     gap: 15,
   },
@@ -949,10 +1236,23 @@ const styles = {
     margin: 0,
   },
 
+  bookingInfo: {
+    marginTop: 5,
+    color: '#17457f',
+    fontWeight: 700,
+    fontSize: 13,
+  },
+
+  contactInfo: {
+    marginTop: 4,
+    color: '#687080',
+    fontSize: 12,
+  },
+
   bookingLink: {
-    textDecoration: 'none',
     color: '#17457f',
     fontWeight: 800,
+    textDecoration: 'none',
   },
 
   messagesArea: {
@@ -960,14 +1260,17 @@ const styles = {
     overflowY: 'auto',
     padding: 20,
     background: '#f8fafc',
+    maxHeight: '60vh',
   },
 
   guestBubble: {
     width: 'fit-content',
     maxWidth: '75%',
     background: '#ffffff',
-    border: '1px solid #dfe4e9',
-    borderRadius: '14px 14px 14px 4px',
+    border:
+      '1px solid #dfe4e9',
+    borderRadius:
+      '14px 14px 14px 4px',
     padding: 12,
     marginBottom: 12,
   },
@@ -977,8 +1280,10 @@ const styles = {
     maxWidth: '75%',
     marginLeft: 'auto',
     background: '#e8f1ff',
-    border: '1px solid #c7daf5',
-    borderRadius: '14px 14px 4px 14px',
+    border:
+      '1px solid #c7daf5',
+    borderRadius:
+      '14px 14px 4px 14px',
     padding: 12,
     marginBottom: 12,
   },
@@ -1001,6 +1306,11 @@ const styles = {
     marginBottom: 5,
   },
 
+  messageText: {
+    whiteSpace: 'pre-wrap',
+    lineHeight: 1.45,
+  },
+
   messageTime: {
     marginTop: 6,
     color: '#929aa4',
@@ -1009,20 +1319,23 @@ const styles = {
 
   replyBox: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto',
+    gridTemplateColumns:
+      '1fr auto',
     gap: 10,
     padding: 15,
-    borderTop: '1px solid #e2e5e8',
+    borderTop:
+      '1px solid #e2e5e8',
     background: '#ffffff',
   },
 
   textarea: {
     width: '100%',
     boxSizing: 'border-box',
-    minHeight: 65,
+    minHeight: 70,
     resize: 'vertical',
     padding: 11,
-    border: '1px solid #ccd1d8',
+    border:
+      '1px solid #ccd1d8',
     borderRadius: 9,
   },
 
@@ -1042,8 +1355,24 @@ const styles = {
     color: '#687080',
   },
 
+  emptyConversation: {
+    textAlign: 'center',
+    color: '#687080',
+    padding: 30,
+  },
+
   empty: {
     padding: 25,
     color: '#687080',
+  },
+
+  adminLink: {
+    display: 'inline-block',
+    marginTop: 12,
+    background: '#17457f',
+    color: '#ffffff',
+    textDecoration: 'none',
+    padding: '10px 15px',
+    borderRadius: 8,
   },
 };
