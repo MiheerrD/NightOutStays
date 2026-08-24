@@ -6,84 +6,372 @@ export function roundCurrency(value) {
   );
 }
 
+/*
+  ---------------------------------------------------------
+  MANUAL DATE RATE OVERRIDES
+  ---------------------------------------------------------
+
+  Host can set:
+
+  15 Aug = ₹5,000
+
+  OR
+
+  24 Dec to 01 Jan = ₹7,500/night
+
+  This NEVER changes property.base_price.
+
+  Priority:
+  Manual Date Override
+  → otherwise normal Base + Dynamic Pricing
+*/
+
+export function findRateOverrideForDate(
+  date,
+  overrides = []
+) {
+  const matches =
+    overrides.filter(
+      (override) => {
+        if (
+          override.is_active ===
+          false
+        ) {
+          return false;
+        }
+
+        if (
+          !override.start_date ||
+          !override.end_date
+        ) {
+          return false;
+        }
+
+        if (
+          date <
+          override.start_date
+        ) {
+          return false;
+        }
+
+        if (
+          date >
+          override.end_date
+        ) {
+          return false;
+        }
+
+        return true;
+      }
+    );
+
+  if (!matches.length) {
+    return null;
+  }
+
+  /*
+    If somehow two overrides overlap,
+    the most recently created/updated
+    override gets priority.
+  */
+
+  const sorted =
+    [...matches].sort(
+      (a, b) => {
+        const aTime =
+          new Date(
+            a.updated_at ||
+              a.created_at ||
+              0
+          ).getTime();
+
+        const bTime =
+          new Date(
+            b.updated_at ||
+              b.created_at ||
+              0
+          ).getTime();
+
+        return (
+          bTime - aTime
+        );
+      }
+    );
+
+  return sorted[0];
+}
+
 export function calculateNightlyRate({
   basePrice,
+
   guestCount,
+
   includedGuests,
+
   extraGuestFee,
+
   date,
+
   dynamicPricingEnabled,
+
   weekendMarkupPercent,
+
   longWeekendMarkupPercent,
+
   festivalMarkupPercent,
+
   seasonMarkupPercent,
+
   specialRule,
+
+  rateOverride = null,
 }) {
-  let nightlyRate = Number(basePrice || 0);
+  /*
+    Extra guest fee remains applicable
+    even when the host manually overrides
+    the accommodation rate.
 
-  const guests = Number(guestCount || 0);
-  const included = Number(includedGuests || 0);
-  const extraFee = Number(extraGuestFee || 0);
+    Example:
+    Manual rate = ₹5,000
+    Extra guest fee = ₹500
+    1 extra guest
 
-  if (guests > included) {
-    nightlyRate +=
-      (guests - included) * extraFee;
+    Night total = ₹5,500
+  */
+
+  const guests =
+    Number(
+      guestCount || 0
+    );
+
+  const included =
+    Number(
+      includedGuests || 0
+    );
+
+  const extraFee =
+    Number(
+      extraGuestFee || 0
+    );
+
+  let extraGuestAmount = 0;
+
+  if (
+    guests >
+    included
+  ) {
+    extraGuestAmount =
+      (
+        guests -
+        included
+      ) *
+      extraFee;
   }
+
+  /*
+    MANUAL OVERRIDE HAS FIRST PRIORITY.
+
+    Dynamic pricing is NOT applied
+    on top of a manual override.
+  */
+
+  if (rateOverride) {
+    const manualRate =
+      Number(
+        rateOverride.nightly_rate ||
+          0
+      );
+
+    const finalRate =
+      manualRate +
+      extraGuestAmount;
+
+    return {
+      nightlyRate:
+        roundCurrency(
+          finalRate
+        ),
+
+      accommodationRate:
+        roundCurrency(
+          manualRate
+        ),
+
+      extraGuestAmount:
+        roundCurrency(
+          extraGuestAmount
+        ),
+
+      rateSource:
+        'manual_override',
+
+      rateSourceLabel:
+        'Manual Rate',
+
+      rateOverrideId:
+        rateOverride.id ||
+        null,
+
+      rateOverrideNote:
+        rateOverride.note ||
+        null,
+
+      adjustments: [
+        {
+          type:
+            'manual_override',
+
+          label:
+            rateOverride.note ||
+            'Host manual rate',
+
+          amount:
+            roundCurrency(
+              manualRate
+            ),
+        },
+
+        ...(extraGuestAmount >
+        0
+          ? [
+              {
+                type:
+                  'extra_guest',
+
+                label:
+                  'Extra guest fee',
+
+                amount:
+                  roundCurrency(
+                    extraGuestAmount
+                  ),
+              },
+            ]
+          : []),
+      ],
+    };
+  }
+
+  /*
+    No manual override:
+    calculate normal property pricing.
+  */
+
+  let nightlyRate =
+    Number(
+      basePrice || 0
+    );
+
+  nightlyRate +=
+    extraGuestAmount;
 
   const adjustments = [];
 
-  if (dynamicPricingEnabled) {
-    const day = new Date(
-      `${date}T12:00:00`
-    ).getDay();
+  if (
+    extraGuestAmount >
+    0
+  ) {
+    adjustments.push({
+      type:
+        'extra_guest',
+
+      label:
+        'Extra guest fee',
+
+      amount:
+        roundCurrency(
+          extraGuestAmount
+        ),
+    });
+  }
+
+  let dynamicPricingApplied =
+    false;
+
+  if (
+    dynamicPricingEnabled
+  ) {
+    const day =
+      new Date(
+        `${date}T12:00:00`
+      ).getDay();
 
     const isWeekend =
-      day === 5 || day === 6;
+      day === 5 ||
+      day === 6;
 
     if (isWeekend) {
-      const percent = Number(
-        weekendMarkupPercent || 0
-      );
+      const percent =
+        Number(
+          weekendMarkupPercent ||
+            0
+        );
 
-      const amount =
-        nightlyRate *
-        (percent / 100);
+      if (
+        percent !== 0
+      ) {
+        const amount =
+          nightlyRate *
+          (percent / 100);
 
-      nightlyRate += amount;
+        nightlyRate +=
+          amount;
 
-      adjustments.push({
-        type: 'weekend',
-        label: 'Weekend markup',
-        percent,
-        amount:
-          roundCurrency(amount),
-      });
+        dynamicPricingApplied =
+          true;
+
+        adjustments.push({
+          type:
+            'weekend',
+
+          label:
+            'Weekend markup',
+
+          percent,
+
+          amount:
+            roundCurrency(
+              amount
+            ),
+        });
+      }
     }
 
     if (
       specialRule?.type ===
       'long_weekend'
     ) {
-      const percent = Number(
-        specialRule.percent ??
-          longWeekendMarkupPercent ??
-          0
-      );
+      const percent =
+        Number(
+          specialRule.percent ??
+            longWeekendMarkupPercent ??
+            0
+        );
 
       const amount =
         nightlyRate *
         (percent / 100);
 
-      nightlyRate += amount;
+      nightlyRate +=
+        amount;
+
+      dynamicPricingApplied =
+        true;
 
       adjustments.push({
-        type: 'long_weekend',
+        type:
+          'long_weekend',
+
         label:
           specialRule.label ||
           'Long weekend markup',
+
         percent,
+
         amount:
-          roundCurrency(amount),
+          roundCurrency(
+            amount
+          ),
       });
     }
 
@@ -91,26 +379,37 @@ export function calculateNightlyRate({
       specialRule?.type ===
       'festival'
     ) {
-      const percent = Number(
-        specialRule.percent ??
-          festivalMarkupPercent ??
-          0
-      );
+      const percent =
+        Number(
+          specialRule.percent ??
+            festivalMarkupPercent ??
+            0
+        );
 
       const amount =
         nightlyRate *
         (percent / 100);
 
-      nightlyRate += amount;
+      nightlyRate +=
+        amount;
+
+      dynamicPricingApplied =
+        true;
 
       adjustments.push({
-        type: 'festival',
+        type:
+          'festival',
+
         label:
           specialRule.label ||
           'Festival markup',
+
         percent,
+
         amount:
-          roundCurrency(amount),
+          roundCurrency(
+            amount
+          ),
       });
     }
 
@@ -118,26 +417,37 @@ export function calculateNightlyRate({
       specialRule?.type ===
       'season'
     ) {
-      const percent = Number(
-        specialRule.percent ??
-          seasonMarkupPercent ??
-          0
-      );
+      const percent =
+        Number(
+          specialRule.percent ??
+            seasonMarkupPercent ??
+            0
+        );
 
       const amount =
         nightlyRate *
         (percent / 100);
 
-      nightlyRate += amount;
+      nightlyRate +=
+        amount;
+
+      dynamicPricingApplied =
+        true;
 
       adjustments.push({
-        type: 'season',
+        type:
+          'season',
+
         label:
           specialRule.label ||
           'Season markup',
+
         percent,
+
         amount:
-          roundCurrency(amount),
+          roundCurrency(
+            amount
+          ),
       });
     }
 
@@ -151,39 +461,60 @@ export function calculateNightlyRate({
       ) {
         const amount =
           Number(
-            specialRule.value || 0
+            specialRule.value ||
+              0
           );
 
-        nightlyRate += amount;
+        nightlyRate +=
+          amount;
+
+        dynamicPricingApplied =
+          true;
 
         adjustments.push({
-          type: 'custom',
+          type:
+            'custom',
+
           label:
             specialRule.label ||
             'Custom adjustment',
+
           amount:
-            roundCurrency(amount),
+            roundCurrency(
+              amount
+            ),
         });
       } else {
         const percent =
           Number(
-            specialRule.value || 0
+            specialRule.value ||
+              0
           );
 
         const amount =
           nightlyRate *
           (percent / 100);
 
-        nightlyRate += amount;
+        nightlyRate +=
+          amount;
+
+        dynamicPricingApplied =
+          true;
 
         adjustments.push({
-          type: 'custom',
+          type:
+            'custom',
+
           label:
             specialRule.label ||
             'Custom adjustment',
+
           percent,
+
           amount:
-            roundCurrency(amount),
+            roundCurrency(
+              amount
+            ),
         });
       }
     }
@@ -194,6 +525,34 @@ export function calculateNightlyRate({
       roundCurrency(
         nightlyRate
       ),
+
+    accommodationRate:
+      roundCurrency(
+        nightlyRate -
+          extraGuestAmount
+      ),
+
+    extraGuestAmount:
+      roundCurrency(
+        extraGuestAmount
+      ),
+
+    rateSource:
+      dynamicPricingApplied
+        ? 'dynamic'
+        : 'base',
+
+    rateSourceLabel:
+      dynamicPricingApplied
+        ? 'Dynamic Rate'
+        : 'Base Rate',
+
+    rateOverrideId:
+      null,
+
+    rateOverrideNote:
+      null,
+
     adjustments,
   };
 }
@@ -203,50 +562,58 @@ export function findPricingRuleForDate(
   rules = []
 ) {
   const matchingRules =
-    rules.filter((rule) => {
-      if (!rule.is_active) {
-        return false;
-      }
-
-      if (
-        rule.start_date &&
-        date < rule.start_date
-      ) {
-        return false;
-      }
-
-      if (
-        rule.end_date &&
-        date > rule.end_date
-      ) {
-        return false;
-      }
-
-      if (
-        Array.isArray(
-          rule.weekdays
-        ) &&
-        rule.weekdays.length >
-          0
-      ) {
-        const weekday =
-          new Date(
-            `${date}T12:00:00`
-          ).getDay();
-
+    rules.filter(
+      (rule) => {
         if (
-          !rule.weekdays.includes(
-            weekday
-          )
+          !rule.is_active
         ) {
           return false;
         }
+
+        if (
+          rule.start_date &&
+          date <
+            rule.start_date
+        ) {
+          return false;
+        }
+
+        if (
+          rule.end_date &&
+          date >
+            rule.end_date
+        ) {
+          return false;
+        }
+
+        if (
+          Array.isArray(
+            rule.weekdays
+          ) &&
+          rule.weekdays.length >
+            0
+        ) {
+          const weekday =
+            new Date(
+              `${date}T12:00:00`
+            ).getDay();
+
+          if (
+            !rule.weekdays.includes(
+              weekday
+            )
+          ) {
+            return false;
+          }
+        }
+
+        return true;
       }
+    );
 
-      return true;
-    });
-
-  if (!matchingRules.length) {
+  if (
+    !matchingRules.length
+  ) {
     return null;
   }
 
@@ -264,18 +631,131 @@ export function findPricingRuleForDate(
   return sorted[0];
 }
 
+/*
+  ---------------------------------------------------------
+  GET RATE FOR ONE CALENDAR DATE
+  ---------------------------------------------------------
+
+  We will use this function on BOTH:
+
+  Guest Property Calendar
+  Host Property Calendar
+
+  This guarantees that calendar price
+  and booking price always use the
+  same calculation.
+*/
+
+export function calculateCalendarDateRate({
+  property,
+
+  date,
+
+  guestCount = null,
+
+  pricingRules = [],
+
+  rateOverrides = [],
+}) {
+  if (
+    !property ||
+    !date
+  ) {
+    return {
+      valid: false,
+
+      error:
+        'Property and date are required.',
+    };
+  }
+
+  const guests =
+    Number(
+      guestCount ??
+        property.included_guests ??
+        property.min_guests ??
+        1
+    );
+
+  const pricingRule =
+    findPricingRuleForDate(
+      date,
+      pricingRules
+    );
+
+  const rateOverride =
+    findRateOverrideForDate(
+      date,
+      rateOverrides
+    );
+
+  const result =
+    calculateNightlyRate({
+      basePrice:
+        property.base_price,
+
+      guestCount:
+        guests,
+
+      includedGuests:
+        property.included_guests,
+
+      extraGuestFee:
+        property.extra_guest_fee,
+
+      date,
+
+      dynamicPricingEnabled:
+        property.dynamic_pricing_enabled,
+
+      weekendMarkupPercent:
+        property.weekend_markup_percent,
+
+      longWeekendMarkupPercent:
+        property.long_weekend_markup_percent,
+
+      festivalMarkupPercent:
+        property.festival_markup_percent,
+
+      seasonMarkupPercent:
+        property.season_markup_percent,
+
+      specialRule:
+        pricingRule,
+
+      rateOverride,
+    });
+
+  return {
+    valid: true,
+
+    date,
+
+    ...result,
+  };
+}
+
 export function calculateBookingPrice({
   property,
+
   guestCount,
+
   checkIn,
+
   checkOut,
+
   pricingRules = [],
+
+  rateOverrides = [],
+
   offer = null,
+
   gstRate = 18,
 }) {
   if (!property) {
     return {
       valid: false,
+
       error:
         'Property is required.',
     };
@@ -288,19 +768,23 @@ export function calculateBookingPrice({
 
   const minGuests =
     Number(
-      property.min_guests || 1
+      property.min_guests ||
+        1
     );
 
   const maxGuests =
     Number(
-      property.max_guests || 1
+      property.max_guests ||
+        1
     );
 
   if (
-    guests < minGuests
+    guests <
+    minGuests
   ) {
     return {
       valid: false,
+
       error: `Minimum ${minGuests} guest${
         minGuests === 1
           ? ''
@@ -310,10 +794,12 @@ export function calculateBookingPrice({
   }
 
   if (
-    guests > maxGuests
+    guests >
+    maxGuests
   ) {
     return {
       valid: false,
+
       error: `Maximum ${maxGuests} guests allowed.`,
     };
   }
@@ -338,6 +824,7 @@ export function calculateBookingPrice({
   ) {
     return {
       valid: false,
+
       error:
         'Please select valid dates.',
     };
@@ -360,6 +847,7 @@ export function calculateBookingPrice({
   ) {
     return {
       valid: false,
+
       error:
         'Check-out must be after check-in.',
     };
@@ -379,10 +867,12 @@ export function calculateBookingPrice({
       : null;
 
   if (
-    nights < minStay
+    nights <
+    minStay
   ) {
     return {
       valid: false,
+
       error: `Minimum stay is ${minStay} night${
         minStay === 1
           ? ''
@@ -393,10 +883,12 @@ export function calculateBookingPrice({
 
   if (
     maxStay &&
-    nights > maxStay
+    nights >
+      maxStay
   ) {
     return {
       valid: false,
+
       error: `Maximum stay is ${maxStay} nights.`,
     };
   }
@@ -426,6 +918,12 @@ export function calculateBookingPrice({
       findPricingRuleForDate(
         dateString,
         pricingRules
+      );
+
+    const rateOverride =
+      findRateOverrideForDate(
+        dateString,
+        rateOverrides
       );
 
     const result =
@@ -462,6 +960,8 @@ export function calculateBookingPrice({
 
         specialRule:
           matchingRule,
+
+        rateOverride,
       });
 
     staySubtotal +=
@@ -473,6 +973,24 @@ export function calculateBookingPrice({
 
       rate:
         result.nightlyRate,
+
+      accommodationRate:
+        result.accommodationRate,
+
+      extraGuestAmount:
+        result.extraGuestAmount,
+
+      rateSource:
+        result.rateSource,
+
+      rateSourceLabel:
+        result.rateSourceLabel,
+
+      rateOverrideId:
+        result.rateOverrideId,
+
+      rateOverrideNote:
+        result.rateOverrideNote,
 
       adjustments:
         result.adjustments,
@@ -497,12 +1015,14 @@ export function calculateBookingPrice({
     );
 
   /*
-    Taxable amount before discount:
-    Accommodation + extra guest pricing +
-    dynamic pricing + cleaning fee.
+    GST TAXABLE VALUE:
 
-    Refundable security deposit is kept
-    outside the GST calculation.
+    Stay subtotal
+    + cleaning fee
+    - selected regular discount
+
+    Refundable security deposit
+    remains outside GST.
   */
 
   const amountBeforeDiscount =
@@ -521,11 +1041,13 @@ export function calculateBookingPrice({
     ) {
       autoDiscountAmount =
         amountBeforeDiscount *
-        (Number(
-          offer.discount_value ||
-            0
-        ) /
-          100);
+        (
+          Number(
+            offer.discount_value ||
+              0
+          ) /
+          100
+        );
     }
 
     if (
@@ -553,9 +1075,17 @@ export function calculateBookingPrice({
       amountBeforeDiscount;
   }
 
+  if (
+    autoDiscountAmount <
+    0
+  ) {
+    autoDiscountAmount =
+      0;
+  }
+
   /*
     GST is calculated AFTER
-    pre-approved discount.
+    the selected regular discount.
   */
 
   const taxableAmount =
@@ -572,8 +1102,10 @@ export function calculateBookingPrice({
   const gstAmount =
     roundCurrency(
       taxableAmount *
-        (appliedGstRate /
-          100)
+        (
+          appliedGstRate /
+          100
+        )
     );
 
   const amountIncludingGst =
@@ -592,6 +1124,7 @@ export function calculateBookingPrice({
     valid: true,
 
     nights,
+
     guests,
 
     staySubtotal,
