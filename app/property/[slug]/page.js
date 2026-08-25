@@ -1530,12 +1530,37 @@ export default function PropertyPage() {
           guest
         );
 
-              nights:
-          Number(
-            pricing.nights ||
-              nights
-          ),
-      };
+const bookingPayload = {
+  property_id: property.id,
+
+  guest_id: guest.id,
+
+  check_in: checkIn,
+
+  check_out: checkOut,
+
+  guest_count: Number(guestCount),
+
+  booking_status: 'pending',
+
+  payment_status: 'unpaid',
+
+  taxable_amount: Number(
+    pricing.subtotalAfterDiscount || 0
+  ),
+
+  gst_rate: 18,
+
+  gst_amount: Number(
+    pricing.gstAmount || 0
+  ),
+
+  amount_including_gst: Number(
+    pricing.totalPayable ||
+    pricing.total ||
+    0
+  ),
+};
 
       const {
         data: createdBooking,
