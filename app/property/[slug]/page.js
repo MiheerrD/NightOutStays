@@ -32,7 +32,10 @@ function addDays(dateString, days) {
   if (!dateString) return '';
 
   const date = new Date(`${dateString}T12:00:00`);
-  date.setDate(date.getDate() + days);
+
+  date.setDate(
+    date.getDate() + days
+  );
 
   return [
     date.getFullYear(),
@@ -41,50 +44,94 @@ function addDays(dateString, days) {
   ].join('-');
 }
 
-function rangesOverlap(startA, endA, startB, endB) {
-  return startA < endB && endA > startB;
+function rangesOverlap(
+  startA,
+  endA,
+  startB,
+  endB
+) {
+  return (
+    startA < endB &&
+    endA > startB
+  );
 }
 
 function formatTime(value) {
   if (!value) return '—';
 
-  const [hour, minute] = String(value)
-    .slice(0, 5)
-    .split(':');
+  const [hour, minute] =
+    String(value)
+      .slice(0, 5)
+      .split(':');
 
   const date = new Date();
 
-  date.setHours(Number(hour));
-  date.setMinutes(Number(minute));
+  date.setHours(
+    Number(hour)
+  );
 
-  return date.toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  date.setMinutes(
+    Number(minute)
+  );
+
+  return date.toLocaleTimeString(
+    'en-IN',
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+    }
+  );
 }
 
-function dateDayNumber(dateString) {
-  return new Date(`${dateString}T12:00:00`).getDay();
+function dateDayNumber(
+  dateString
+) {
+  return new Date(
+    `${dateString}T12:00:00`
+  ).getDay();
 }
 
-function getStayDates(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return [];
+function getStayDates(
+  checkIn,
+  checkOut
+) {
+  if (
+    !checkIn ||
+    !checkOut
+  ) {
+    return [];
+  }
 
   const dates = [];
 
-  let current = new Date(`${checkIn}T12:00:00`);
-  const end = new Date(`${checkOut}T12:00:00`);
+  let current =
+    new Date(
+      `${checkIn}T12:00:00`
+    );
+
+  const end =
+    new Date(
+      `${checkOut}T12:00:00`
+    );
 
   while (current < end) {
     dates.push(
       [
         current.getFullYear(),
-        String(current.getMonth() + 1).padStart(2, '0'),
-        String(current.getDate()).padStart(2, '0'),
+
+        String(
+          current.getMonth() + 1
+        ).padStart(2, '0'),
+
+        String(
+          current.getDate()
+        ).padStart(2, '0'),
       ].join('-')
     );
 
-    current.setDate(current.getDate() + 1);
+    current.setDate(
+      current.getDate() + 1
+    );
   }
 
   return dates;
@@ -96,75 +143,138 @@ function offerEligibleForBooking(
   checkOut,
   nights
 ) {
-  if (!offer || !checkIn || !checkOut || nights <= 0) {
+  if (
+    !offer ||
+    !checkIn ||
+    !checkOut ||
+    nights <= 0
+  ) {
     return false;
   }
 
   if (
     !offer.is_active ||
-    offer.guest_selectable === false
+    offer.guest_selectable ===
+      false
   ) {
     return false;
   }
 
-  const offerCategory = String(
-    offer.offer_category || ''
-  ).toLowerCase();
+  const offerCategory =
+    String(
+      offer.offer_category ||
+        ''
+    ).toLowerCase();
 
-  let requiredNights = Number(
-    offer.min_nights || 1
-  );
+  const offerTitle =
+    String(
+      offer.title ||
+        offer.name ||
+        ''
+    ).toLowerCase();
 
-  if (offerCategory === 'monthly') {
-    requiredNights = Math.max(requiredNights, 20);
-  } else if (offerCategory === 'fortnightly') {
-    requiredNights = Math.max(requiredNights, 12);
-  } else if (offerCategory === 'weekly') {
-    requiredNights = Math.max(requiredNights, 6);
+  let requiredNights =
+    Number(
+      offer.min_nights || 1
+    );
+
+  if (
+    offerCategory ===
+      'monthly' ||
+    offerTitle.includes(
+      'monthly'
+    )
+  ) {
+    requiredNights =
+      Math.max(
+        requiredNights,
+        20
+      );
+  } else if (
+    offerCategory ===
+      'fortnightly' ||
+    offerTitle.includes(
+      'fortnight'
+    )
+  ) {
+    requiredNights =
+      Math.max(
+        requiredNights,
+        12
+      );
+  } else if (
+    offerCategory ===
+      'weekly' ||
+    offerTitle.includes(
+      'weekly'
+    )
+  ) {
+    requiredNights =
+      Math.max(
+        requiredNights,
+        6
+      );
   }
 
-  if (nights < requiredNights) {
+  if (
+    nights <
+    requiredNights
+  ) {
     return false;
   }
 
-  const stayDates = getStayDates(
-    checkIn,
-    checkOut
-  );
+  const stayDates =
+    getStayDates(
+      checkIn,
+      checkOut
+    );
 
   const startDate =
-    offer.start_date || null;
+    offer.start_date ||
+    null;
 
   const endDate =
-    offer.end_date || null;
+    offer.end_date ||
+    null;
 
   const allowedDays =
-    Array.isArray(offer.applicable_days)
+    Array.isArray(
+      offer.applicable_days
+    )
       ? offer.applicable_days
       : [];
 
-  const eligibleDates = stayDates.filter(
-    (date) => {
-      if (startDate && date < startDate) {
-        return false;
-      }
+  const eligibleDates =
+    stayDates.filter(
+      (date) => {
+        if (
+          startDate &&
+          date < startDate
+        ) {
+          return false;
+        }
 
-      if (endDate && date > endDate) {
-        return false;
-      }
+        if (
+          endDate &&
+          date > endDate
+        ) {
+          return false;
+        }
 
-      if (
-        allowedDays.length &&
-        !allowedDays.includes(
-          dateDayNumber(date)
-        )
-      ) {
-        return false;
-      }
+        if (
+          allowedDays.length &&
+          !allowedDays.includes(
+            dateDayNumber(
+              date
+            )
+          )
+        ) {
+          return false;
+        }
 
-      return true;
-    }
-  );
+        return true;
+      }
+    );
 
   if (
     offer.apply_scope ===
@@ -176,7 +286,10 @@ function offerEligibleForBooking(
     );
   }
 
-  return eligibleDates.length > 0;
+  return (
+    eligibleDates.length >
+    0
+  );
 }
 
 function calculateRegularDiscount(
@@ -185,49 +298,60 @@ function calculateRegularDiscount(
   checkIn,
   checkOut
 ) {
-  if (!pricing?.valid || !offer) {
+  if (
+    !pricing?.valid ||
+    !offer
+  ) {
     return {
       discountAmount: 0,
       eligibleAmount: 0,
     };
   }
 
-  const stayDates = getStayDates(
-    checkIn,
-    checkOut
-  );
+  const stayDates =
+    getStayDates(
+      checkIn,
+      checkOut
+    );
 
   const allowedDays =
-    Array.isArray(offer.applicable_days)
+    Array.isArray(
+      offer.applicable_days
+    )
       ? offer.applicable_days
       : [];
 
-  const dateIsEligible = (date) => {
-    if (
-      offer.start_date &&
-      date < offer.start_date
-    ) {
-      return false;
-    }
+  const dateIsEligible =
+    (date) => {
+      if (
+        offer.start_date &&
+        date <
+          offer.start_date
+      ) {
+        return false;
+      }
 
-    if (
-      offer.end_date &&
-      date > offer.end_date
-    ) {
-      return false;
-    }
+      if (
+        offer.end_date &&
+        date >
+          offer.end_date
+      ) {
+        return false;
+      }
 
-    if (
-      allowedDays.length &&
-      !allowedDays.includes(
-        dateDayNumber(date)
-      )
-    ) {
-      return false;
-    }
+      if (
+        allowedDays.length &&
+        !allowedDays.includes(
+          dateDayNumber(
+            date
+          )
+        )
+      ) {
+        return false;
+      }
 
-    return true;
-  };
+      return true;
+    };
 
   let eligibleAmount = 0;
 
@@ -235,9 +359,11 @@ function calculateRegularDiscount(
     offer.apply_scope ===
     'entire_booking'
   ) {
-    eligibleAmount = Number(
-      pricing.staySubtotal || 0
-    );
+    eligibleAmount =
+      Number(
+        pricing.staySubtotal ||
+          0
+      );
   } else {
     const breakdown =
       Array.isArray(
@@ -246,16 +372,24 @@ function calculateRegularDiscount(
         ? pricing.nightlyBreakdown
         : [];
 
-    if (breakdown.length) {
-      breakdown.forEach((night) => {
-        if (
-          dateIsEligible(night.date)
-        ) {
-          eligibleAmount += Number(
-            night.rate || 0
-          );
+    if (
+      breakdown.length
+    ) {
+      breakdown.forEach(
+        (night) => {
+          if (
+            dateIsEligible(
+              night.date
+            )
+          ) {
+            eligibleAmount +=
+              Number(
+                night.rate ||
+                  0
+              );
+          }
         }
-      });
+      );
     } else {
       const eligibleNightCount =
         stayDates.filter(
@@ -264,10 +398,14 @@ function calculateRegularDiscount(
 
       const averageNight =
         Number(
-          pricing.staySubtotal || 0
+          pricing.staySubtotal ||
+            0
         ) /
         Math.max(
-          Number(pricing.nights || 1),
+          Number(
+            pricing.nights ||
+              1
+          ),
           1
         );
 
@@ -285,148 +423,194 @@ function calculateRegularDiscount(
   ) {
     discountAmount =
       eligibleAmount *
-      (Number(
-        offer.discount_value || 0
-      ) /
-        100);
+      (
+        Number(
+          offer.discount_value ||
+            0
+        ) / 100
+      );
   } else {
-    discountAmount = Number(
-      offer.discount_value || 0
-    );
+    discountAmount =
+      Number(
+        offer.discount_value ||
+          0
+      );
   }
 
-  discountAmount = Math.max(
-    0,
-    Math.min(
-      discountAmount,
-      eligibleAmount
-    )
-  );
+  discountAmount =
+    Math.max(
+      0,
+      Math.min(
+        discountAmount,
+        eligibleAmount
+      )
+    );
 
   return {
     eligibleAmount:
       Math.round(
-        eligibleAmount * 100
+        eligibleAmount *
+          100
       ) / 100,
 
     discountAmount:
       Math.round(
-        discountAmount * 100
+        discountAmount *
+          100
       ) / 100,
   };
 }
 
 export default function PropertyPage() {
-  const params = useParams();
-  const slug = params?.slug;
+  const params =
+    useParams();
 
-  const [property, setProperty] =
+  const slug =
+    params?.slug;
+
+  const [
+    property,
+    setProperty,
+  ] =
     useState(null);
 
-  const [photos, setPhotos] =
+  const [
+    photos,
+    setPhotos,
+  ] =
     useState([]);
 
   const [
     pricingRules,
     setPricingRules,
-  ] = useState([]);
+  ] =
+    useState([]);
 
   const [
     rateOverrides,
     setRateOverrides,
-  ] = useState([]);
+  ] =
+    useState([]);
 
   const [
     propertyOffers,
     setPropertyOffers,
-  ] = useState([]);
+  ] =
+    useState([]);
 
   const [
     blockedDates,
     setBlockedDates,
-  ] = useState([]);
+  ] =
+    useState([]);
 
   const [
     existingBookings,
     setExistingBookings,
-  ] = useState([]);
+  ] =
+    useState([]);
 
-  const [session, setSession] =
+  const [
+    session,
+    setSession,
+  ] =
     useState(null);
 
   const [
     guestProfile,
     setGuestProfile,
-  ] = useState(null);
+  ] =
+    useState(null);
 
   const [
     authChecking,
     setAuthChecking,
-  ] = useState(true);
+  ] =
+    useState(true);
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
   const [
     pageError,
     setPageError,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     activePhoto,
     setActivePhoto,
-  ] = useState(0);
+  ] =
+    useState(0);
 
-  const [checkIn, setCheckIn] =
+  const [
+    checkIn,
+    setCheckIn,
+  ] =
     useState('');
 
-  const [checkOut, setCheckOut] =
+  const [
+    checkOut,
+    setCheckOut,
+  ] =
     useState('');
 
   const [
     guestCount,
     setGuestCount,
-  ] = useState(1);
+  ] =
+    useState(1);
 
   const [
     selectedOfferId,
     setSelectedOfferId,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     guestName,
     setGuestName,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     guestPhone,
     setGuestPhone,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     guestEmail,
     setGuestEmail,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     guestMessage,
     setGuestMessage,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     bookingLoading,
     setBookingLoading,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     bookingError,
     setBookingError,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     bookingSuccess,
     setBookingSuccess,
-  ] = useState(null);
+  ] =
+    useState(null);
 
   useEffect(() => {
     checkGuestLogin();
@@ -439,43 +623,59 @@ export default function PropertyPage() {
   }, [slug]);
 
   async function checkGuestLogin() {
-    setAuthChecking(true);
+    setAuthChecking(
+      true
+    );
 
     try {
       const {
-        data: { session },
+        data: {
+          session,
+        },
       } =
         await supabase.auth.getSession();
 
-      setSession(session);
+      setSession(
+        session
+      );
 
-      if (!session?.user) {
+      if (
+        !session?.user
+      ) {
         return;
       }
 
       const authEmail =
-        session.user.email || '';
-
-      /*
-        IMPORTANT:
-        guests table has no user_id column.
-
-        We identify the guest using the
-        authenticated email address.
-      */
+        String(
+          session.user.email ||
+            ''
+        )
+          .trim()
+          .toLowerCase();
 
       if (authEmail) {
         const {
-          data: guestRows,
+          data:
+            guestRows,
           error,
-        } = await supabase
-          .from('guests')
-          .select('*')
-          .eq('email', authEmail)
-          .order('created_at', {
-            ascending: true,
-          })
-          .limit(1);
+        } =
+          await supabase
+            .from(
+              'guests'
+            )
+            .select('*')
+            .eq(
+              'email',
+              authEmail
+            )
+            .order(
+              'created_at',
+              {
+                ascending:
+                  true,
+              }
+            )
+            .limit(1);
 
         if (error) {
           console.error(
@@ -485,17 +685,22 @@ export default function PropertyPage() {
         }
 
         const guest =
-          guestRows?.[0] || null;
+          guestRows?.[0] ||
+          null;
 
         if (guest) {
-          setGuestProfile(guest);
+          setGuestProfile(
+            guest
+          );
 
           setGuestName(
-            guest.full_name || ''
+            guest.full_name ||
+              ''
           );
 
           setGuestPhone(
-            guest.phone || ''
+            guest.phone ||
+              ''
           );
 
           setGuestEmail(
@@ -508,13 +713,19 @@ export default function PropertyPage() {
       }
 
       setGuestName(
-        session.user.user_metadata
-          ?.full_name || ''
+        session.user
+          .user_metadata
+          ?.full_name ||
+          ''
       );
 
-      setGuestEmail(authEmail);
+      setGuestEmail(
+        authEmail
+      );
     } finally {
-      setAuthChecking(false);
+      setAuthChecking(
+        false
+      );
     }
   }
 
@@ -524,14 +735,25 @@ export default function PropertyPage() {
 
     try {
       const {
-        data: propertyData,
-        error: propertyError,
-      } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .single();
+        data:
+          propertyData,
+        error:
+          propertyError,
+      } =
+        await supabase
+          .from(
+            'properties'
+          )
+          .select('*')
+          .eq(
+            'slug',
+            slug
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .single();
 
       if (
         propertyError ||
@@ -542,7 +764,9 @@ export default function PropertyPage() {
         );
       }
 
-      setProperty(propertyData);
+      setProperty(
+        propertyData
+      );
 
       setGuestCount(
         Math.max(
@@ -561,232 +785,248 @@ export default function PropertyPage() {
         rateOverrideResult,
         blockedResult,
         bookingResult,
-      ] = await Promise.all([
-        supabase
-          .from('property_photos')
-          .select(
-            'id, property_id, image_url, alt_text, sort_order, is_cover'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .order('is_cover', {
-            ascending: false,
-          })
-          .order('sort_order', {
-            ascending: true,
-          }),
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              'property_photos'
+            )
+            .select(
+              'id, property_id, image_url, alt_text, sort_order, is_cover'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .order(
+              'is_cover',
+              {
+                ascending:
+                  false,
+              }
+            )
+            .order(
+              'sort_order',
+              {
+                ascending:
+                  true,
+              }
+            ),
 
-        supabase
-          .from('property_offers')
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true),
+          supabase
+            .from(
+              'property_offers'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            ),
 
-        supabase
-          .from('pricing_rules')
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true)
-          .order('priority', {
-            ascending: false,
-          }),
+          supabase
+            .from(
+              'pricing_rules'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            )
+            .order(
+              'priority',
+              {
+                ascending:
+                  false,
+              }
+            ),
 
-        supabase
-          .from(
-            'property_rate_overrides'
-          )
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true)
-          .order('start_date', {
-            ascending: true,
-          }),
+          supabase
+            .from(
+              'property_rate_overrides'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            )
+            .order(
+              'start_date',
+              {
+                ascending:
+                  true,
+              }
+            ),
 
-        supabase
-          .from('blocked_dates')
-          .select(
-            'start_date, end_date'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          ),
+          supabase
+            .from(
+              'blocked_dates'
+            )
+            .select(
+              'start_date, end_date'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            ),
 
-        supabase
-          .from('bookings')
-          .select(
-            'check_in, check_out, booking_status, payment_status'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq(
-            'booking_status',
-            'confirmed'
-          )
-          .eq(
-            'payment_status',
-            'paid'
-          ),
-      ]);
+          supabase
+            .from(
+              'bookings'
+            )
+            .select(
+              'check_in, check_out, booking_status, payment_status'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'booking_status',
+              'confirmed'
+            )
+            .eq(
+              'payment_status',
+              'paid'
+            ),
+        ]);
 
-      if (photoResult.error) {
+      if (
+        photoResult.error
+      ) {
         console.error(
           'Photo loading error:',
           photoResult.error
         );
       }
 
-      if (offerResult.error) {
-        console.error(
-          'Offer loading error:',
-          offerResult.error
-        );
-      }
-
-      if (pricingResult.error) {
-        console.error(
-          'Pricing rule loading error:',
-          pricingResult.error
-        );
-      }
-
-      if (
-        rateOverrideResult.error
-      ) {
-        console.error(
-          'Rate override loading error:',
-          rateOverrideResult.error
-        );
-      }
-
-      if (blockedResult.error) {
-        console.error(
-          'Blocked date loading error:',
-          blockedResult.error
-        );
-      }
-
-      if (bookingResult.error) {
-        console.error(
-          'Booking loading error:',
-          bookingResult.error
-        );
-      }
-
-      /*
-        IMPORTANT PHOTO FIX:
-
-        property_photos uses image_url,
-        NOT photo_url.
-      */
-
       setPhotos(
-        (photoResult.data || []).filter(
+        (
+          photoResult.data ||
+          []
+        ).filter(
           (photo) =>
-            Boolean(photo.image_url)
+            Boolean(
+              photo.image_url
+            )
         )
       );
 
       setPropertyOffers(
-        offerResult.data || []
+        offerResult.data ||
+          []
       );
 
       setRateOverrides(
-        rateOverrideResult.data || []
+        rateOverrideResult.data ||
+          []
       );
 
       setBlockedDates(
-        blockedResult.data || []
+        blockedResult.data ||
+          []
       );
 
       setExistingBookings(
-        bookingResult.data || []
+        bookingResult.data ||
+          []
       );
 
       const mappedRules =
         (
-          pricingResult.data || []
-        ).map((rule) => ({
-          ...rule,
+          pricingResult.data ||
+          []
+        ).map(
+          (rule) => ({
+            ...rule,
 
-          type:
-            rule.rule_type,
+            type:
+              rule.rule_type,
 
-          percent:
-            rule.adjustment_type ===
-            'percent'
-              ? Number(
-                  rule.adjustment_value ||
-                    0
-                )
-              : undefined,
+            percent:
+              rule.adjustment_type ===
+              'percent'
+                ? Number(
+                    rule.adjustment_value ||
+                      0
+                  )
+                : undefined,
 
-          value: Number(
-            rule.adjustment_value || 0
-          ),
+            value:
+              Number(
+                rule.adjustment_value ||
+                  0
+              ),
 
-          label: rule.name,
+            label:
+              rule.name,
 
-          adjustmentType:
-            rule.adjustment_type,
-        }));
+            adjustmentType:
+              rule.adjustment_type,
+          })
+        );
 
       setPricingRules(
         mappedRules
       );
     } catch (error) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       setPageError(
         error.message
       );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
   const availableOffers =
-    useMemo(() => {
-      if (
-        !checkIn ||
-        !checkOut
-      ) {
-        return [];
-      }
+    useMemo(
+      () => {
+        if (
+          !checkIn ||
+          !checkOut
+        ) {
+          return [];
+        }
 
-      const nights =
-        getStayDates(
-          checkIn,
-          checkOut
-        ).length;
-
-      return propertyOffers.filter(
-        (offer) =>
-          offerEligibleForBooking(
-            offer,
+        const nights =
+          getStayDates(
             checkIn,
-            checkOut,
-            nights
-          )
-      );
-    }, [
-      propertyOffers,
-      checkIn,
-      checkOut,
-    ]);
+            checkOut
+          ).length;
+
+        return propertyOffers.filter(
+          (offer) =>
+            offerEligibleForBooking(
+              offer,
+              checkIn,
+              checkOut,
+              nights
+            )
+        );
+      },
+      [
+        propertyOffers,
+        checkIn,
+        checkOut,
+      ]
+    );
 
   useEffect(() => {
     if (
@@ -797,7 +1037,9 @@ export default function PropertyPage() {
           selectedOfferId
       )
     ) {
-      setSelectedOfferId('');
+      setSelectedOfferId(
+        ''
+      );
     }
   }, [
     availableOffers,
@@ -811,7 +1053,8 @@ export default function PropertyPage() {
           (offer) =>
             offer.id ===
             selectedOfferId
-        ) || null,
+        ) ||
+        null,
       [
         availableOffers,
         selectedOfferId,
@@ -819,148 +1062,166 @@ export default function PropertyPage() {
     );
 
   const pricing =
-    useMemo(() => {
-      if (
-        !property ||
-        !checkIn ||
-        !checkOut
-      ) {
-        return {
-          valid: false,
-        };
-      }
-
-      try {
-        const result =
-          calculateBookingPrice({
-            property,
-
-            guestCount:
-              Number(
-                guestCount || 1
-              ),
-
-            checkIn,
-            checkOut,
-            pricingRules,
-            rateOverrides,
-            gstRate: 18,
-          });
-
+    useMemo(
+      () => {
         if (
-          !result ||
-          result.valid === false
+          !property ||
+          !checkIn ||
+          !checkOut
         ) {
-          return (
-            result || {
-              valid: false,
-            }
-          );
+          return {
+            valid: false,
+          };
         }
 
-        let regularDiscount = {
-          discountAmount: 0,
-          eligibleAmount: 0,
-        };
+        try {
+          const result =
+            calculateBookingPrice({
+              property,
 
-        if (selectedOffer) {
-          regularDiscount =
-            calculateRegularDiscount(
-              result,
-              selectedOffer,
+              guestCount:
+                Number(
+                  guestCount ||
+                    1
+                ),
+
               checkIn,
-              checkOut
+
+              checkOut,
+
+              pricingRules,
+
+              rateOverrides,
+
+              gstRate: 18,
+            });
+
+          if (
+            !result ||
+            result.valid ===
+              false
+          ) {
+            return (
+              result || {
+                valid: false,
+              }
             );
-        }
+          }
 
-        const discountAmount =
-          Number(
-            regularDiscount.discountAmount ||
-              0
-          );
+          let regularDiscount =
+            {
+              discountAmount:
+                0,
 
-        const subtotalBeforeDiscount =
-          Number(
-            result.amountBeforeDiscount ??
-              result.staySubtotal ??
-              0
-          );
+              eligibleAmount:
+                0,
+            };
 
-        const subtotalAfterDiscount =
-          Math.max(
-            0,
-            subtotalBeforeDiscount -
-              discountAmount
-          );
+          if (
+            selectedOffer
+          ) {
+            regularDiscount =
+              calculateRegularDiscount(
+                result,
+                selectedOffer,
+                checkIn,
+                checkOut
+              );
+          }
 
-        const gstAmount =
-          Math.round(
-            subtotalAfterDiscount *
-              0.18 *
-              100
-          ) / 100;
+          const discountAmount =
+            Number(
+              regularDiscount.discountAmount ||
+                0
+            );
 
-        const totalPayable =
-          Math.round(
-            (
-              subtotalAfterDiscount +
-              gstAmount +
-              Number(
-                result.securityDeposit ||
-                  0
-              )
-            ) *
-              100
-          ) / 100;
+          const subtotalBeforeDiscount =
+            Number(
+              result.amountBeforeDiscount ??
+                result.staySubtotal ??
+                0
+            );
 
-        return {
-          ...result,
+          const subtotalAfterDiscount =
+            Math.max(
+              0,
+              subtotalBeforeDiscount -
+                discountAmount
+            );
 
-          regularDiscountAmount:
-            discountAmount,
+          const gstAmount =
+            Math.round(
+              subtotalAfterDiscount *
+                0.18 *
+                100
+            ) / 100;
 
-          selectedOffer,
+          const totalPayable =
+            Math.round(
+              (
+                subtotalAfterDiscount +
+                gstAmount +
+                Number(
+                  result.securityDeposit ||
+                    0
+                )
+              ) *
+                100
+            ) / 100;
 
-          subtotalBeforeDiscount,
+          return {
+            ...result,
 
-          subtotalAfterDiscount,
+            regularDiscountAmount:
+              discountAmount,
 
-          gstAmount,
+            selectedOffer,
 
-          total:
+            subtotalBeforeDiscount,
+
+            subtotalAfterDiscount,
+
+            gstAmount,
+
+            total:
+              totalPayable,
+
             totalPayable,
+          };
+        } catch (error) {
+          console.error(
+            'Pricing calculation failed:',
+            error
+          );
 
-          totalPayable,
-        };
-      } catch (error) {
-        console.error(
-          'Pricing calculation failed:',
-          error
-        );
+          return {
+            valid: false,
 
-        return {
-          valid: false,
-
-          error:
-            error.message ||
-            'Unable to calculate booking price.',
-        };
-      }
-    }, [
-      property,
-      checkIn,
-      checkOut,
-      guestCount,
-      pricingRules,
-      rateOverrides,
-      selectedOffer,
-    ]);
+            error:
+              error.message ||
+              'Unable to calculate booking price.',
+          };
+        }
+      },
+      [
+        property,
+        checkIn,
+        checkOut,
+        guestCount,
+        pricingRules,
+        rateOverrides,
+        selectedOffer,
+      ]
+    );
 
   function datesUnavailable(
     start,
     end
   ) {
-    if (!start || !end) {
+    if (
+      !start ||
+      !end
+    ) {
       return false;
     }
 
@@ -978,7 +1239,9 @@ export default function PropertyPage() {
           )
       );
 
-    if (manuallyBlocked) {
+    if (
+      manuallyBlocked
+    ) {
       return true;
     }
 
@@ -1015,17 +1278,29 @@ export default function PropertyPage() {
   function changeCheckIn(
     value
   ) {
-    setCheckIn(value);
-    setBookingError('');
-    setBookingSuccess(null);
+    setCheckIn(
+      value
+    );
+
+    setBookingError(
+      ''
+    );
+
+    setBookingSuccess(
+      null
+    );
 
     if (
       value &&
       checkOut &&
-      checkOut <= value
+      checkOut <=
+        value
     ) {
       setCheckOut(
-        addDays(value, 1)
+        addDays(
+          value,
+          1
+        )
       );
     }
   }
@@ -1033,9 +1308,17 @@ export default function PropertyPage() {
   function changeCheckOut(
     value
   ) {
-    setCheckOut(value);
-    setBookingError('');
-    setBookingSuccess(null);
+    setCheckOut(
+      value
+    );
+
+    setBookingError(
+      ''
+    );
+
+    setBookingSuccess(
+      null
+    );
   }
 
   function changeGuests(
@@ -1065,7 +1348,8 @@ export default function PropertyPage() {
         Math.max(
           minimum,
           Number(
-            value || minimum
+            value ||
+              minimum
           )
         )
       );
@@ -1074,8 +1358,13 @@ export default function PropertyPage() {
       nextValue
     );
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingError(
+      ''
+    );
+
+    setBookingSuccess(
+      null
+    );
   }
 
   function redirectToLogin() {
@@ -1095,47 +1384,56 @@ export default function PropertyPage() {
       )}`;
   }
 
-  /*
-    FIXED:
-    No guests.user_id query.
-
-    We search by authenticated email.
-    If a matching guest already exists,
-    we reuse the oldest existing record.
-  */
-
   async function ensureGuestProfile() {
-    if (!session?.user) {
+    if (
+      !session?.user
+    ) {
       return null;
     }
 
-    if (guestProfile) {
+    if (
+      guestProfile
+    ) {
       return guestProfile;
     }
 
     const email =
-      (
+      String(
         guestEmail ||
-        session.user.email ||
-        ''
+          session.user.email ||
+          ''
       )
         .trim()
         .toLowerCase();
 
     if (email) {
       const {
-        data: existingRows,
-        error: existingError,
-      } = await supabase
-        .from('guests')
-        .select('*')
-        .eq('email', email)
-        .order('created_at', {
-          ascending: true,
-        })
-        .limit(1);
+        data:
+          existingRows,
+        error:
+          existingError,
+      } =
+        await supabase
+          .from(
+            'guests'
+          )
+          .select('*')
+          .eq(
+            'email',
+            email
+          )
+          .order(
+            'created_at',
+            {
+              ascending:
+                true,
+            }
+          )
+          .limit(1);
 
-      if (existingError) {
+      if (
+        existingError
+      ) {
         throw existingError;
       }
 
@@ -1143,7 +1441,9 @@ export default function PropertyPage() {
         existingRows?.[0] ||
         null;
 
-      if (existingGuest) {
+      if (
+        existingGuest
+      ) {
         setGuestProfile(
           existingGuest
         );
@@ -1153,32 +1453,39 @@ export default function PropertyPage() {
     }
 
     const {
-      data: newGuest,
-      error: createError,
-    } = await supabase
-      .from('guests')
-      .insert({
-        full_name:
-          guestName.trim() ||
-          session.user.user_metadata
-            ?.full_name ||
-          session.user.email?.split(
-            '@'
-          )[0] ||
-          'Guest',
+      data:
+        newGuest,
+      error:
+        createError,
+    } =
+      await supabase
+        .from(
+          'guests'
+        )
+        .insert({
+          full_name:
+            guestName.trim() ||
+            session.user
+              .user_metadata
+              ?.full_name ||
+            session.user.email
+              ?.split('@')[0] ||
+            'Guest',
 
-        email:
-          email ||
-          null,
+          email:
+            email ||
+            null,
 
-        phone:
-          guestPhone.trim() ||
-          null,
-      })
-      .select('*')
-      .single();
+          phone:
+            guestPhone.trim() ||
+            null,
+        })
+        .select('*')
+        .single();
 
-    if (createError) {
+    if (
+      createError
+    ) {
       throw createError;
     }
 
@@ -1192,7 +1499,9 @@ export default function PropertyPage() {
   async function updateGuestDetails(
     guest
   ) {
-    if (!guest?.id) {
+    if (
+      !guest?.id
+    ) {
       return guest;
     }
 
@@ -1212,18 +1521,28 @@ export default function PropertyPage() {
     const {
       data,
       error,
-    } = await supabase
-      .from('guests')
-      .update(payload)
-      .eq('id', guest.id)
-      .select('*')
-      .single();
+    } =
+      await supabase
+        .from(
+          'guests'
+        )
+        .update(
+          payload
+        )
+        .eq(
+          'id',
+          guest.id
+        )
+        .select('*')
+        .single();
 
     if (error) {
       throw error;
     }
 
-    setGuestProfile(data);
+    setGuestProfile(
+      data
+    );
 
     return data;
   }
@@ -1233,19 +1552,31 @@ export default function PropertyPage() {
   ) {
     event.preventDefault();
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingError(
+      ''
+    );
 
-    if (authChecking) {
+    setBookingSuccess(
+      null
+    );
+
+    if (
+      authChecking
+    ) {
       return;
     }
 
-    if (!session?.user) {
+    if (
+      !session?.user
+    ) {
       redirectToLogin();
+
       return;
     }
 
-    if (!property) {
+    if (
+      !property
+    ) {
       setBookingError(
         'Property information is unavailable.'
       );
@@ -1265,7 +1596,8 @@ export default function PropertyPage() {
     }
 
     if (
-      checkOut <= checkIn
+      checkOut <=
+      checkIn
     ) {
       setBookingError(
         'Check-out must be after check-in.'
@@ -1323,7 +1655,9 @@ export default function PropertyPage() {
     }
 
     if (
-      Number(guestCount) <
+      Number(
+        guestCount
+      ) <
       Number(
         property.min_guests ||
           1
@@ -1340,7 +1674,9 @@ export default function PropertyPage() {
     }
 
     if (
-      Number(guestCount) >
+      Number(
+        guestCount
+      ) >
       Number(
         property.max_guests ||
           guestCount
@@ -1353,7 +1689,9 @@ export default function PropertyPage() {
       return;
     }
 
-    if (!guestName.trim()) {
+    if (
+      !guestName.trim()
+    ) {
       setBookingError(
         'Please enter your full name.'
       );
@@ -1361,7 +1699,9 @@ export default function PropertyPage() {
       return;
     }
 
-    if (!guestPhone.trim()) {
+    if (
+      !guestPhone.trim()
+    ) {
       setBookingError(
         'Please enter your phone number.'
       );
@@ -1369,7 +1709,9 @@ export default function PropertyPage() {
       return;
     }
 
-    if (!guestEmail.trim()) {
+    if (
+      !guestEmail.trim()
+    ) {
       setBookingError(
         'Please enter your email address.'
       );
@@ -1386,7 +1728,9 @@ export default function PropertyPage() {
         nights
       )
     ) {
-      setSelectedOfferId('');
+      setSelectedOfferId(
+        ''
+      );
 
       setBookingError(
         'The selected discount is not eligible for these booking dates or stay duration.'
@@ -1405,7 +1749,9 @@ export default function PropertyPage() {
       return;
     }
 
-    if (!pricing?.valid) {
+    if (
+      !pricing?.valid
+    ) {
       setBookingError(
         pricing?.error ||
           'Unable to calculate booking price.'
@@ -1414,46 +1760,48 @@ export default function PropertyPage() {
       return;
     }
 
-    setBookingLoading(true);
+    setBookingLoading(
+      true
+    );
 
     try {
-      /*
-        Recheck availability immediately
-        before inserting the request.
-      */
-
       const [
         latestBlockedResult,
         latestBookingsResult,
-      ] = await Promise.all([
-        supabase
-          .from('blocked_dates')
-          .select(
-            'start_date, end_date'
-          )
-          .eq(
-            'property_id',
-            property.id
-          ),
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              'blocked_dates'
+            )
+            .select(
+              'start_date, end_date'
+            )
+            .eq(
+              'property_id',
+              property.id
+            ),
 
-        supabase
-          .from('bookings')
-          .select(
-            'id, check_in, check_out, booking_status, payment_status'
-          )
-          .eq(
-            'property_id',
-            property.id
-          )
-          .eq(
-            'booking_status',
-            'confirmed'
-          )
-          .eq(
-            'payment_status',
-            'paid'
-          ),
-      ]);
+          supabase
+            .from(
+              'bookings'
+            )
+            .select(
+              'id, check_in, check_out, booking_status, payment_status'
+            )
+            .eq(
+              'property_id',
+              property.id
+            )
+            .eq(
+              'booking_status',
+              'confirmed'
+            )
+            .eq(
+              'payment_status',
+              'paid'
+            ),
+        ]);
 
       if (
         latestBlockedResult.error
@@ -1471,16 +1819,17 @@ export default function PropertyPage() {
         (
           latestBlockedResult.data ||
           []
-        ).some((block) =>
-          rangesOverlap(
-            checkIn,
-            checkOut,
-            block.start_date,
-            addDays(
-              block.end_date,
-              1
+        ).some(
+          (block) =>
+            rangesOverlap(
+              checkIn,
+              checkOut,
+              block.start_date,
+              addDays(
+                block.end_date,
+                1
+              )
             )
-          )
         );
 
       const latestBookingConflict =
@@ -1530,49 +1879,81 @@ export default function PropertyPage() {
           guest
         );
 
-const bookingPayload = {
-  property_id: property.id,
+      /*
+        IMPORTANT:
+        These field names match the
+        current bookings table.
+      */
 
-  guest_id: guest.id,
+      const bookingPayload = {
+        property_id:
+          property.id,
 
-  check_in: checkIn,
+        guest_id:
+          guest.id,
 
-  check_out: checkOut,
+        check_in:
+          checkIn,
 
-  guests_count: Number(guestCount),
+        check_out:
+          checkOut,
 
-  booking_status: 'pending',
+        guests_count:
+          Number(
+            guestCount
+          ),
 
-  payment_status: 'unpaid',
+        nights:
+          Number(
+            pricing.nights ||
+              nights ||
+              1
+          ),
 
-  taxable_amount: Number(
-    pricing.subtotalAfterDiscount || 0
-  ),
+        booking_status:
+          'pending',
 
-  gst_rate: 18,
+        payment_status:
+          'unpaid',
 
-  gst_amount: Number(
-    pricing.gstAmount || 0
-  ),
+        taxable_amount:
+          Number(
+            pricing.subtotalAfterDiscount ||
+              0
+          ),
 
-  amount_including_gst: Number(
-    pricing.totalPayable ||
-    pricing.total ||
-    0
-  ),
-};
+        gst_rate:
+          18,
+
+        gst_amount:
+          Number(
+            pricing.gstAmount ||
+              0
+          ),
+
+        amount_including_gst:
+          Number(
+            pricing.totalPayable ||
+              pricing.total ||
+              0
+          ),
+      };
 
       const {
-        data: createdBooking,
+        data:
+          createdBooking,
         error:
           bookingInsertError,
-      } = await supabase
-        .from('bookings')
-        .insert(
-          bookingPayload
-        )
-        .select('*')
-        .single();
+      } =
+        await supabase
+          .from(
+            'bookings'
+          )
+          .insert(
+            bookingPayload
+          )
+          .select('*')
+          .single();
 
       if (
         bookingInsertError
@@ -1584,7 +1965,9 @@ const bookingPayload = {
         createdBooking
       );
 
-      setGuestMessage('');
+      setGuestMessage(
+        ''
+      );
     } catch (error) {
       console.error(
         'Booking request failed:',
@@ -1596,13 +1979,19 @@ const bookingPayload = {
           'Unable to send booking request.'
       );
     } finally {
-      setBookingLoading(false);
+      setBookingLoading(
+        false
+      );
     }
   }
 
   if (loading) {
     return (
-      <main style={styles.page}>
+      <main
+        style={
+          styles.page
+        }
+      >
         <div
           style={
             styles.centerMessage
@@ -1619,7 +2008,11 @@ const bookingPayload = {
     !property
   ) {
     return (
-      <main style={styles.page}>
+      <main
+        style={
+          styles.page
+        }
+      >
         <div
           style={
             styles.centerMessage
@@ -1648,7 +2041,9 @@ const bookingPayload = {
   }
 
   const coverPhoto =
-    photos[activePhoto] ||
+    photos[
+      activePhoto
+    ] ||
     photos[0] ||
     null;
 
@@ -1667,11 +2062,21 @@ const bookingPayload = {
       : todayString();
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main
+      style={
+        styles.page
+      }
+    >
+      <header
+        style={
+          styles.header
+        }
+      >
         <a
           href="/"
-          style={styles.logo}
+          style={
+            styles.logo
+          }
         >
           NightOutStays
         </a>
@@ -1716,7 +2121,11 @@ const bookingPayload = {
         </div>
       </header>
 
-      <div style={styles.container}>
+      <div
+        style={
+          styles.container
+        }
+      >
         <section
           style={
             styles.titleSection
@@ -1736,7 +2145,9 @@ const bookingPayload = {
                 styles.location
               }
             >
-              {property.location_name}
+              {
+                property.location_name
+              }
             </div>
           </div>
 
@@ -1759,7 +2170,9 @@ const bookingPayload = {
         </section>
 
         <section
-          style={styles.gallery}
+          style={
+            styles.gallery
+          }
         >
           <div
             style={
@@ -1790,7 +2203,8 @@ const bookingPayload = {
             )}
           </div>
 
-          {photos.length > 1 && (
+          {photos.length >
+            1 && (
             <div
               style={
                 styles.thumbnailRow
@@ -1936,23 +2350,29 @@ const bookingPayload = {
               >
                 <Detail
                   label="Check-in"
-                  value={formatTime(
-                    property.check_in_time
-                  )}
+                  value={
+                    formatTime(
+                      property.check_in_time
+                    )
+                  }
                 />
 
                 <Detail
                   label="Check-out"
-                  value={formatTime(
-                    property.check_out_time
-                  )}
+                  value={
+                    formatTime(
+                      property.check_out_time
+                    )
+                  }
                 />
 
                 <Detail
                   label="Base rate"
-                  value={money(
-                    property.base_price
-                  )}
+                  value={
+                    money(
+                      property.base_price
+                    )
+                  }
                 />
 
                 <Detail
@@ -2038,7 +2458,9 @@ const bookingPayload = {
               </p>
 
               <GuestAvailabilityCalendar
-                property={property}
+                property={
+                  property
+                }
                 pricingRules={
                   pricingRules
                 }
@@ -2070,122 +2492,277 @@ const bookingPayload = {
             </section>
           </div>
 
-          <aside style={styles.bookingCard}>
-            <div style={styles.bookingPrice}>
-              {money(property.base_price)}
+          <aside
+            style={
+              styles.bookingColumn
+            }
+          >
+            <form
+              onSubmit={
+                submitBookingRequest
+              }
+              style={
+                styles.bookingCard
+              }
+            >
+              <div
+                style={
+                  styles.bookingPrice
+                }
+              >
+                {money(
+                  property.base_price
+                )}
 
-              <span style={styles.perNight}>
-                {' '}
-                / night
-              </span>
-            </div>
-
-            <form onSubmit={submitBookingRequest}>
-              <div style={styles.dateGrid}>
-                <div>
-                  <label style={styles.label}>
-                    CHECK-IN
-                  </label>
-
-                  <input
-                    type="date"
-                    value={checkIn}
-                    min={todayString()}
-                    onChange={(event) =>
-                      changeCheckIn(event.target.value)
-                    }
-                    style={styles.input}
-                  />
-                </div>
-
-                <div>
-                  <label style={styles.label}>
-                    CHECK-OUT
-                  </label>
-
-                  <input
-                    type="date"
-                    value={checkOut}
-                    min={minimumCheckout}
-                    onChange={(event) =>
-                      changeCheckOut(event.target.value)
-                    }
-                    style={styles.input}
-                  />
-                </div>
+                <span>
+                  {' '}
+                  / night
+                </span>
               </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  GUESTS
+              <div
+                style={
+                  styles.formGrid
+                }
+              >
+                <label
+                  style={
+                    styles.label
+                  }
+                >
+                  CHECK-IN
+
+                  <input
+                    type="date"
+                    value={
+                      checkIn
+                    }
+                    min={
+                      todayString()
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      changeCheckIn(
+                        event.target
+                          .value
+                      )
+                    }
+                    style={
+                      styles.input
+                    }
+                  />
                 </label>
 
-                <input
-                  type="number"
-                  min={property.min_guests || 1}
-                  max={property.max_guests || 1}
-                  value={guestCount}
-                  onChange={(event) =>
-                    changeGuests(event.target.value)
+                <label
+                  style={
+                    styles.label
                   }
-                  style={styles.input}
-                />
+                >
+                  CHECK-OUT
+
+                  <input
+                    type="date"
+                    value={
+                      checkOut
+                    }
+                    min={
+                      minimumCheckout
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      changeCheckOut(
+                        event.target
+                          .value
+                      )
+                    }
+                    style={
+                      styles.input
+                    }
+                  />
+                </label>
               </div>
 
-              {checkIn && checkOut && (
-                <div style={styles.discountSection}>
-                  <label style={styles.label}>
-                    AVAILABLE DISCOUNT
-                  </label>
+              <label
+                style={
+                  styles.label
+                }
+              >
+                GUESTS
 
-                  <select
-                    value={selectedOfferId}
-                    onChange={(event) => {
-                      setSelectedOfferId(
-                        event.target.value
-                      );
-
-                      setBookingError('');
-                      setBookingSuccess(null);
-                    }}
-                    style={styles.input}
-                  >
-                    <option value="">
-                      No discount
-                    </option>
-
-                    {availableOffers.map((offer) => (
+                <select
+                  value={
+                    guestCount
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    changeGuests(
+                      event.target
+                        .value
+                    )
+                  }
+                  style={
+                    styles.input
+                  }
+                >
+                  {Array.from(
+                    {
+                      length:
+                        Math.max(
+                          Number(
+                            property.max_guests ||
+                              1
+                          ) -
+                            Math.max(
+                              Number(
+                                property.min_guests ||
+                                  1
+                              ),
+                              1
+                            ) +
+                            1,
+                          1
+                        ),
+                    },
+                    (
+                      _,
+                      index
+                    ) =>
+                      Math.max(
+                        Number(
+                          property.min_guests ||
+                            1
+                        ),
+                        1
+                      ) +
+                      index
+                  ).map(
+                    (count) => (
                       <option
-                        key={offer.id}
-                        value={offer.id}
+                        key={
+                          count
+                        }
+                        value={
+                          count
+                        }
                       >
-                        {offer.title}
-                        {' — '}
-                        {offer.discount_type === 'percent'
-                          ? `${Number(
-                              offer.discount_value || 0
-                            )}% OFF`
-                          : `${money(
-                              offer.discount_value
-                            )} OFF`}
+                        {count}{' '}
+                        {count ===
+                        1
+                          ? 'guest'
+                          : 'guests'}
                       </option>
-                    ))}
-                  </select>
-
-                  {availableOffers.length === 0 && (
-                    <div style={styles.smallNote}>
-                      No discount is eligible for the
-                      selected stay duration.
-                    </div>
+                    )
                   )}
+                </select>
+              </label>
 
-                  {selectedOffer && (
-                    <div style={styles.offerNotice}>
-                      <strong>
-                        {selectedOffer.title}
-                      </strong>
+              {checkIn &&
+                checkOut &&
+                !selectedDatesUnavailable && (
+                  <div
+                    style={
+                      styles.availableBox
+                    }
+                  >
+                    Dates are currently available.
+                  </div>
+                )}
 
-                      <div>
+              {selectedDatesUnavailable && (
+                <div
+                  style={
+                    styles.errorBox
+                  }
+                >
+                  These dates are booked or blocked.
+                </div>
+              )}
+
+              {checkIn &&
+                checkOut &&
+                availableOffers.length >
+                  0 && (
+                  <div
+                    style={
+                      styles.discountBox
+                    }
+                  >
+                    <label
+                      style={
+                        styles.label
+                      }
+                    >
+                      AVAILABLE DISCOUNT
+
+                      <select
+                        value={
+                          selectedOfferId
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          setSelectedOfferId(
+                            event
+                              .target
+                              .value
+                          )
+                        }
+                        style={
+                          styles.input
+                        }
+                      >
+                        <option value="">
+                          No discount
+                        </option>
+
+                        {availableOffers.map(
+                          (
+                            offer
+                          ) => (
+                            <option
+                              key={
+                                offer.id
+                              }
+                              value={
+                                offer.id
+                              }
+                            >
+                              {offer.title ||
+                                offer.name ||
+                                'Special offer'}
+                              {' — '}
+                              {offer.discount_type ===
+                              'percent'
+                                ? `${Number(
+                                    offer.discount_value ||
+                                      0
+                                  )}% OFF`
+                                : `${money(
+                                    offer.discount_value
+                                  )} OFF`}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    {selectedOffer && (
+                      <div
+                        style={
+                          styles.offerDescription
+                        }
+                      >
+                        <strong>
+                          {selectedOffer.title ||
+                            selectedOffer.name ||
+                            'Special offer'}
+                        </strong>
+
+                        <br />
+
                         {selectedOffer.discount_type ===
                         'percent'
                           ? `${Number(
@@ -2196,124 +2773,132 @@ const bookingPayload = {
                               selectedOffer.discount_value
                             )} discount`}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedDatesUnavailable && (
-                <div style={styles.errorBox}>
-                  These dates are already booked or blocked
-                  by the host.
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
 
               {pricing?.valid && (
-                <div style={styles.priceBox}>
-                  <div style={styles.priceRow}>
-                    <span>
-                      Stay ({pricing.nights || 0}{' '}
-                      {Number(pricing.nights || 0) === 1
-                        ? 'night'
-                        : 'nights'})
-                    </span>
-
-                    <span>
-                      {money(
+                <div
+                  style={
+                    styles.priceSummary
+                  }
+                >
+                  <PriceRow
+                    label={`Stay (${
+                      pricing.nights ||
+                      getStayDates(
+                        checkIn,
+                        checkOut
+                      ).length
+                    } night${
+                      Number(
+                        pricing.nights ||
+                          getStayDates(
+                            checkIn,
+                            checkOut
+                          ).length
+                      ) === 1
+                        ? ''
+                        : 's'
+                    })`}
+                    value={
+                      money(
                         pricing.staySubtotal ||
                           pricing.subtotalBeforeDiscount ||
                           0
-                      )}
-                    </span>
-                  </div>
+                      )
+                    }
+                  />
 
                   {Number(
-                    pricing.extraGuestCharge || 0
+                    pricing.extraGuestCharge ||
+                      0
                   ) > 0 && (
-                    <div style={styles.priceRow}>
-                      <span>
-                        Extra guest charge
-                      </span>
-
-                      <span>
-                        {money(
+                    <PriceRow
+                      label="Extra guest charge"
+                      value={
+                        money(
                           pricing.extraGuestCharge
-                        )}
-                      </span>
-                    </div>
+                        )
+                      }
+                    />
                   )}
 
                   {Number(
-                    pricing.cleaningFee || 0
+                    pricing.cleaningFee ||
+                      property.cleaning_fee ||
+                      0
                   ) > 0 && (
-                    <div style={styles.priceRow}>
-                      <span>Cleaning fee</span>
-
-                      <span>
-                        {money(pricing.cleaningFee)}
-                      </span>
-                    </div>
+                    <PriceRow
+                      label="Cleaning fee"
+                      value={
+                        money(
+                          pricing.cleaningFee ||
+                            property.cleaning_fee
+                        )
+                      }
+                    />
                   )}
 
                   {Number(
-                    pricing.regularDiscountAmount || 0
+                    pricing.regularDiscountAmount ||
+                      0
                   ) > 0 && (
-                    <div style={styles.discountRow}>
-                      <span>
-                        {selectedOffer?.title ||
-                          'Discount'}
-                      </span>
-
-                      <span>
-                        -
-                        {money(
-                          pricing.regularDiscountAmount
-                        )}
-                      </span>
-                    </div>
+                    <PriceRow
+                      label={
+                        selectedOffer?.title ||
+                        selectedOffer?.name ||
+                        'Discount'
+                      }
+                      value={`-${money(
+                        pricing.regularDiscountAmount
+                      )}`}
+                      discount
+                    />
                   )}
 
-                  <div style={styles.priceRow}>
-                    <span>
-                      Taxable amount
-                    </span>
-
-                    <span>
-                      {money(
+                  <PriceRow
+                    label="Taxable amount"
+                    value={
+                      money(
                         pricing.subtotalAfterDiscount ||
                           0
-                      )}
-                    </span>
-                  </div>
+                      )
+                    }
+                  />
 
-                  {Number(pricing.gstAmount || 0) > 0 && (
-                    <div style={styles.priceRow}>
-                      <span>GST (18%)</span>
-
-                      <span>
-                        {money(pricing.gstAmount)}
-                      </span>
-                    </div>
-                  )}
+                  <PriceRow
+                    label="GST (18%)"
+                    value={
+                      money(
+                        pricing.gstAmount ||
+                          0
+                      )
+                    }
+                  />
 
                   {Number(
-                    pricing.securityDeposit || 0
+                    pricing.securityDeposit ||
+                      0
                   ) > 0 && (
-                    <div style={styles.priceRow}>
-                      <span>
-                        Security deposit
-                      </span>
-
-                      <span>
-                        {money(
+                    <PriceRow
+                      label="Security deposit"
+                      value={
+                        money(
                           pricing.securityDeposit
-                        )}
-                      </span>
-                    </div>
+                        )
+                      }
+                    />
                   )}
 
-                  <div style={styles.totalRow}>
-                    <strong>Total</strong>
+                  <div
+                    style={
+                      styles.totalRow
+                    }
+                  >
+                    <strong>
+                      Total
+                    </strong>
 
                     <strong>
                       {money(
@@ -2326,153 +2911,187 @@ const bookingPayload = {
                 </div>
               )}
 
-              {!session && (
-                <div style={styles.loginNotice}>
-                  You can check availability, rates and
-                  discounts without logging in. Login is
-                  required only when you send the booking
-                  request.
-                </div>
-              )}
+              <label
+                style={
+                  styles.label
+                }
+              >
+                FULL NAME
 
-              {session && (
-                <>
-                  <div style={styles.field}>
-                    <label style={styles.label}>
-                      FULL NAME
-                    </label>
+                <input
+                  type="text"
+                  value={
+                    guestName
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setGuestName(
+                      event.target
+                        .value
+                    )
+                  }
+                  style={
+                    styles.input
+                  }
+                  placeholder="Your full name"
+                />
+              </label>
 
-                    <input
-                      type="text"
-                      value={guestName}
-                      onChange={(event) =>
-                        setGuestName(event.target.value)
-                      }
-                      placeholder="Your full name"
-                      style={styles.input}
-                    />
-                  </div>
+              <label
+                style={
+                  styles.label
+                }
+              >
+                PHONE
 
-                  <div style={styles.field}>
-                    <label style={styles.label}>
-                      PHONE
-                    </label>
+                <input
+                  type="tel"
+                  value={
+                    guestPhone
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setGuestPhone(
+                      event.target
+                        .value
+                    )
+                  }
+                  style={
+                    styles.input
+                  }
+                  placeholder="Mobile number"
+                />
+              </label>
 
-                    <input
-                      type="tel"
-                      value={guestPhone}
-                      onChange={(event) =>
-                        setGuestPhone(event.target.value)
-                      }
-                      placeholder="Mobile number"
-                      style={styles.input}
-                    />
-                  </div>
+              <label
+                style={
+                  styles.label
+                }
+              >
+                EMAIL
 
-                  <div style={styles.field}>
-                    <label style={styles.label}>
-                      EMAIL
-                    </label>
+                <input
+                  type="email"
+                  value={
+                    guestEmail
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setGuestEmail(
+                      event.target
+                        .value
+                    )
+                  }
+                  style={
+                    styles.input
+                  }
+                  placeholder="Email address"
+                />
+              </label>
 
-                    <input
-                      type="email"
-                      value={guestEmail}
-                      onChange={(event) =>
-                        setGuestEmail(event.target.value)
-                      }
-                      placeholder="Email address"
-                      style={styles.input}
-                    />
-                  </div>
+              <label
+                style={
+                  styles.label
+                }
+              >
+                MESSAGE TO HOST
 
-                  <div style={styles.field}>
-                    <label style={styles.label}>
-                      MESSAGE TO HOST
-                    </label>
-
-                    <textarea
-                      value={guestMessage}
-                      onChange={(event) =>
-                        setGuestMessage(event.target.value)
-                      }
-                      placeholder="Tell the host anything important about your stay."
-                      rows={4}
-                      style={{
-                        ...styles.input,
-                        resize: 'vertical',
-                      }}
-                    />
-                  </div>
-                </>
-              )}
+                <textarea
+                  value={
+                    guestMessage
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setGuestMessage(
+                      event.target
+                        .value
+                    )
+                  }
+                  style={
+                    styles.textarea
+                  }
+                  placeholder="Tell the host anything important about your stay."
+                />
+              </label>
 
               {bookingError && (
-                <div style={styles.errorBox}>
-                  {bookingError}
+                <div
+                  style={
+                    styles.errorBox
+                  }
+                >
+                  {
+                    bookingError
+                  }
                 </div>
               )}
 
               {bookingSuccess && (
-                <div style={styles.successBox}>
-                  <strong>
-                    Booking request sent successfully.
-                  </strong>
+                <div
+                  style={
+                    styles.successBox
+                  }
+                >
+                  Booking request sent successfully.
 
-                  <div style={styles.successText}>
-                    The host will review your request.
-                    Pending requests do not block the dates.
-                    The dates become unavailable only after
-                    the booking is confirmed and payment is
-                    completed.
-                  </div>
+                  {bookingSuccess.booking_code && (
+                    <>
+                      <br />
 
-                  <div style={styles.successActions}>
-                    <a
-                      href="/account/bookings"
-                      style={styles.successLink}
-                    >
-                      View My Bookings
-                    </a>
-
-                    <a
-                      href="/account/messages"
-                      style={styles.successLink}
-                    >
-                      Messages
-                    </a>
-                  </div>
+                      Booking ID:{' '}
+                      <strong>
+                        {
+                          bookingSuccess.booking_code
+                        }
+                      </strong>
+                    </>
+                  )}
                 </div>
               )}
+
+              {!session &&
+                !authChecking && (
+                  <div
+                    style={
+                      styles.loginNotice
+                    }
+                  >
+                    Please login before sending a booking request.
+                  </div>
+                )}
 
               <button
                 type="submit"
                 disabled={
                   bookingLoading ||
-                  authChecking ||
                   selectedDatesUnavailable
                 }
                 style={{
-                  ...styles.bookingButton,
+                  ...styles.bookButton,
 
                   ...(bookingLoading ||
-                  authChecking ||
                   selectedDatesUnavailable
                     ? styles.disabledButton
                     : {}),
                 }}
               >
-                {authChecking
-                  ? 'Checking account...'
-                  : bookingLoading
+                {bookingLoading
                   ? 'Sending Request...'
                   : session
                   ? 'Request Booking'
                   : 'Login to Request Booking'}
               </button>
 
-              <div style={styles.bookingNote}>
-                Sending a request does not immediately
-                reserve or block the dates.
+              <div
+                style={
+                  styles.bookingNote
+                }
+              >
+                Sending a request does not immediately reserve or block the dates.
               </div>
             </form>
           </aside>
@@ -2482,30 +3101,86 @@ const bookingPayload = {
   );
 }
 
-function Fact({ label, value }) {
+function Fact({
+  label,
+  value,
+}) {
   return (
-    <div style={styles.fact}>
-      <div style={styles.factValue}>
+    <div
+      style={
+        styles.fact
+      }
+    >
+      <div
+        style={
+          styles.factValue
+        }
+      >
         {value}
       </div>
 
-      <div style={styles.factLabel}>
+      <div
+        style={
+          styles.factLabel
+        }
+      >
         {label}
       </div>
     </div>
   );
 }
 
-function Detail({ label, value }) {
+function Detail({
+  label,
+  value,
+}) {
   return (
-    <div style={styles.detail}>
-      <div style={styles.detailLabel}>
+    <div
+      style={
+        styles.detail
+      }
+    >
+      <div
+        style={
+          styles.detailLabel
+        }
+      >
         {label}
       </div>
 
-      <div style={styles.detailValue}>
+      <div
+        style={
+          styles.detailValue
+        }
+      >
         {value}
       </div>
+    </div>
+  );
+}
+
+function PriceRow({
+  label,
+  value,
+  discount = false,
+}) {
+  return (
+    <div
+      style={{
+        ...styles.priceRow,
+
+        ...(discount
+          ? styles.discountRow
+          : {}),
+      }}
+    >
+      <span>
+        {label}
+      </span>
+
+      <span>
+        {value}
+      </span>
     </div>
   );
 }
@@ -2514,111 +3189,111 @@ const styles = {
   page: {
     minHeight: '100vh',
     background: '#f6f7f9',
-    color: '#11213c',
-    fontFamily: 'Arial, sans-serif',
+    color: '#0b2447',
+    fontFamily:
+      'Arial, sans-serif',
   },
 
   header: {
-    minHeight: 68,
-    padding: '12px 5vw',
+    height: 72,
     background: '#ffffff',
-    borderBottom: '1px solid #e2e5e8',
+    borderBottom:
+      '1px solid #e4e7ec',
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 20,
+    justifyContent:
+      'space-between',
+    padding: '0 5%',
+    position: 'sticky',
+    top: 0,
+    zIndex: 50,
   },
 
   logo: {
-    color: '#17457f',
     fontSize: 24,
-    fontWeight: 900,
+    fontWeight: 800,
     textDecoration: 'none',
+    color: '#174f91',
   },
 
   headerActions: {
     display: 'flex',
+    gap: 18,
     alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
   },
 
   headerLink: {
-    color: '#17457f',
-    fontWeight: 800,
+    color: '#174f91',
     textDecoration: 'none',
-    fontSize: 13,
+    fontWeight: 600,
   },
 
   loginButton: {
-    display: 'inline-block',
-    border: 0,
-    background: '#17457f',
+    background: '#174f91',
     color: '#ffffff',
-    padding: '10px 15px',
-    borderRadius: 9,
-    fontWeight: 800,
+    padding: '10px 18px',
+    borderRadius: 8,
     textDecoration: 'none',
+    fontWeight: 700,
   },
 
   container: {
-    maxWidth: 1350,
+    width: '90%',
+    maxWidth: 1220,
     margin: '0 auto',
-    padding: '28px 5vw 80px',
+    padding: '30px 0 70px',
   },
 
   centerMessage: {
-    maxWidth: 650,
-    margin: '80px auto',
-    padding: 30,
+    width: '90%',
+    maxWidth: 700,
+    margin: '100px auto',
     background: '#ffffff',
-    border: '1px solid #e2e5e8',
-    borderRadius: 16,
+    padding: 40,
+    borderRadius: 18,
     textAlign: 'center',
+    boxShadow:
+      '0 10px 35px rgba(0,0,0,0.06)',
   },
 
   homeLink: {
-    display: 'inline-block',
-    marginTop: 14,
-    padding: '10px 15px',
-    borderRadius: 9,
-    background: '#17457f',
-    color: '#ffffff',
-    textDecoration: 'none',
-    fontWeight: 800,
+    color: '#174f91',
+    fontWeight: 700,
   },
 
   titleSection: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    justifyContent:
+      'space-between',
     gap: 20,
-    flexWrap: 'wrap',
+    alignItems: 'flex-end',
     marginBottom: 24,
+    flexWrap: 'wrap',
   },
 
   propertyTitle: {
     margin: 0,
     fontSize: 34,
+    lineHeight: 1.2,
   },
 
   location: {
     marginTop: 8,
-    color: '#687080',
+    color: '#667085',
   },
 
   basePrice: {
-    color: '#17457f',
-    fontSize: 24,
+    fontSize: 16,
+    color: '#667085',
   },
 
   gallery: {
-    marginBottom: 28,
+    marginBottom: 30,
   },
 
   mainPhotoBox: {
     width: '100%',
-    minHeight: 420,
+    height: 520,
     borderRadius: 18,
     overflow: 'hidden',
     background: '#e9edf2',
@@ -2626,43 +3301,50 @@ const styles = {
 
   mainPhoto: {
     width: '100%',
-    height: 520,
+    height: '100%',
     objectFit: 'cover',
     display: 'block',
   },
 
   noPhoto: {
-    height: 420,
+    width: '100%',
+    height: '100%',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    color: '#687080',
-    fontWeight: 800,
+    justifyContent:
+      'center',
+    color: '#667085',
   },
 
   thumbnailRow: {
     display: 'flex',
-    gap: 9,
+    gap: 10,
+    marginTop: 10,
     overflowX: 'auto',
-    paddingTop: 10,
+    paddingBottom: 4,
   },
 
   thumbnailButton: {
-    border: '2px solid transparent',
+    width: 105,
+    height: 75,
+    flex: '0 0 auto',
+    padding: 0,
+    border:
+      '2px solid transparent',
+    borderRadius: 10,
+    overflow: 'hidden',
     background: '#ffffff',
-    borderRadius: 9,
-    padding: 2,
     cursor: 'pointer',
   },
 
   activeThumbnail: {
-    border: '2px solid #17457f',
+    border:
+      '2px solid #174f91',
   },
 
   thumbnail: {
-    width: 95,
-    height: 65,
-    borderRadius: 7,
+    width: '100%',
+    height: '100%',
     objectFit: 'cover',
     display: 'block',
   },
@@ -2670,22 +3352,23 @@ const styles = {
   contentGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'minmax(0, 1.45fr) minmax(340px, 0.7fr)',
+      'minmax(0, 1fr) 385px',
     gap: 28,
     alignItems: 'start',
   },
 
   infoCard: {
-    marginBottom: 20,
-    padding: 22,
     background: '#ffffff',
-    border: '1px solid #e2e5e8',
-    borderRadius: 15,
+    border:
+      '1px solid #e4e7ec',
+    borderRadius: 18,
+    padding: 24,
+    marginBottom: 20,
   },
 
   description: {
-    color: '#56606e',
-    lineHeight: 1.65,
+    lineHeight: 1.7,
+    color: '#475467',
   },
 
   quickFacts: {
@@ -2693,237 +3376,233 @@ const styles = {
     gridTemplateColumns:
       'repeat(auto-fit, minmax(130px, 1fr))',
     gap: 12,
-    marginTop: 18,
+    marginTop: 20,
   },
 
   fact: {
-    padding: 14,
     background: '#f7f8fa',
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 16,
   },
 
   factValue: {
+    fontWeight: 800,
     fontSize: 18,
-    fontWeight: 900,
-    color: '#17457f',
   },
 
   factLabel: {
-    marginTop: 4,
-    color: '#687080',
-    fontSize: 11,
+    color: '#667085',
+    marginTop: 5,
+    fontSize: 13,
   },
 
   detailGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(160px, 1fr))',
+      'repeat(auto-fit, minmax(140px, 1fr))',
     gap: 12,
   },
 
   detail: {
-    padding: 13,
-    border: '1px solid #e2e5e8',
-    borderRadius: 10,
+    border:
+      '1px solid #e4e7ec',
+    borderRadius: 12,
+    padding: 14,
   },
 
   detailLabel: {
-    color: '#687080',
-    fontSize: 11,
+    fontSize: 12,
+    color: '#667085',
+    marginBottom: 8,
   },
 
   detailValue: {
-    marginTop: 5,
     fontWeight: 800,
+    fontSize: 17,
+  },
+
+  bookingColumn: {
+    position: 'relative',
   },
 
   bookingCard: {
     position: 'sticky',
-    top: 18,
-    padding: 22,
+    top: 92,
     background: '#ffffff',
-    border: '1px solid #dfe3e8',
-    borderRadius: 16,
+    border:
+      '1px solid #dfe3e8',
+    borderRadius: 18,
+    padding: 22,
     boxShadow:
-      '0 8px 28px rgba(16,24,40,0.07)',
+      '0 12px 35px rgba(16,24,40,0.08)',
+    display: 'grid',
+    gap: 16,
   },
 
   bookingPrice: {
-    marginBottom: 20,
-    color: '#17457f',
-    fontSize: 25,
-    fontWeight: 900,
+    fontSize: 28,
+    fontWeight: 800,
+    color: '#174f91',
   },
 
-  perNight: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#687080',
-  },
-
-  dateGrid: {
+  formGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns:
+      '1fr 1fr',
     gap: 10,
   },
 
-  field: {
-    marginTop: 14,
-  },
-
   label: {
-    display: 'block',
-    marginBottom: 6,
-    fontSize: 10,
-    fontWeight: 900,
-    letterSpacing: 0.8,
+    display: 'grid',
+    gap: 7,
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: 0.5,
+    color: '#0b2447',
   },
 
   input: {
     width: '100%',
-    boxSizing: 'border-box',
-    padding: 11,
-    border: '1px solid #ccd1d8',
+    boxSizing:
+      'border-box',
+    border:
+      '1px solid #cfd6df',
     borderRadius: 9,
+    padding: '12px 12px',
     background: '#ffffff',
+    color: '#101828',
     fontSize: 14,
+    outline: 'none',
   },
 
-  discountSection: {
-    marginTop: 16,
-    padding: 13,
-    background: '#fffaf0',
-    border: '1px solid #f0dfb4',
+  textarea: {
+    width: '100%',
+    minHeight: 100,
+    resize: 'vertical',
+    boxSizing:
+      'border-box',
+    border:
+      '1px solid #cfd6df',
+    borderRadius: 9,
+    padding: 12,
+    background: '#ffffff',
+    color: '#101828',
+    fontSize: 14,
+    outline: 'none',
+  },
+
+  availableBox: {
+    padding: 12,
+    background: '#eaf7ee',
+    color: '#24723a',
     borderRadius: 10,
+    fontWeight: 700,
+    fontSize: 13,
   },
 
-  smallNote: {
-    marginTop: 8,
-    color: '#687080',
-    fontSize: 11,
-    lineHeight: 1.4,
+  discountBox: {
+    background: '#fff8e7',
+    border:
+      '1px solid #efd493',
+    borderRadius: 12,
+    padding: 12,
+    display: 'grid',
+    gap: 10,
   },
 
-  offerNotice: {
-    marginTop: 10,
+  offerDescription: {
+    background: '#fff1c9',
     padding: 10,
-    background: '#fff4d8',
     borderRadius: 8,
-    color: '#735800',
     fontSize: 12,
+    color: '#805b00',
+    lineHeight: 1.5,
   },
 
-  priceBox: {
-    marginTop: 18,
-    padding: 14,
+  priceSummary: {
     background: '#f7f8fa',
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 14,
+    display: 'grid',
+    gap: 10,
   },
 
   priceRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: '7px 0',
+    justifyContent:
+      'space-between',
+    gap: 14,
+    color: '#344054',
     fontSize: 13,
   },
 
   discountRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: '7px 0',
-    color: '#26733d',
-    fontWeight: 800,
-    fontSize: 13,
+    color: '#24723a',
+    fontWeight: 700,
   },
 
   totalRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 9,
+    justifyContent:
+      'space-between',
+    gap: 14,
     paddingTop: 12,
-    borderTop: '1px solid #dfe3e8',
+    marginTop: 3,
+    borderTop:
+      '1px solid #dfe3e8',
     fontSize: 17,
   },
 
-  loginNotice: {
-    marginTop: 15,
-    padding: 12,
-    borderRadius: 9,
-    background: '#eef4fb',
-    color: '#17457f',
-    fontSize: 12,
-    lineHeight: 1.5,
-  },
-
   errorBox: {
-    marginTop: 14,
     padding: 12,
-    borderRadius: 9,
-    background: '#ffeaea',
-    color: '#8b2020',
-    fontWeight: 700,
-    fontSize: 12,
-    lineHeight: 1.4,
+    background: '#fdeaea',
+    color: '#a12828',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 1.5,
   },
 
   successBox: {
-    marginTop: 14,
-    padding: 13,
-    borderRadius: 9,
-    background: '#eaf8ee',
-    color: '#25663a',
-    fontSize: 12,
+    padding: 12,
+    background: '#eaf7ee',
+    color: '#24723a',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
     lineHeight: 1.5,
   },
 
-  successText: {
-    marginTop: 7,
-  },
-
-  successActions: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginTop: 11,
-  },
-
-  successLink: {
-    display: 'inline-block',
-    padding: '8px 11px',
-    borderRadius: 8,
-    background: '#ffffff',
-    border: '1px solid #b9d9c4',
-    color: '#25663a',
-    textDecoration: 'none',
-    fontWeight: 800,
-  },
-
-  bookingButton: {
-    width: '100%',
-    marginTop: 18,
-    border: 0,
-    padding: 14,
+  loginNotice: {
+    padding: 12,
+    background: '#fff8e7',
+    color: '#805b00',
     borderRadius: 10,
-    background: '#17457f',
+    fontSize: 13,
+  },
+
+  bookButton: {
+    width: '100%',
+    border: 0,
+    borderRadius: 10,
+    padding: '15px 16px',
+    background: '#174f91',
     color: '#ffffff',
-    fontWeight: 900,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: 800,
     cursor: 'pointer',
   },
 
   disabledButton: {
     opacity: 0.55,
-    cursor: 'not-allowed',
+    cursor:
+      'not-allowed',
   },
 
   bookingNote: {
-    marginTop: 9,
     textAlign: 'center',
-    color: '#687080',
-    fontSize: 10,
-    lineHeight: 1.4,
+    color: '#667085',
+    fontSize: 11,
+    lineHeight: 1.5,
   },
 };
