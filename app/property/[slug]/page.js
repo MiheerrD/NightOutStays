@@ -412,6 +412,11 @@ export default function PropertyPage() {
   ] = useState([]);
 
   const [
+    rateOverrides,
+    setRateOverrides,
+  ] = useState([]);
+
+  const [
     propertyOffers,
     setPropertyOffers,
   ] = useState([]);
@@ -644,6 +649,7 @@ export default function PropertyPage() {
         photoResult,
         offerResult,
         pricingResult,
+        rateOverrideResult,
         blockedResult,
         bookingResult,
       ] =
@@ -709,6 +715,27 @@ export default function PropertyPage() {
 
           supabase
             .from(
+              'property_rate_overrides'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            )
+            .order(
+              'start_date',
+              {
+                ascending:
+                  true,
+              }
+            ),
+
+          supabase
+            .from(
               'blocked_dates'
             )
             .select(
@@ -758,6 +785,11 @@ export default function PropertyPage() {
 
       setPropertyOffers(
         offerResult.data ||
+          []
+      );
+
+      setRateOverrides(
+        rateOverrideResult.data ||
           []
       );
 
@@ -882,44 +914,6 @@ export default function PropertyPage() {
       ]
     );
 
-  const manualDiscount =
-    useMemo(
-      () => {
-        if (
-          !selectedOffer ||
-          !checkIn ||
-          !checkOut
-        ) {
-          return {
-            discountAmount: 0,
-            eligibleAmount: 0,
-          };
-        }
-
-        return calculateRegularDiscount(
-          {
-            valid: true,
-            staySubtotal: 0,
-            nights:
-              getStayDates(
-                checkIn,
-                checkOut
-              ).length,
-            nightlyBreakdown:
-              [],
-          },
-          selectedOffer,
-          checkIn,
-          checkOut
-        );
-      },
-      [
-        selectedOffer,
-        checkIn,
-        checkOut,
-      ]
-    );
-
   const pricing =
     useMemo(
       () => {
@@ -937,14 +931,22 @@ export default function PropertyPage() {
           const result =
             calculateBookingPrice({
               property,
-              checkIn,
-              checkOut,
-              guests:
+
+              guestCount:
                 Number(
                   guestCount ||
                     1
                 ),
+
+              checkIn,
+
+              checkOut,
+
               pricingRules,
+
+              rateOverrides,
+
+              gstRate: 18,
             });
 
           if (
@@ -984,9 +986,8 @@ export default function PropertyPage() {
 
           const subtotalBeforeDiscount =
             Number(
-              result.subtotalBeforeDiscount ??
-                result.subtotal ??
-                result.total ??
+              result.amountBeforeDiscount ??
+                result.staySubtotal ??
                 0
             );
 
@@ -996,6 +997,26 @@ export default function PropertyPage() {
               subtotalBeforeDiscount -
                 discountAmount
             );
+
+          const gstAmount =
+            Math.round(
+              subtotalAfterDiscount *
+                0.18 *
+                100
+            ) / 100;
+
+          const totalPayable =
+            Math.round(
+              (
+                subtotalAfterDiscount +
+                gstAmount +
+                Number(
+                  result.securityDeposit ||
+                    0
+                )
+              ) *
+                100
+            ) / 100;
 
           return {
             ...result,
@@ -1009,8 +1030,12 @@ export default function PropertyPage() {
 
             subtotalAfterDiscount,
 
+            gstAmount,
+
             total:
-              subtotalAfterDiscount,
+              totalPayable,
+
+            totalPayable,
           };
         } catch (error) {
           console.error(
@@ -1020,6 +1045,7 @@ export default function PropertyPage() {
 
           return {
             valid: false,
+
             error:
               error.message ||
               'Unable to calculate booking price.',
@@ -1032,6 +1058,7 @@ export default function PropertyPage() {
         checkOut,
         guestCount,
         pricingRules,
+        rateOverrides,
         selectedOffer,
       ]
     );
@@ -1066,13 +1093,6 @@ export default function PropertyPage() {
     ) {
       return true;
     }
-
-    /*
-      Defensive check:
-      even if existingBookings somehow contains
-      another booking state, only confirmed + paid
-      bookings are allowed to block inventory.
-    */
 
     const bookingConflict =
       existingBookings.some(
@@ -1165,7 +1185,8 @@ export default function PropertyPage() {
         Math.max(
           minimum,
           Number(
-            value || minimum
+            value ||
+              minimum
           )
         )
       );
@@ -1340,12 +1361,6 @@ export default function PropertyPage() {
       return;
     }
 
-    /*
-      Guests can browse without login,
-      but they must login before sending
-      a booking request.
-    */
-
     if (
       !session?.user
     ) {
@@ -1498,14 +1513,6 @@ export default function PropertyPage() {
       return;
     }
 
-    /*
-      Re-check the discount at submission time.
-
-      This prevents a guest from selecting Monthly
-      and then changing the dates to a 1-night stay,
-      or manipulating the frontend.
-    */
-
     if (
       selectedOffer &&
       !offerEligibleForBooking(
@@ -1548,15 +1555,6 @@ export default function PropertyPage() {
     setBookingLoading(true);
 
     try {
-      /*
-        Re-check availability from Supabase immediately
-        before inserting the booking request.
-
-        IMPORTANT:
-        Pending/unpaid requests are NOT considered
-        booking conflicts.
-      */
-
       const [
         latestBlockedResult,
         latestBookingsResult,
@@ -1725,13 +1723,13 @@ export default function PropertyPage() {
         subtotal:
           Number(
             pricing.subtotalBeforeDiscount ||
-              pricing.subtotal ||
               0
           ),
 
         total_amount:
           Number(
-            pricing.total ||
+            pricing.totalPayable ||
+              pricing.total ||
               0
           ),
 
@@ -1765,15 +1763,8 @@ export default function PropertyPage() {
       }
 
       /*
-        A booking REQUEST does not block inventory.
-
-        Do NOT add this pending booking to
-        existingBookings.
-
-        The dates remain available until:
-        booking_status = confirmed
-        AND
-        payment_status = paid
+        Pending booking request does NOT
+        block the selected dates.
       */
 
       setBookingSuccess(
@@ -2600,6 +2591,28 @@ export default function PropertyPage() {
                   )}
 
                   {Number(
+                    pricing.extraGuestCharge ||
+                      0
+                  ) >
+                    0 && (
+                    <div
+                      style={
+                        styles.priceRow
+                      }
+                    >
+                      <span>
+                        Extra guest charge
+                      </span>
+
+                      <span>
+                        {money(
+                          pricing.extraGuestCharge
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {Number(
                     pricing.cleaningFee ||
                       0
                   ) >
@@ -2622,7 +2635,7 @@ export default function PropertyPage() {
                   )}
 
                   {Number(
-                    pricing.serviceFee ||
+                    pricing.gstAmount ||
                       0
                   ) >
                     0 && (
@@ -2632,20 +2645,19 @@ export default function PropertyPage() {
                       }
                     >
                       <span>
-                        Service fee
+                        GST (18%)
                       </span>
 
                       <span>
                         {money(
-                          pricing.serviceFee
+                          pricing.gstAmount
                         )}
                       </span>
                     </div>
                   )}
 
                   {Number(
-                    pricing.taxAmount ||
-                      pricing.gst ||
+                    pricing.securityDeposit ||
                       0
                   ) >
                     0 && (
@@ -2655,13 +2667,12 @@ export default function PropertyPage() {
                       }
                     >
                       <span>
-                        Taxes
+                        Security deposit
                       </span>
 
                       <span>
                         {money(
-                          pricing.taxAmount ||
-                            pricing.gst
+                          pricing.securityDeposit
                         )}
                       </span>
                     </div>
@@ -2678,7 +2689,8 @@ export default function PropertyPage() {
 
                     <strong>
                       {money(
-                        pricing.total
+                        pricing.totalPayable ||
+                          pricing.total
                       )}
                     </strong>
                   </div>
@@ -3145,7 +3157,8 @@ const styles = {
 
   contentGrid: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.45fr) minmax(340px, 0.7fr)',
+    gridTemplateColumns:
+      'minmax(0, 1.45fr) minmax(340px, 0.7fr)',
     gap: 28,
     alignItems: 'start',
   },
@@ -3165,7 +3178,8 @@ const styles = {
 
   quickFacts: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+    gridTemplateColumns:
+      'repeat(auto-fit, minmax(130px, 1fr))',
     gap: 12,
     marginTop: 18,
   },
@@ -3190,7 +3204,8 @@ const styles = {
 
   detailGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gridTemplateColumns:
+      'repeat(auto-fit, minmax(160px, 1fr))',
     gap: 12,
   },
 
@@ -3242,7 +3257,8 @@ const styles = {
     background: '#ffffff',
     border: '1px solid #dfe3e8',
     borderRadius: 16,
-    boxShadow: '0 8px 28px rgba(16,24,40,0.07)',
+    boxShadow:
+      '0 8px 28px rgba(16,24,40,0.07)',
   },
 
   bookingPrice: {
