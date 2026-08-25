@@ -1539,7 +1539,7 @@ const bookingPayload = {
 
   check_out: checkOut,
 
-  guest_count: Number(guestCount),
+  guests_count: Number(guestCount),
 
   booking_status: 'pending',
 
