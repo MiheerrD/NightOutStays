@@ -1530,71 +1530,7 @@ export default function PropertyPage() {
           guest
         );
 
-      const bookingPayload = {
-        property_id:
-          property.id,
-
-        guest_id:
-          guest.id,
-
-        check_in:
-          checkIn,
-
-        check_out:
-          checkOut,
-
-        guest_count:
-          Number(guestCount),
-
-        guest_name:
-          guestName.trim(),
-
-        guest_phone:
-          guestPhone.trim(),
-
-        guest_email:
-          guestEmail
-            .trim()
-            .toLowerCase(),
-
-        guest_message:
-          guestMessage.trim() ||
-          null,
-
-        booking_status:
-          'pending',
-
-        payment_status:
-          'unpaid',
-
-        selected_offer_id:
-          selectedOffer?.id ||
-          null,
-
-        selected_offer_title:
-          selectedOffer?.title ||
-          null,
-
-        discount_amount:
-          Number(
-            pricing.regularDiscountAmount ||
-              0
-          ),
-
-        subtotal:
-          Number(
-            pricing.subtotalBeforeDiscount ||
-              0
-          ),
-
-        total_amount:
-          Number(
-            pricing.totalPayable ||
-              pricing.total ||
-              0
-          ),
-
-        nights:
+              nights:
           Number(
             pricing.nights ||
               nights
