@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import PropertyPhotoManager from './PropertyPhotoManager';
 import PropertyDiscountManager from './PropertyDiscountManager';
+import PropertyCalendarManager from './PropertyCalendarManager';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -769,7 +770,7 @@ export default function AdminPropertiesPage() {
         );
       } else {
         setSuccessMessage(
-          'Property created successfully. Click Edit Property to add photos and discounts.'
+          'Property created successfully. Click Edit Property to add photos, discounts and calendar rates.'
         );
 
         const createdProperty =
@@ -831,6 +832,7 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         `Unable to update property status: ${error.message}`
       );
+
       return;
     }
 
@@ -915,7 +917,7 @@ export default function AdminPropertiesPage() {
             </h1>
 
             <p style={styles.muted}>
-              Manage property information, pricing, guest capacity, facilities, rules, photos and discounts.
+              Manage property information, pricing, guest capacity, facilities, rules, photos, discounts and the availability calendar.
             </p>
           </div>
 
@@ -1672,152 +1674,166 @@ export default function AdminPropertiesPage() {
           />
         )}
 
+        {form.id && (
+          <PropertyCalendarManager
+            propertyId={form.id}
+            propertyName={form.name}
+          />
+        )}
+
         <hr style={styles.separator} />
 
-        <div style={styles.topRow}>
-          <div>
-            <h1>
-              Existing Properties
-            </h1>
+        <section style={styles.listSection}>
+          <div style={styles.topRow}>
+            <div>
+              <h2>
+                Existing Properties
+              </h2>
 
-            <p style={styles.muted}>
-              Edit any property to manage details, photos and discounts.
-            </p>
+              <p style={styles.muted}>
+                Edit any property to manage details, photos,
+                discounts, availability and date-specific rates.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadProperties}
+              style={styles.secondaryButton}
+            >
+              Refresh
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={
-              newProperty
-            }
-            style={
-              styles.secondaryButton
-            }
-          >
-            + Add Property
-          </button>
-        </div>
+          {loadingProperties ? (
+            <div style={styles.loading}>
+              Loading properties...
+            </div>
+          ) : properties.length === 0 ? (
+            <div style={styles.empty}>
+              No properties added yet.
+            </div>
+          ) : (
+            <div style={styles.propertyGrid}>
+              {properties.map(
+                (property) => (
+                  <article
+                    key={property.id}
+                    style={styles.propertyCard}
+                  >
+                    <div style={styles.cardTop}>
+                      <div>
+                        <h3 style={styles.propertyName}>
+                          {property.name}
+                        </h3>
 
-        {loadingProperties ? (
-          <p>
-            Loading properties...
-          </p>
-        ) : properties.length ===
-          0 ? (
-          <div style={styles.empty}>
-            No properties found.
-          </div>
-        ) : (
-          <div style={styles.propertyGrid}>
-            {properties.map(
-              (property) => (
-                <div
-                  key={
-                    property.id
-                  }
-                  style={
-                    styles.propertyCard
-                  }
-                >
-                  <div style={styles.cardTop}>
-                    <div>
-                      <h3
-                        style={
-                          styles.cardTitle
-                        }
-                      >
-                        {property.name}
-                      </h3>
-
-                      <div style={styles.muted}>
-                        {
-                          property.location_name
-                        }
+                        <div style={styles.muted}>
+                          {property.location_name}
+                        </div>
                       </div>
+
+                      <span
+                        style={{
+                          ...styles.statusBadge,
+
+                          ...(property.is_active
+                            ? styles.activeBadge
+                            : styles.inactiveBadge),
+                        }}
+                      >
+                        {property.is_active
+                          ? 'Active'
+                          : 'Inactive'}
+                      </span>
                     </div>
 
-                    <span
-                      style={{
-                        ...styles.status,
+                    <div style={styles.propertyDetails}>
+                      <div>
+                        <strong>
+                          ₹
+                          {toNumber(
+                            property.base_price
+                          ).toLocaleString(
+                            'en-IN'
+                          )}
+                        </strong>
+                        {' / night'}
+                      </div>
 
-                        background:
+                      <div>
+                        {property.bedrooms || 0}
+                        {' Bedrooms · '}
+                        {property.bathrooms || 0}
+                        {' Bathrooms'}
+                      </div>
+
+                      <div>
+                        Up to{' '}
+                        {property.max_guests || 0}
+                        {' guests'}
+                      </div>
+
+                      <div>
+                        Base price includes{' '}
+                        {property.included_guests || 0}
+                        {' guests'}
+                      </div>
+
+                      {property.dynamic_pricing_enabled && (
+                        <div style={styles.dynamicTag}>
+                          Dynamic Pricing Active
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={styles.cardActions}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          editProperty(
+                            property
+                          )
+                        }
+                        style={styles.editButton}
+                      >
+                        Edit Property
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleProperty(
+                            property
+                          )
+                        }
+                        style={
                           property.is_active
-                            ? '#e7f7ec'
-                            : '#eeeeee',
-                      }}
-                    >
-                      {property.is_active
-                        ? 'Active'
-                        : 'Inactive'}
-                    </span>
-                  </div>
+                            ? styles.deactivateButton
+                            : styles.activateButton
+                        }
+                      >
+                        {property.is_active
+                          ? 'Deactivate'
+                          : 'Activate'}
+                      </button>
 
-                  <div style={styles.cardPrice}>
-                    ₹
-                    {toNumber(
-                      property.base_price
-                    ).toLocaleString(
-                      'en-IN'
-                    )}
-                    {' / night'}
-                  </div>
-
-                  <div style={styles.small}>
-                    Base rate includes{' '}
-                    {
-                      property.included_guests
-                    }{' '}
-                    guest
-                    {property.included_guests !==
-                    1
-                      ? 's'
-                      : ''}
-                  </div>
-
-                  <div style={styles.small}>
-                    Maximum{' '}
-                    {
-                      property.max_guests
-                    }{' '}
-                    guests
-                  </div>
-
-                  <div style={styles.cardButtons}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        editProperty(
-                          property
-                        )
-                      }
-                      style={
-                        styles.editButton
-                      }
-                    >
-                      Edit Property
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toggleProperty(
-                          property
-                        )
-                      }
-                      style={
-                        styles.statusButton
-                      }
-                    >
-                      {property.is_active
-                        ? 'Deactivate'
-                        : 'Activate'}
-                    </button>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        )}
+                      {property.slug && (
+                        <a
+                          href={`/property/${property.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.viewLink}
+                        >
+                          View Guest Page
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                )
+              )}
+            </div>
+          )}
+        </section>
       </section>
     </main>
   );
@@ -1828,7 +1844,7 @@ function Section({
   children,
 }) {
   return (
-    <div style={styles.section}>
+    <section style={styles.section}>
       <h2 style={styles.sectionTitle}>
         {title}
       </h2>
@@ -1836,7 +1852,7 @@ function Section({
       <div style={styles.formGrid}>
         {children}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1847,22 +1863,23 @@ function Field({
   placeholder = '',
 }) {
   return (
-    <div>
-      <label style={styles.label}>
+    <label style={styles.field}>
+      <span style={styles.label}>
         {label}
-      </label>
+      </span>
 
       <input
-        style={styles.input}
-        value={value || ''}
-        placeholder={placeholder}
+        type="text"
+        value={value ?? ''}
         onChange={(event) =>
           onChange(
             event.target.value
           )
         }
+        placeholder={placeholder}
+        style={styles.input}
       />
-    </div>
+    </label>
   );
 }
 
@@ -1870,26 +1887,28 @@ function NumberField({
   label,
   value,
   onChange,
+  min = 0,
+  step = 1,
 }) {
   return (
-    <div>
-      <label style={styles.label}>
+    <label style={styles.field}>
+      <span style={styles.label}>
         {label}
-      </label>
+      </span>
 
       <input
-        style={styles.input}
         type="number"
-        min="0"
-        step="0.01"
-        value={value ?? 0}
+        min={min}
+        step={step}
+        value={value ?? ''}
         onChange={(event) =>
           onChange(
             event.target.value
           )
         }
+        style={styles.input}
       />
-    </div>
+    </label>
   );
 }
 
@@ -1899,13 +1918,12 @@ function TimeField({
   onChange,
 }) {
   return (
-    <div>
-      <label style={styles.label}>
+    <label style={styles.field}>
+      <span style={styles.label}>
         {label}
-      </label>
+      </span>
 
       <input
-        style={styles.input}
         type="time"
         value={value || ''}
         onChange={(event) =>
@@ -1913,8 +1931,9 @@ function TimeField({
             event.target.value
           )
         }
+        style={styles.input}
       />
-    </div>
+    </label>
   );
 }
 
@@ -1924,21 +1943,22 @@ function TextArea({
   onChange,
 }) {
   return (
-    <div style={styles.fullWidth}>
-      <label style={styles.label}>
+    <label style={styles.fullField}>
+      <span style={styles.label}>
         {label}
-      </label>
+      </span>
 
       <textarea
-        style={styles.textarea}
-        value={value || ''}
+        value={value ?? ''}
         onChange={(event) =>
           onChange(
             event.target.value
           )
         }
+        rows={5}
+        style={styles.textarea}
       />
-    </div>
+    </label>
   );
 }
 
@@ -1948,12 +1968,12 @@ function Toggle({
   onChange,
 }) {
   return (
-    <label style={styles.toggleRow}>
+    <label style={styles.toggleCard}>
       <input
         type="checkbox"
-        checked={
-          Boolean(checked)
-        }
+        checked={Boolean(
+          checked
+        )}
         onChange={(event) =>
           onChange(
             event.target.checked
@@ -1974,32 +1994,34 @@ function CheckboxGrid({
   onToggle,
 }) {
   return (
-    <div style={styles.fullWidth}>
+    <div style={styles.fullField}>
       <div style={styles.checkboxGrid}>
-        {items.map((item) => (
-          <label
-            key={item}
-            style={
-              styles.checkboxItem
-            }
-          >
-            <input
-              type="checkbox"
-              checked={
-                selected.includes(
-                  item
-                )
-              }
-              onChange={() =>
-                onToggle(item)
-              }
-            />
+        {items.map(
+          (item) => (
+            <label
+              key={item}
+              style={styles.checkboxCard}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  selected?.includes(
+                    item
+                  ) || false
+                }
+                onChange={() =>
+                  onToggle(
+                    item
+                  )
+                }
+              />
 
-            <span>
-              {item}
-            </span>
-          </label>
-        ))}
+              <span>
+                {item}
+              </span>
+            </label>
+          )
+        )}
       </div>
     </div>
   );
@@ -2008,48 +2030,53 @@ function CheckboxGrid({
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#f6f7f9',
-    color: '#172033',
+    background: '#f5f7fa',
+    color: '#11213c',
     fontFamily:
       'Arial, sans-serif',
   },
 
-  loading: {
-    padding: 40,
-  },
-
   header: {
     background: '#ffffff',
-    padding: '18px 5vw',
+    borderBottom:
+      '1px solid #e1e5ea',
+    padding: '17px 3vw',
     display: 'flex',
     justifyContent:
       'space-between',
     alignItems: 'center',
-    gap: 15,
-    borderBottom:
-      '1px solid #e4e6e9',
+    gap: 20,
+    position: 'sticky',
+    top: 0,
+    zIndex: 20,
   },
 
   brand: {
-    fontSize: 24,
-    fontWeight: 800,
-    color: '#163c74',
+    fontSize: 25,
+    fontWeight: 900,
+    color: '#17457f',
+  },
+
+  muted: {
+    color: '#687080',
+    lineHeight: 1.5,
   },
 
   logout: {
     border:
-      '1px solid #ddd',
-    background: '#fff',
-    borderRadius: 20,
+      '1px solid #d6dae0',
+    background: '#ffffff',
+    color: '#11213c',
     padding: '9px 15px',
+    borderRadius: 20,
     cursor: 'pointer',
+    fontWeight: 700,
   },
 
   content: {
-    maxWidth: 1400,
-    margin: 'auto',
-    padding:
-      '35px 5vw 80px',
+    maxWidth: 1450,
+    margin: '0 auto',
+    padding: '32px 3vw 80px',
   },
 
   topRow: {
@@ -2057,258 +2084,336 @@ const styles = {
     justifyContent:
       'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 20,
-  },
-
-  muted: {
-    color: '#687080',
+    flexWrap: 'wrap',
   },
 
   section: {
     marginTop: 22,
+    padding: 22,
     background: '#ffffff',
-    padding: 24,
     border:
-      '1px solid #e2e5e8',
-    borderRadius: 16,
+      '1px solid #e1e5ea',
+    borderRadius: 15,
+    boxShadow:
+      '0 3px 12px rgba(0,0,0,0.03)',
   },
 
   sectionTitle: {
     marginTop: 0,
-    marginBottom: 20,
+    marginBottom: 18,
+    fontSize: 21,
+    color: '#11213c',
   },
 
   formGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(230px, 1fr))',
-    gap: 18,
+      'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: 16,
+    alignItems: 'start',
   },
 
-  fullWidth: {
-    gridColumn:
-      '1 / -1',
+  field: {
+    display: 'block',
+  },
+
+  fullField: {
+    display: 'block',
+    gridColumn: '1 / -1',
   },
 
   label: {
     display: 'block',
+    marginBottom: 7,
     fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: 1,
-    marginBottom: 6,
+    fontWeight: 900,
+    color: '#3d4653',
+    letterSpacing: 0.4,
   },
 
   input: {
     width: '100%',
-    boxSizing:
-      'border-box',
-    padding: 12,
+    boxSizing: 'border-box',
+    padding: '11px 12px',
     border:
-      '1px solid #ccd1d7',
-    borderRadius: 10,
-    background: '#fff',
+      '1px solid #ccd2d9',
+    borderRadius: 9,
+    background: '#ffffff',
+    color: '#11213c',
+    fontSize: 14,
+    outline: 'none',
   },
 
   textarea: {
     width: '100%',
-    boxSizing:
-      'border-box',
-    minHeight: 100,
+    boxSizing: 'border-box',
     padding: 12,
     border:
-      '1px solid #ccd1d7',
-    borderRadius: 10,
+      '1px solid #ccd2d9',
+    borderRadius: 9,
+    background: '#ffffff',
+    color: '#11213c',
+    fontSize: 14,
     resize: 'vertical',
+    lineHeight: 1.5,
+    outline: 'none',
   },
 
-  toggleRow: {
+  toggleCard: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: 13,
+    gap: 9,
+    minHeight: 43,
+    padding: '9px 12px',
     border:
-      '1px solid #e0e3e7',
-    borderRadius: 10,
-    background: '#fafafa',
+      '1px solid #dde1e6',
+    borderRadius: 9,
+    background: '#fafbfc',
     cursor: 'pointer',
+    fontWeight: 700,
+    fontSize: 13,
   },
 
   checkboxGrid: {
     display: 'grid',
     gridTemplateColumns:
       'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 10,
+    gap: 9,
   },
 
-  checkboxItem: {
+  checkboxCard: {
     display: 'flex',
     alignItems: 'center',
-    gap: 9,
-    padding: 11,
+    gap: 8,
+    padding: '10px 11px',
     border:
-      '1px solid #e0e3e7',
-    borderRadius: 10,
-    background: '#fafafa',
+      '1px solid #dde1e6',
+    borderRadius: 9,
+    background: '#fafbfc',
     cursor: 'pointer',
+    fontSize: 13,
   },
 
   infoBox: {
-    gridColumn:
-      '1 / -1',
-    padding: 14,
-    background: '#fff7e5',
-    borderRadius: 10,
-    fontWeight: 700,
-  },
-
-  error: {
-    marginTop: 20,
-    padding: 14,
-    borderRadius: 10,
-    background: '#ffeaea',
-    color: '#8c2020',
-    fontWeight: 700,
-  },
-
-  success: {
-    marginTop: 20,
-    padding: 14,
-    borderRadius: 10,
-    background: '#eaf8ee',
-    color: '#236339',
-    fontWeight: 700,
+    gridColumn: '1 / -1',
+    padding: 13,
+    background: '#edf4ff',
+    border:
+      '1px solid #ccdcf3',
+    color: '#17457f',
+    borderRadius: 9,
+    lineHeight: 1.5,
   },
 
   saveButton: {
+    marginTop: 22,
     width: '100%',
-    marginTop: 25,
-    padding: 16,
     border: 0,
-    borderRadius: 12,
-    background: '#163c74',
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 800,
+    background: '#17457f',
+    color: '#ffffff',
+    padding: '14px 20px',
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 900,
     cursor: 'pointer',
   },
 
   secondaryButton: {
-    padding:
-      '11px 17px',
-    borderRadius: 10,
-    background: '#fff',
     border:
-      '1px solid #163c74',
-    color: '#163c74',
-    fontWeight: 700,
+      '1px solid #17457f',
+    background: '#ffffff',
+    color: '#17457f',
+    padding: '10px 15px',
+    borderRadius: 9,
+    fontWeight: 800,
     cursor: 'pointer',
   },
 
+  error: {
+    marginTop: 18,
+    padding: 13,
+    borderRadius: 9,
+    background: '#ffe9e9',
+    border:
+      '1px solid #f2c5c5',
+    color: '#8d2424',
+    fontWeight: 700,
+  },
+
+  success: {
+    marginTop: 18,
+    padding: 13,
+    borderRadius: 9,
+    background: '#eaf8ee',
+    border:
+      '1px solid #c8e9d0',
+    color: '#24663a',
+    fontWeight: 700,
+  },
+
   separator: {
-    margin:
-      '55px 0 30px',
     border: 0,
     borderTop:
-      '1px solid #ddd',
+      '1px solid #dfe3e7',
+    margin: '42px 0',
+  },
+
+  listSection: {
+    marginTop: 20,
   },
 
   propertyGrid: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: 20,
+      'repeat(auto-fit, minmax(310px, 1fr))',
+    gap: 16,
     marginTop: 20,
   },
 
   propertyCard: {
-    background: '#fff',
+    background: '#ffffff',
     border:
-      '1px solid #e2e4e8',
-    borderRadius: 16,
-    padding: 20,
+      '1px solid #dfe3e7',
+    borderRadius: 14,
+    padding: 18,
+    boxShadow:
+      '0 3px 12px rgba(0,0,0,0.03)',
   },
 
   cardTop: {
     display: 'flex',
     justifyContent:
       'space-between',
-    gap: 15,
+    alignItems: 'flex-start',
+    gap: 12,
   },
 
-  cardTitle: {
+  propertyName: {
     margin: 0,
+    fontSize: 18,
   },
 
-  status: {
-    height: 'fit-content',
-    padding: '6px 10px',
+  statusBadge: {
+    display: 'inline-flex',
+    padding: '5px 9px',
     borderRadius: 20,
-    fontSize: 11,
-    fontWeight: 800,
+    fontSize: 10,
+    fontWeight: 900,
   },
 
-  cardPrice: {
-    marginTop: 20,
-    color: '#163c74',
-    fontSize: 21,
-    fontWeight: 800,
+  activeBadge: {
+    background: '#e7f7ec',
+    color: '#27713e',
   },
 
-  small: {
-    marginTop: 5,
+  inactiveBadge: {
+    background: '#eeeeee',
+    color: '#656565',
+  },
+
+  propertyDetails: {
+    display: 'grid',
+    gap: 6,
+    marginTop: 16,
+    color: '#505967',
     fontSize: 13,
-    color: '#666',
   },
 
-  cardButtons: {
+  dynamicTag: {
+    width: 'fit-content',
+    marginTop: 4,
+    padding: '5px 8px',
+    background: '#fff4d8',
+    color: '#7a5a00',
+    borderRadius: 7,
+    fontSize: 10,
+    fontWeight: 900,
+  },
+  cardActions: {
     display: 'flex',
-    gap: 10,
-    marginTop: 20,
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 18,
   },
 
   editButton: {
-    flex: 1,
-    padding: 10,
     border: 0,
-    borderRadius: 10,
-    background: '#163c74',
-    color: '#fff',
-    fontWeight: 700,
+    background: '#17457f',
+    color: '#ffffff',
+    padding: '9px 12px',
+    borderRadius: 8,
+    fontWeight: 800,
     cursor: 'pointer',
   },
 
-  statusButton: {
-    padding: 10,
-    border:
-      '1px solid #ccc',
-    borderRadius: 10,
-    background: '#fff',
+  deactivateButton: {
+    border: 0,
+    background: '#fff0e8',
+    color: '#9a4a22',
+    padding: '9px 12px',
+    borderRadius: 8,
+    fontWeight: 800,
     cursor: 'pointer',
+  },
+
+  activateButton: {
+    border: 0,
+    background: '#e8f7ed',
+    color: '#27713e',
+    padding: '9px 12px',
+    borderRadius: 8,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  viewLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    textDecoration: 'none',
+    border: '1px solid #17457f',
+    color: '#17457f',
+    background: '#ffffff',
+    padding: '8px 12px',
+    borderRadius: 8,
+    fontWeight: 800,
+    fontSize: 12,
+  },
+
+  loading: {
+    padding: 30,
+    textAlign: 'center',
+    color: '#687080',
   },
 
   empty: {
-    padding: 30,
     marginTop: 20,
-    background: '#fff',
-    borderRadius: 15,
+    padding: 25,
+    textAlign: 'center',
+    background: '#ffffff',
+    border: '1px solid #e1e5ea',
+    borderRadius: 12,
+    color: '#687080',
   },
 
   notice: {
-    maxWidth: 450,
+    maxWidth: 520,
     margin: '80px auto',
-    background: '#fff',
     padding: 30,
-    borderRadius: 16,
+    background: '#ffffff',
+    border: '1px solid #e1e5ea',
+    borderRadius: 15,
+    textAlign: 'center',
   },
 
   primaryLink: {
     display: 'inline-block',
-    marginTop: 15,
+    marginTop: 12,
     padding: '11px 16px',
-    borderRadius: 10,
-    background: '#163c74',
-    color: '#fff',
+    borderRadius: 9,
+    background: '#17457f',
+    color: '#ffffff',
     textDecoration: 'none',
+    fontWeight: 800,
   },
 };
