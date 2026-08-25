@@ -1,21 +1,46 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-import { calculateBookingPrice } from '../../lib/pricing';
-import GuestAvailabilityCalendar from './GuestAvailabilityCalendar';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-const supabase = createClient(
-  'https://gxwemplbykjxhezefykh.supabase.co',
-  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
-);
+import {
+  useParams,
+} from 'next/navigation';
+
+import {
+  createClient,
+} from '@supabase/supabase-js';
+
+import {
+  calculateBookingPrice,
+} from '../../lib/pricing';
+
+import GuestAvailabilityCalendar
+  from './GuestAvailabilityCalendar';
+
+const supabase =
+  createClient(
+    'https://gxwemplbykjxhezefykh.supabase.co',
+    'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
+  );
+
+/* =========================
+   BASIC HELPERS
+========================= */
 
 function money(value) {
-  return `₹${Number(value || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return `₹${Number(
+    value || 0
+  ).toLocaleString(
+    'en-IN',
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }
+  )}`;
 }
 
 function todayString() {
@@ -23,74 +48,175 @@ function todayString() {
 
   return [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
+    String(
+      now.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      now.getDate()
+    ).padStart(2, '0'),
   ].join('-');
 }
 
-function addDays(dateString, days) {
-  if (!dateString) return '';
+function addDays(
+  dateString,
+  days
+) {
+  if (!dateString) {
+    return '';
+  }
 
-  const date = new Date(`${dateString}T12:00:00`);
-  date.setDate(date.getDate() + days);
+  const date =
+    new Date(
+      `${dateString}T12:00:00`
+    );
+
+  date.setDate(
+    date.getDate() +
+      Number(days || 0)
+  );
 
   return [
     date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
+    String(
+      date.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      date.getDate()
+    ).padStart(2, '0'),
   ].join('-');
 }
 
-function rangesOverlap(startA, endA, startB, endB) {
-  return startA < endB && endA > startB;
+function rangesOverlap(
+  startA,
+  endA,
+  startB,
+  endB
+) {
+  return (
+    startA < endB &&
+    endA > startB
+  );
 }
 
 function formatTime(value) {
-  if (!value) return '—';
+  if (!value) {
+    return '—';
+  }
 
-  const [hour, minute] = String(value)
+  const [
+    hour,
+    minute,
+  ] = String(value)
     .slice(0, 5)
     .split(':');
 
   const date = new Date();
 
-  date.setHours(Number(hour));
-  date.setMinutes(Number(minute));
+  date.setHours(
+    Number(hour)
+  );
 
-  return date.toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  date.setMinutes(
+    Number(minute)
+  );
+
+  return date.toLocaleTimeString(
+    'en-IN',
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+    }
+  );
 }
 
-function dateDayNumber(dateString) {
-  return new Date(`${dateString}T12:00:00`).getDay();
+function dateDayNumber(
+  dateString
+) {
+  return new Date(
+    `${dateString}T12:00:00`
+  ).getDay();
 }
 
-function getStayDates(checkIn, checkOut) {
-  if (!checkIn || !checkOut) {
+function getStayDates(
+  checkIn,
+  checkOut
+) {
+  if (
+    !checkIn ||
+    !checkOut
+  ) {
     return [];
   }
 
   const dates = [];
 
-  let current = new Date(`${checkIn}T12:00:00`);
-  const end = new Date(`${checkOut}T12:00:00`);
+  let current =
+    new Date(
+      `${checkIn}T12:00:00`
+    );
 
-  while (current < end) {
+  const end =
+    new Date(
+      `${checkOut}T12:00:00`
+    );
+
+  while (
+    current < end
+  ) {
     dates.push(
       [
         current.getFullYear(),
-        String(current.getMonth() + 1).padStart(2, '0'),
-        String(current.getDate()).padStart(2, '0'),
+
+        String(
+          current.getMonth() +
+            1
+        ).padStart(
+          2,
+          '0'
+        ),
+
+        String(
+          current.getDate()
+        ).padStart(
+          2,
+          '0'
+        ),
       ].join('-')
     );
 
-    current.setDate(current.getDate() + 1);
+    current.setDate(
+      current.getDate() +
+        1
+    );
   }
 
   return dates;
 }
+
+function isValidEmail(
+  value
+) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    String(
+      value || ''
+    ).trim()
+  );
+}
+
+function cleanPhone(
+  value
+) {
+  return String(
+    value || ''
+  ).replace(
+    /\D/g,
+    ''
+  );
+}
+
+/* =========================
+   OFFER HELPERS
+========================= */
 
 function offerEligibleForBooking(
   offer,
@@ -109,82 +235,143 @@ function offerEligibleForBooking(
 
   if (
     !offer.is_active ||
-    offer.guest_selectable === false
+    offer.guest_selectable ===
+      false
   ) {
     return false;
   }
 
-  const category = String(
-    offer.offer_category || ''
-  ).toLowerCase();
+  const category =
+    String(
+      offer.offer_category ||
+        ''
+    ).toLowerCase();
 
-  const title = String(
-    offer.title || offer.name || ''
-  ).toLowerCase();
+  const title =
+    String(
+      offer.title ||
+        offer.name ||
+        ''
+    ).toLowerCase();
 
-  let requiredNights = Number(
-    offer.min_nights || 1
-  );
+  let requiredNights =
+    Number(
+      offer.min_nights ||
+        1
+    );
 
   if (
-    category === 'monthly' ||
-    title.includes('monthly')
+    category ===
+      'monthly' ||
+    title.includes(
+      'monthly'
+    )
   ) {
-    requiredNights = Math.max(requiredNights, 20);
+    requiredNights =
+      Math.max(
+        requiredNights,
+        20
+      );
   } else if (
-    category === 'fortnightly' ||
-    title.includes('fortnight')
+    category ===
+      'fortnightly' ||
+    title.includes(
+      'fortnight'
+    )
   ) {
-    requiredNights = Math.max(requiredNights, 12);
+    requiredNights =
+      Math.max(
+        requiredNights,
+        12
+      );
   } else if (
-    category === 'weekly' ||
-    title.includes('weekly')
+    category ===
+      'weekly' ||
+    title.includes(
+      'weekly'
+    )
   ) {
-    requiredNights = Math.max(requiredNights, 6);
+    requiredNights =
+      Math.max(
+        requiredNights,
+        6
+      );
   }
 
-  if (nights < requiredNights) {
+  if (
+    nights <
+    requiredNights
+  ) {
     return false;
   }
 
-  const stayDates = getStayDates(
-    checkIn,
-    checkOut
-  );
+  const stayDates =
+    getStayDates(
+      checkIn,
+      checkOut
+    );
 
-  const startDate = offer.start_date || null;
-  const endDate = offer.end_date || null;
+  const startDate =
+    offer.start_date ||
+    null;
 
-  const allowedDays = Array.isArray(
-    offer.applicable_days
-  )
-    ? offer.applicable_days
-    : [];
+  const endDate =
+    offer.end_date ||
+    null;
 
-  const eligibleDates = stayDates.filter((date) => {
-    if (startDate && date < startDate) {
-      return false;
-    }
+  const allowedDays =
+    Array.isArray(
+      offer.applicable_days
+    )
+      ? offer.applicable_days
+      : [];
 
-    if (endDate && date > endDate) {
-      return false;
-    }
+  const eligibleDates =
+    stayDates.filter(
+      (date) => {
+        if (
+          startDate &&
+          date < startDate
+        ) {
+          return false;
+        }
 
-    if (
-      allowedDays.length &&
-      !allowedDays.includes(dateDayNumber(date))
-    ) {
-      return false;
-    }
+        if (
+          endDate &&
+          date > endDate
+        ) {
+          return false;
+        }
 
-    return true;
-  });
+        if (
+          allowedDays.length &&
+          !allowedDays.includes(
+            dateDayNumber(
+              date
+            )
+          )
+        ) {
+          return false;
+        }
 
-  if (offer.apply_scope === 'entire_booking') {
-    return eligibleDates.length === stayDates.length;
+        return true;
+      }
+    );
+
+  if (
+    offer.apply_scope ===
+    'entire_booking'
+  ) {
+    return (
+      eligibleDates.length ===
+      stayDates.length
+    );
   }
 
-  return eligibleDates.length > 0;
+  return (
+    eligibleDates.length >
+    0
+  );
 }
 
 function calculateRegularDiscount(
@@ -193,149 +380,286 @@ function calculateRegularDiscount(
   checkIn,
   checkOut
 ) {
-  if (!pricing?.valid || !offer) {
+  if (
+    !pricing?.valid ||
+    !offer
+  ) {
     return {
       discountAmount: 0,
       eligibleAmount: 0,
     };
   }
 
-  const stayDates = getStayDates(
-    checkIn,
-    checkOut
-  );
-
-  const allowedDays = Array.isArray(
-    offer.applicable_days
-  )
-    ? offer.applicable_days
-    : [];
-
-  const dateIsEligible = (date) => {
-    if (
-      offer.start_date &&
-      date < offer.start_date
-    ) {
-      return false;
-    }
-
-    if (
-      offer.end_date &&
-      date > offer.end_date
-    ) {
-      return false;
-    }
-
-    if (
-      allowedDays.length &&
-      !allowedDays.includes(dateDayNumber(date))
-    ) {
-      return false;
-    }
-
-    return true;
-  };
-
-  let eligibleAmount = 0;
-
-  if (offer.apply_scope === 'entire_booking') {
-    eligibleAmount = Number(
-      pricing.staySubtotal || 0
+  const stayDates =
+    getStayDates(
+      checkIn,
+      checkOut
     );
-  } else {
-    const breakdown = Array.isArray(
-      pricing.nightlyBreakdown
+
+  const allowedDays =
+    Array.isArray(
+      offer.applicable_days
     )
-      ? pricing.nightlyBreakdown
+      ? offer.applicable_days
       : [];
 
-    if (breakdown.length) {
-      breakdown.forEach((night) => {
-        if (dateIsEligible(night.date)) {
-          eligibleAmount += Number(
-            night.rate || 0
-          );
+  const dateIsEligible =
+    (date) => {
+      if (
+        offer.start_date &&
+        date <
+          offer.start_date
+      ) {
+        return false;
+      }
+
+      if (
+        offer.end_date &&
+        date >
+          offer.end_date
+      ) {
+        return false;
+      }
+
+      if (
+        allowedDays.length &&
+        !allowedDays.includes(
+          dateDayNumber(
+            date
+          )
+        )
+      ) {
+        return false;
+      }
+
+      return true;
+    };
+
+  let eligibleAmount =
+    0;
+
+  if (
+    offer.apply_scope ===
+    'entire_booking'
+  ) {
+    eligibleAmount =
+      Number(
+        pricing.staySubtotal ||
+          0
+      );
+  } else {
+    const breakdown =
+      Array.isArray(
+        pricing.nightlyBreakdown
+      )
+        ? pricing.nightlyBreakdown
+        : [];
+
+    if (
+      breakdown.length
+    ) {
+      breakdown.forEach(
+        (night) => {
+          if (
+            dateIsEligible(
+              night.date
+            )
+          ) {
+            eligibleAmount +=
+              Number(
+                night.rate ||
+                  0
+              );
+          }
         }
-      });
+      );
     } else {
       const eligibleNightCount =
-        stayDates.filter(dateIsEligible).length;
+        stayDates.filter(
+          dateIsEligible
+        ).length;
 
       const averageNight =
-        Number(pricing.staySubtotal || 0) /
+        Number(
+          pricing.staySubtotal ||
+            0
+        ) /
         Math.max(
-          Number(pricing.nights || 1),
+          Number(
+            pricing.nights ||
+              1
+          ),
           1
         );
 
       eligibleAmount =
-        averageNight * eligibleNightCount;
+        averageNight *
+        eligibleNightCount;
     }
   }
 
-  let discountAmount = 0;
+  let discountAmount =
+    0;
 
-  if (offer.discount_type === 'percent') {
+  if (
+    offer.discount_type ===
+    'percent'
+  ) {
     discountAmount =
       eligibleAmount *
-      (Number(offer.discount_value || 0) / 100);
+      (
+        Number(
+          offer.discount_value ||
+            0
+        ) / 100
+      );
   } else {
-    discountAmount = Number(
-      offer.discount_value || 0
-    );
+    discountAmount =
+      Number(
+        offer.discount_value ||
+          0
+      );
   }
 
-  discountAmount = Math.max(
-    0,
-    Math.min(
-      discountAmount,
-      eligibleAmount
-    )
-  );
+  discountAmount =
+    Math.max(
+      0,
+      Math.min(
+        discountAmount,
+        eligibleAmount
+      )
+    );
 
   return {
     eligibleAmount:
-      Math.round(eligibleAmount * 100) / 100,
+      Math.round(
+        eligibleAmount *
+          100
+      ) / 100,
 
     discountAmount:
-      Math.round(discountAmount * 100) / 100,
+      Math.round(
+        discountAmount *
+          100
+      ) / 100,
   };
 }
 
+/* =========================
+   MAIN PAGE
+========================= */
+
 export default function PropertyPage() {
-  const params = useParams();
-  const slug = params?.slug;
+  const params =
+    useParams();
 
-  const [property, setProperty] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  const [pricingRules, setPricingRules] = useState([]);
-  const [rateOverrides, setRateOverrides] = useState([]);
-  const [propertyOffers, setPropertyOffers] = useState([]);
-  const [blockedDates, setBlockedDates] = useState([]);
-  const [existingBookings, setExistingBookings] = useState([]);
+  const slug =
+    params?.slug;
 
-  const [session, setSession] = useState(null);
-  const [guestProfile, setGuestProfile] = useState(null);
-  const [authChecking, setAuthChecking] = useState(true);
+  const [
+    property,
+    setProperty,
+  ] = useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState('');
+  const [
+    photos,
+    setPhotos,
+  ] = useState([]);
 
-  const [activePhoto, setActivePhoto] = useState(0);
+  const [
+    pricingRules,
+    setPricingRules,
+  ] = useState([]);
 
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [guestCount, setGuestCount] = useState(1);
+  const [
+    rateOverrides,
+    setRateOverrides,
+  ] = useState([]);
+
+  const [
+    propertyOffers,
+    setPropertyOffers,
+  ] = useState([]);
+
+  const [
+    blockedDates,
+    setBlockedDates,
+  ] = useState([]);
+
+  const [
+    existingBookings,
+    setExistingBookings,
+  ] = useState([]);
+
+  const [
+    session,
+    setSession,
+  ] = useState(null);
+
+  const [
+    guestProfile,
+    setGuestProfile,
+  ] = useState(null);
+
+  const [
+    authChecking,
+    setAuthChecking,
+  ] = useState(true);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    pageError,
+    setPageError,
+  ] = useState('');
+
+  const [
+    activePhoto,
+    setActivePhoto,
+  ] = useState(0);
+
+  const [
+    checkIn,
+    setCheckIn,
+  ] = useState('');
+
+  const [
+    checkOut,
+    setCheckOut,
+  ] = useState('');
+
+  const [
+    guestCount,
+    setGuestCount,
+  ] = useState(1);
 
   const [
     selectedOfferId,
     setSelectedOfferId,
   ] = useState('');
 
-  const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestMessage, setGuestMessage] = useState('');
+  const [
+    guestName,
+    setGuestName,
+  ] = useState('');
+
+  const [
+    guestPhone,
+    setGuestPhone,
+  ] = useState('');
+
+  const [
+    guestEmail,
+    setGuestEmail,
+  ] = useState('');
+
+  const [
+    guestMessage,
+    setGuestMessage,
+  ] = useState('');
 
   const [
     bookingLoading,
@@ -352,48 +676,81 @@ export default function PropertyPage() {
     setBookingSuccess,
   ] = useState(null);
 
-  useEffect(() => {
-    checkGuestLogin();
-  }, []);
+  /* =========================
+     INITIAL LOAD
+  ========================= */
 
-  useEffect(() => {
-    if (slug) {
-      loadProperty();
-    }
-  }, [slug]);
+  useEffect(
+    () => {
+      checkGuestLogin();
+    },
+    []
+  );
+
+  useEffect(
+    () => {
+      if (slug) {
+        loadProperty();
+      }
+    },
+    [slug]
+  );
 
   async function checkGuestLogin() {
-    setAuthChecking(true);
+    setAuthChecking(
+      true
+    );
 
     try {
       const {
-        data: { session },
-      } = await supabase.auth.getSession();
+        data: {
+          session:
+            currentSession,
+        },
+      } =
+        await supabase.auth.getSession();
 
-      setSession(session);
+      setSession(
+        currentSession
+      );
 
-      if (!session?.user) {
+      if (
+        !currentSession?.user
+      ) {
         return;
       }
 
-      const authEmail = String(
-        session.user.email || ''
-      )
-        .trim()
-        .toLowerCase();
+      const authEmail =
+        String(
+          currentSession.user
+            .email || ''
+        )
+          .trim()
+          .toLowerCase();
 
       if (authEmail) {
         const {
-          data: guestRows,
+          data:
+            guestRows,
           error,
-        } = await supabase
-          .from('guests')
-          .select('*')
-          .eq('email', authEmail)
-          .order('created_at', {
-            ascending: true,
-          })
-          .limit(1);
+        } =
+          await supabase
+            .from(
+              'guests'
+            )
+            .select('*')
+            .eq(
+              'email',
+              authEmail
+            )
+            .order(
+              'created_at',
+              {
+                ascending:
+                  true,
+              }
+            )
+            .limit(1);
 
         if (error) {
           console.error(
@@ -402,15 +759,34 @@ export default function PropertyPage() {
           );
         }
 
-        const guest = guestRows?.[0] || null;
+        const guest =
+          guestRows?.[0] ||
+          null;
 
         if (guest) {
-          setGuestProfile(guest);
-          setGuestName(guest.full_name || '');
-          setGuestPhone(guest.phone || '');
+          setGuestProfile(
+            guest
+          );
+
+          setGuestName(
+            String(
+              guest.full_name ||
+                ''
+            )
+          );
+
+          setGuestPhone(
+            String(
+              guest.phone ||
+                ''
+            )
+          );
 
           setGuestEmail(
-            guest.email || authEmail
+            String(
+              guest.email ||
+                authEmail
+            )
           );
 
           return;
@@ -418,12 +794,30 @@ export default function PropertyPage() {
       }
 
       setGuestName(
-        session.user.user_metadata?.full_name || ''
+        String(
+          currentSession.user
+            .user_metadata
+            ?.full_name ||
+            ''
+        )
       );
 
-      setGuestEmail(authEmail);
+      setGuestPhone(
+        String(
+          currentSession.user
+            .user_metadata
+            ?.phone ||
+            ''
+        )
+      );
+
+      setGuestEmail(
+        authEmail
+      );
     } finally {
-      setAuthChecking(false);
+      setAuthChecking(
+        false
+      );
     }
   }
 
@@ -433,14 +827,25 @@ export default function PropertyPage() {
 
     try {
       const {
-        data: propertyData,
-        error: propertyError,
-      } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .single();
+        data:
+          propertyData,
+        error:
+          propertyError,
+      } =
+        await supabase
+          .from(
+            'properties'
+          )
+          .select('*')
+          .eq(
+            'slug',
+            slug
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .single();
 
       if (
         propertyError ||
@@ -451,11 +856,16 @@ export default function PropertyPage() {
         );
       }
 
-      setProperty(propertyData);
+      setProperty(
+        propertyData
+      );
 
       setGuestCount(
         Math.max(
-          Number(propertyData.min_guests || 1),
+          Number(
+            propertyData.min_guests ||
+              1
+          ),
           1
         )
       );
@@ -467,86 +877,126 @@ export default function PropertyPage() {
         rateOverrideResult,
         blockedResult,
         bookingResult,
-      ] = await Promise.all([
-        supabase
-          .from('property_photos')
-          .select(
-            'id, property_id, image_url, alt_text, sort_order, is_cover'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .order('is_cover', {
-            ascending: false,
-          })
-          .order('sort_order', {
-            ascending: true,
-          }),
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              'property_photos'
+            )
+            .select(
+              'id, property_id, image_url, alt_text, sort_order, is_cover'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .order(
+              'is_cover',
+              {
+                ascending:
+                  false,
+              }
+            )
+            .order(
+              'sort_order',
+              {
+                ascending:
+                  true,
+              }
+            ),
 
-        supabase
-          .from('property_offers')
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true),
+          supabase
+            .from(
+              'property_offers'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            ),
 
-        supabase
-          .from('pricing_rules')
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true)
-          .order('priority', {
-            ascending: false,
-          }),
+          supabase
+            .from(
+              'pricing_rules'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            )
+            .order(
+              'priority',
+              {
+                ascending:
+                  false,
+              }
+            ),
 
-        supabase
-          .from('property_rate_overrides')
-          .select('*')
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq('is_active', true)
-          .order('start_date', {
-            ascending: true,
-          }),
+          supabase
+            .from(
+              'property_rate_overrides'
+            )
+            .select('*')
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'is_active',
+              true
+            )
+            .order(
+              'start_date',
+              {
+                ascending:
+                  true,
+              }
+            ),
 
-        supabase
-          .from('blocked_dates')
-          .select(
-            'start_date, end_date'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          ),
+          supabase
+            .from(
+              'blocked_dates'
+            )
+            .select(
+              'start_date, end_date'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            ),
 
-        supabase
-          .from('bookings')
-          .select(
-            'check_in, check_out, booking_status, payment_status'
-          )
-          .eq(
-            'property_id',
-            propertyData.id
-          )
-          .eq(
-            'booking_status',
-            'confirmed'
-          )
-          .eq(
-            'payment_status',
-            'paid'
-          ),
-      ]);
+          supabase
+            .from(
+              'bookings'
+            )
+            .select(
+              'check_in, check_out, booking_status, payment_status'
+            )
+            .eq(
+              'property_id',
+              propertyData.id
+            )
+            .eq(
+              'booking_status',
+              'confirmed'
+            )
+            .eq(
+              'payment_status',
+              'paid'
+            ),
+        ]);
 
-      if (photoResult.error) {
+      if (
+        photoResult.error
+      ) {
         console.error(
           'Photo loading error:',
           photoResult.error
@@ -554,30 +1004,42 @@ export default function PropertyPage() {
       }
 
       setPhotos(
-        (photoResult.data || []).filter(
+        (
+          photoResult.data ||
+          []
+        ).filter(
           (photo) =>
-            Boolean(photo.image_url)
+            Boolean(
+              photo.image_url
+            )
         )
       );
 
       setPropertyOffers(
-        offerResult.data || []
+        offerResult.data ||
+          []
       );
 
       setRateOverrides(
-        rateOverrideResult.data || []
+        rateOverrideResult.data ||
+          []
       );
 
       setBlockedDates(
-        blockedResult.data || []
+        blockedResult.data ||
+          []
       );
 
       setExistingBookings(
-        bookingResult.data || []
+        bookingResult.data ||
+          []
       );
 
       const mappedRules =
-        (pricingResult.data || []).map(
+        (
+          pricingResult.data ||
+          []
+        ).map(
           (rule) => ({
             ...rule,
 
@@ -588,13 +1050,15 @@ export default function PropertyPage() {
               rule.adjustment_type ===
               'percent'
                 ? Number(
-                    rule.adjustment_value || 0
+                    rule.adjustment_value ||
+                      0
                   )
                 : undefined,
 
             value:
               Number(
-                rule.adjustment_value || 0
+                rule.adjustment_value ||
+                  0
               ),
 
             label:
@@ -605,215 +1069,311 @@ export default function PropertyPage() {
           })
         );
 
-      setPricingRules(mappedRules);
+      setPricingRules(
+        mappedRules
+      );
     } catch (error) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       setPageError(
         error.message
       );
     } finally {
-      setLoading(false);
+      setLoading(
+        false
+      );
     }
   }
 
-  const availableOffers = useMemo(() => {
-    if (!checkIn || !checkOut) {
-      return [];
-    }
+  /* =========================
+     DISCOUNTS
+  ========================= */
 
-    const nights =
-      getStayDates(
+  const availableOffers =
+    useMemo(
+      () => {
+        if (
+          !checkIn ||
+          !checkOut
+        ) {
+          return [];
+        }
+
+        const nights =
+          getStayDates(
+            checkIn,
+            checkOut
+          ).length;
+
+        return propertyOffers.filter(
+          (offer) =>
+            offerEligibleForBooking(
+              offer,
+              checkIn,
+              checkOut,
+              nights
+            )
+        );
+      },
+      [
+        propertyOffers,
         checkIn,
-        checkOut
-      ).length;
-
-    return propertyOffers.filter(
-      (offer) =>
-        offerEligibleForBooking(
-          offer,
-          checkIn,
-          checkOut,
-          nights
-        )
+        checkOut,
+      ]
     );
-  }, [
-    propertyOffers,
-    checkIn,
-    checkOut,
-  ]);
 
-  useEffect(() => {
-    if (
-      selectedOfferId &&
-      !availableOffers.some(
-        (offer) =>
-          offer.id === selectedOfferId
-      )
-    ) {
-      setSelectedOfferId('');
-    }
-  }, [
-    availableOffers,
-    selectedOfferId,
-  ]);
-
-  const selectedOffer = useMemo(
-    () =>
-      availableOffers.find(
-        (offer) =>
-          offer.id === selectedOfferId
-      ) || null,
+  useEffect(
+    () => {
+      if (
+        selectedOfferId &&
+        !availableOffers.some(
+          (offer) =>
+            offer.id ===
+            selectedOfferId
+        )
+      ) {
+        setSelectedOfferId(
+          ''
+        );
+      }
+    },
     [
       availableOffers,
       selectedOfferId,
     ]
   );
 
-  const pricing = useMemo(() => {
-    if (
-      !property ||
-      !checkIn ||
-      !checkOut
-    ) {
-      return {
-        valid: false,
-      };
-    }
+  const selectedOffer =
+    useMemo(
+      () =>
+        availableOffers.find(
+          (offer) =>
+            offer.id ===
+            selectedOfferId
+        ) || null,
+      [
+        availableOffers,
+        selectedOfferId,
+      ]
+    );
 
-    try {
-      const result =
-        calculateBookingPrice({
-          property,
+  /* =========================
+     PRICING
+  ========================= */
 
-          guestCount:
-            Number(
-              guestCount || 1
-            ),
-
-          checkIn,
-
-          checkOut,
-
-          pricingRules,
-
-          rateOverrides,
-
-          gstRate: 18,
-        });
-
-      if (
-        !result ||
-        result.valid === false
-      ) {
-        return (
-          result || {
+  const pricing =
+    useMemo(
+      () => {
+        if (
+          !property ||
+          !checkIn ||
+          !checkOut
+        ) {
+          return {
             valid: false,
+          };
+        }
+
+        try {
+          const result =
+            calculateBookingPrice({
+              property,
+
+              guestCount:
+                Number(
+                  guestCount ||
+                    1
+                ),
+
+              checkIn,
+
+              checkOut,
+
+              pricingRules,
+
+              rateOverrides,
+
+              gstRate: 18,
+            });
+
+          if (
+            !result ||
+            result.valid ===
+              false
+          ) {
+            return (
+              result || {
+                valid: false,
+              }
+            );
           }
-        );
-      }
 
-      let regularDiscount = {
-        discountAmount: 0,
-        eligibleAmount: 0,
-      };
+          let regularDiscount =
+            {
+              discountAmount:
+                0,
 
-      if (selectedOffer) {
-        regularDiscount =
-          calculateRegularDiscount(
-            result,
-            selectedOffer,
-            checkIn,
-            checkOut
-          );
-      }
+              eligibleAmount:
+                0,
+            };
 
-      const discountAmount =
-        Number(
-          regularDiscount.discountAmount || 0
-        );
+          if (
+            selectedOffer
+          ) {
+            regularDiscount =
+              calculateRegularDiscount(
+                result,
+                selectedOffer,
+                checkIn,
+                checkOut
+              );
+          }
 
-      const subtotalBeforeDiscount =
-        Number(
-          result.amountBeforeDiscount ??
-            result.staySubtotal ??
-            0
-        );
-
-      const subtotalAfterDiscount =
-        Math.max(
-          0,
-          subtotalBeforeDiscount -
-            discountAmount
-        );
-
-      const gstAmount =
-        Math.round(
-          subtotalAfterDiscount *
-            0.18 *
-            100
-        ) / 100;
-
-      const totalPayable =
-        Math.round(
-          (
-            subtotalAfterDiscount +
-            gstAmount +
+          const discountAmount =
             Number(
-              result.securityDeposit || 0
-            )
-          ) *
-            100
-        ) / 100;
+              regularDiscount.discountAmount ||
+                0
+            );
 
-      return {
-        ...result,
+          const staySubtotal =
+            Number(
+              result.staySubtotal ||
+                0
+            );
 
-        regularDiscountAmount:
-          discountAmount,
+          const cleaningFee =
+            Number(
+              result.cleaningFee ??
+                property.cleaning_fee ??
+                0
+            );
 
+          const extraGuestCharge =
+            Number(
+              result.extraGuestCharge ||
+                0
+            );
+
+          /*
+            IMPORTANT:
+            taxable amount includes
+            stay + extra guest + cleaning,
+            then discount is deducted.
+          */
+
+          const subtotalBeforeDiscount =
+            Math.max(
+              0,
+              staySubtotal +
+                extraGuestCharge +
+                cleaningFee
+            );
+
+          const subtotalAfterDiscount =
+            Math.max(
+              0,
+              subtotalBeforeDiscount -
+                discountAmount
+            );
+
+          const gstAmount =
+            Math.round(
+              subtotalAfterDiscount *
+                0.18 *
+                100
+            ) / 100;
+
+          const securityDeposit =
+            Number(
+              result.securityDeposit ??
+                property.security_deposit ??
+                0
+            );
+
+          const totalPayable =
+            Math.round(
+              (
+                subtotalAfterDiscount +
+                gstAmount +
+                securityDeposit
+              ) *
+                100
+            ) / 100;
+
+          return {
+            ...result,
+
+            valid: true,
+
+            staySubtotal,
+
+            cleaningFee,
+
+            extraGuestCharge,
+
+            securityDeposit,
+
+            regularDiscountAmount:
+              discountAmount,
+
+            selectedOffer,
+
+            subtotalBeforeDiscount,
+
+            subtotalAfterDiscount,
+
+            taxableAmount:
+              subtotalAfterDiscount,
+
+            gstAmount,
+
+            total:
+              totalPayable,
+
+            totalPayable,
+          };
+        } catch (
+          error
+        ) {
+          console.error(
+            'Pricing calculation failed:',
+            error
+          );
+
+          return {
+            valid: false,
+
+            error:
+              error.message ||
+              'Unable to calculate booking price.',
+          };
+        }
+      },
+      [
+        property,
+        checkIn,
+        checkOut,
+        guestCount,
+        pricingRules,
+        rateOverrides,
         selectedOffer,
+      ]
+    );
 
-        subtotalBeforeDiscount,
-
-        subtotalAfterDiscount,
-
-        gstAmount,
-
-        total:
-          totalPayable,
-
-        totalPayable,
-      };
-    } catch (error) {
-      console.error(
-        'Pricing calculation failed:',
-        error
-      );
-
-      return {
-        valid: false,
-
-        error:
-          error.message ||
-          'Unable to calculate booking price.',
-      };
-    }
-  }, [
-    property,
-    checkIn,
-    checkOut,
-    guestCount,
-    pricingRules,
-    rateOverrides,
-    selectedOffer,
-  ]);
+  /* =========================
+     AVAILABILITY
+  ========================= */
 
   function datesUnavailable(
     start,
     end
   ) {
-    if (!start || !end) {
+    if (
+      !start ||
+      !end
+    ) {
       return false;
     }
 
@@ -831,7 +1391,9 @@ export default function PropertyPage() {
           )
       );
 
-    if (manuallyBlocked) {
+    if (
+      manuallyBlocked
+    ) {
       return true;
     }
 
@@ -865,11 +1427,20 @@ export default function PropertyPage() {
       ]
     );
 
-  function changeCheckIn(value) {
-    setCheckIn(value);
+  function changeCheckIn(
+    value
+  ) {
+    setCheckIn(
+      value
+    );
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingError(
+      ''
+    );
+
+    setBookingSuccess(
+      null
+    );
 
     if (
       value &&
@@ -877,48 +1448,74 @@ export default function PropertyPage() {
       checkOut <= value
     ) {
       setCheckOut(
-        addDays(value, 1)
+        addDays(
+          value,
+          1
+        )
       );
     }
   }
 
-  function changeCheckOut(value) {
-    setCheckOut(value);
+  function changeCheckOut(
+    value
+  ) {
+    setCheckOut(
+      value
+    );
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingError(
+      ''
+    );
+
+    setBookingSuccess(
+      null
+    );
   }
 
-  function changeGuests(value) {
-    const minimum = Math.max(
-      Number(
-        property?.min_guests || 1
-      ),
-      1
-    );
-
-    const maximum = Math.max(
-      Number(
-        property?.max_guests ||
-          minimum
-      ),
-      minimum
-    );
-
-    const nextValue = Math.min(
-      maximum,
+  function changeGuests(
+    value
+  ) {
+    const minimum =
       Math.max(
-        minimum,
         Number(
-          value || minimum
+          property?.min_guests ||
+            1
+        ),
+        1
+      );
+
+    const maximum =
+      Math.max(
+        Number(
+          property?.max_guests ||
+            minimum
+        ),
+        minimum
+      );
+
+    const nextValue =
+      Math.min(
+        maximum,
+        Math.max(
+          minimum,
+          Number(
+            value ||
+              minimum
+          )
         )
-      )
+      );
+
+    setGuestCount(
+      nextValue
     );
 
-    setGuestCount(nextValue);
+    setBookingError(
+      ''
+    );
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingSuccess(
+      null
+    );
   }
 
   function redirectToLogin() {
@@ -938,141 +1535,283 @@ export default function PropertyPage() {
       )}`;
   }
 
+  /* =========================
+     GUEST PROFILE
+  ========================= */
+
   async function ensureGuestProfile() {
-    if (!session?.user) {
-      return null;
+    if (
+      !session?.user
+    ) {
+      throw new Error(
+        'Please login before requesting a booking.'
+      );
     }
 
-    if (guestProfile) {
-      return guestProfile;
+    const cleanName =
+      String(
+        guestName || ''
+      ).trim();
+
+    const cleanEmail =
+      String(
+        guestEmail || ''
+      )
+        .trim()
+        .toLowerCase();
+
+    const phoneDigits =
+      cleanPhone(
+        guestPhone
+      );
+
+    /*
+      Do NOT create or update
+      any guest until all
+      information is valid.
+    */
+
+    if (!cleanName) {
+      throw new Error(
+        'Please enter your full name.'
+      );
     }
 
-    const email = String(
-      guestEmail ||
-        session.user.email ||
-        ''
-    )
-      .trim()
-      .toLowerCase();
+    if (
+      phoneDigits.length <
+      10
+    ) {
+      throw new Error(
+        'Please enter a valid mobile number.'
+      );
+    }
 
-    if (email) {
+    if (
+      !isValidEmail(
+        cleanEmail
+      )
+    ) {
+      throw new Error(
+        'Please enter a valid email address.'
+      );
+    }
+
+    let guest =
+      guestProfile;
+
+    /*
+      If current guest record
+      is unavailable, search by
+      email first.
+    */
+
+    if (
+      !guest?.id
+    ) {
       const {
-        data: existingRows,
-        error: existingError,
-      } = await supabase
-        .from('guests')
-        .select('*')
-        .eq('email', email)
-        .order('created_at', {
-          ascending: true,
-        })
-        .limit(1);
+        data:
+          existingRows,
+        error:
+          existingError,
+      } =
+        await supabase
+          .from(
+            'guests'
+          )
+          .select('*')
+          .eq(
+            'email',
+            cleanEmail
+          )
+          .order(
+            'created_at',
+            {
+              ascending:
+                true,
+            }
+          )
+          .limit(1);
 
-      if (existingError) {
+      if (
+        existingError
+      ) {
         throw existingError;
       }
 
-      const existingGuest =
-        existingRows?.[0] || null;
-
-      if (existingGuest) {
-        setGuestProfile(
-          existingGuest
-        );
-
-        return existingGuest;
-      }
+      guest =
+        existingRows?.[0] ||
+        null;
     }
 
+    /*
+      Existing guest:
+      update all three fields.
+    */
+
+    if (
+      guest?.id
+    ) {
+      const {
+        data:
+          updatedGuest,
+        error:
+          updateError,
+      } =
+        await supabase
+          .from(
+            'guests'
+          )
+          .update({
+            full_name:
+              cleanName,
+
+            phone:
+              phoneDigits,
+
+            email:
+              cleanEmail,
+          })
+          .eq(
+            'id',
+            guest.id
+          )
+          .select('*')
+          .single();
+
+      if (
+        updateError
+      ) {
+        throw updateError;
+      }
+
+      setGuestProfile(
+        updatedGuest
+      );
+
+      return updatedGuest;
+    }
+
+    /*
+      No guest exists:
+      create complete guest.
+    */
+
     const {
-      data: newGuest,
-      error: createError,
-    } = await supabase
-      .from('guests')
-      .insert({
-        full_name:
-          guestName.trim() ||
-          session.user.user_metadata?.full_name ||
-          session.user.email?.split('@')[0] ||
-          'Guest',
+      data:
+        createdGuest,
+      error:
+        createError,
+    } =
+      await supabase
+        .from(
+          'guests'
+        )
+        .insert({
+          full_name:
+            cleanName,
 
-        email:
-          email || null,
+          phone:
+            phoneDigits,
 
-        phone:
-          guestPhone.trim() ||
-          null,
-      })
-      .select('*')
-      .single();
+          email:
+            cleanEmail,
+        })
+        .select('*')
+        .single();
 
-    if (createError) {
+    if (
+      createError
+    ) {
       throw createError;
     }
 
     setGuestProfile(
-      newGuest
+      createdGuest
     );
 
-    return newGuest;
+    return createdGuest;
   }
 
-  async function updateGuestDetails(
-    guest
-  ) {
-    if (!guest?.id) {
-      return guest;
-    }
-
-    const payload = {
-      full_name:
-        guestName.trim(),
-
-      phone:
-        guestPhone.trim(),
-
-      email:
-        guestEmail
-          .trim()
-          .toLowerCase(),
-    };
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from('guests')
-      .update(payload)
-      .eq(
-        'id',
-        guest.id
-      )
-      .select('*')
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    setGuestProfile(data);
-
-    return data;
-  }
+  /* =========================
+     BOOKING REQUEST
+  ========================= */
 
   async function submitBookingRequest(
     event
   ) {
     event.preventDefault();
 
-    setBookingError('');
-    setBookingSuccess(null);
+    setBookingError(
+      ''
+    );
 
-    if (authChecking) {
+    setBookingSuccess(
+      null
+    );
+
+    if (
+      authChecking
+    ) {
       return;
     }
 
-    if (!session?.user) {
+    if (
+      !session?.user
+    ) {
       redirectToLogin();
+      return;
+    }
+
+    /*
+      REQUIRED GUEST INFORMATION
+      VALIDATION BEFORE DATABASE
+    */
+
+    const cleanName =
+      String(
+        guestName || ''
+      ).trim();
+
+    const cleanEmail =
+      String(
+        guestEmail || ''
+      )
+        .trim()
+        .toLowerCase();
+
+    const phoneDigits =
+      cleanPhone(
+        guestPhone
+      );
+
+    if (!cleanName) {
+      setBookingError(
+        'Full Name is required.'
+      );
+
+      return;
+    }
+
+    if (
+      phoneDigits.length <
+      10
+    ) {
+      setBookingError(
+        'A valid mobile number is required.'
+      );
+
+      return;
+    }
+
+    if (
+      !isValidEmail(
+        cleanEmail
+      )
+    ) {
+      setBookingError(
+        'A valid email address is required.'
+      );
+
       return;
     }
 
@@ -1096,7 +1835,8 @@ export default function PropertyPage() {
     }
 
     if (
-      checkOut <= checkIn
+      checkOut <=
+      checkIn
     ) {
       setBookingError(
         'Check-out must be after check-in.'
@@ -1114,12 +1854,14 @@ export default function PropertyPage() {
     if (
       nights <
       Number(
-        property.min_stay_nights || 1
+        property.min_stay_nights ||
+          1
       )
     ) {
       setBookingError(
         `Minimum stay is ${
-          property.min_stay_nights || 1
+          property.min_stay_nights ||
+          1
         } night(s).`
       );
 
@@ -1135,7 +1877,9 @@ export default function PropertyPage() {
         nights
       )
     ) {
-      setSelectedOfferId('');
+      setSelectedOfferId(
+        ''
+      );
 
       setBookingError(
         'The selected discount is not eligible for this stay.'
@@ -1154,7 +1898,9 @@ export default function PropertyPage() {
       return;
     }
 
-    if (!pricing?.valid) {
+    if (
+      !pricing?.valid
+    ) {
       setBookingError(
         pricing?.error ||
           'Unable to calculate booking price.'
@@ -1163,41 +1909,53 @@ export default function PropertyPage() {
       return;
     }
 
-    setBookingLoading(true);
+    setBookingLoading(
+      true
+    );
 
     try {
+      /*
+        FINAL AVAILABILITY
+        RECHECK BEFORE INSERT
+      */
+
       const [
         latestBlockedResult,
         latestBookingsResult,
-      ] = await Promise.all([
-        supabase
-          .from('blocked_dates')
-          .select(
-            'start_date, end_date'
-          )
-          .eq(
-            'property_id',
-            property.id
-          ),
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              'blocked_dates'
+            )
+            .select(
+              'start_date, end_date'
+            )
+            .eq(
+              'property_id',
+              property.id
+            ),
 
-        supabase
-          .from('bookings')
-          .select(
-            'id, check_in, check_out, booking_status, payment_status'
-          )
-          .eq(
-            'property_id',
-            property.id
-          )
-          .eq(
-            'booking_status',
-            'confirmed'
-          )
-          .eq(
-            'payment_status',
-            'paid'
-          ),
-      ]);
+          supabase
+            .from(
+              'bookings'
+            )
+            .select(
+              'id, check_in, check_out, booking_status, payment_status'
+            )
+            .eq(
+              'property_id',
+              property.id
+            )
+            .eq(
+              'booking_status',
+              'confirmed'
+            )
+            .eq(
+              'payment_status',
+              'paid'
+            ),
+        ]);
 
       if (
         latestBlockedResult.error
@@ -1213,7 +1971,8 @@ export default function PropertyPage() {
 
       const latestManualConflict =
         (
-          latestBlockedResult.data || []
+          latestBlockedResult.data ||
+          []
         ).some(
           (block) =>
             rangesOverlap(
@@ -1229,7 +1988,8 @@ export default function PropertyPage() {
 
       const latestBookingConflict =
         (
-          latestBookingsResult.data || []
+          latestBookingsResult.data ||
+          []
         ).some(
           (booking) =>
             booking.booking_status ===
@@ -1255,26 +2015,37 @@ export default function PropertyPage() {
         return;
       }
 
-      let guest =
+      /*
+        GUEST MUST BE SAVED
+        SUCCESSFULLY BEFORE
+        BOOKING IS CREATED.
+      */
+
+      const guest =
         await ensureGuestProfile();
 
-      guest =
-        await updateGuestDetails(
-          guest
+      if (
+        !guest?.id
+      ) {
+        throw new Error(
+          'Guest information could not be saved.'
         );
+      }
 
       const bookingNights =
-        Number(
-          pricing.nights ||
-          nights ||
+        Math.max(
+          Number(
+            pricing.nights ||
+              nights ||
+              1
+          ),
           1
         );
 
       const stayAmount =
         Number(
           pricing.staySubtotal ||
-          pricing.subtotalBeforeDiscount ||
-          0
+            0
         );
 
       const averageNightlyRate =
@@ -1283,146 +2054,165 @@ export default function PropertyPage() {
               (
                 stayAmount /
                 bookingNights
-              ) * 100
+              ) *
+                100
             ) / 100
           : Number(
               property.base_price ||
-              0
+                0
             );
 
       const cleaningFee =
         Number(
           pricing.cleaningFee ??
-          property.cleaning_fee ??
-          0
+            property.cleaning_fee ??
+            0
         );
 
       const securityDeposit =
         Number(
           pricing.securityDeposit ??
-          property.security_deposit ??
-          0
+            property.security_deposit ??
+            0
         );
 
       const taxableAmount =
         Number(
           pricing.subtotalAfterDiscount ||
-          0
+            0
         );
 
       const gstAmount =
         Number(
           pricing.gstAmount ||
-          0
+            0
         );
 
       const finalAmount =
         Number(
           pricing.totalPayable ||
-          pricing.total ||
-          0
+            pricing.total ||
+            0
         );
 
-      const bookingPayload = {
-        property_id:
-          property.id,
-
-        guest_id:
-          guest.id,
-
-        check_in:
-          checkIn,
-
-        check_out:
-          checkOut,
-
-        guests_count:
-          Number(
-            guestCount
-          ),
-
-        nights:
-          bookingNights,
-
-        nightly_rate:
-          averageNightlyRate,
-
-        cleaning_fee:
-          cleaningFee,
-
-        security_deposit:
-          securityDeposit,
-
-        total_amount:
-          finalAmount,
-
-        booking_status:
-          'pending',
-
-        payment_status:
-          'unpaid',
-
-        notes:
-          guestMessage.trim() ||
-          null,
-
-        base_amount:
-          Number(
-            pricing.subtotalBeforeDiscount ||
-            stayAmount
-          ),
-
-        auto_discount_amount:
-          Number(
-            pricing.regularDiscountAmount ||
+      const discountAmount =
+        Number(
+          pricing.regularDiscountAmount ||
             0
-          ),
+        );
 
-        host_discount_amount:
-          0,
+      /*
+        COMPLETE BOOKING PAYLOAD
+      */
 
-        final_payable_amount:
-          finalAmount,
+      const bookingPayload =
+        {
+          property_id:
+            property.id,
 
-        offer_status:
-          'none',
+          guest_id:
+            guest.id,
 
-        host_decision:
-          'pending',
+          check_in:
+            checkIn,
 
-        guest_discount_requested:
-          false,
+          check_out:
+            checkOut,
 
-        verification_status:
-          'not_required',
+          guests_count:
+            Number(
+              guestCount
+            ),
 
-        taxable_amount:
-          taxableAmount,
+          nights:
+            bookingNights,
 
-        gst_rate:
-          18,
+          nightly_rate:
+            averageNightlyRate,
 
-        gst_amount:
-          gstAmount,
+          cleaning_fee:
+            cleaningFee,
 
-        amount_including_gst:
-          finalAmount,
+          security_deposit:
+            securityDeposit,
 
-        property_offer_id:
-          selectedOffer?.id ||
-          null,
-      };
+          total_amount:
+            finalAmount,
+
+          booking_status:
+            'pending',
+
+          payment_status:
+            'unpaid',
+
+          notes:
+            guestMessage
+              .trim() ||
+            null,
+
+          base_amount:
+            Number(
+              pricing.subtotalBeforeDiscount ||
+                stayAmount
+            ),
+
+          auto_discount_amount:
+            discountAmount,
+
+          host_discount_amount:
+            0,
+
+          final_payable_amount:
+            finalAmount,
+
+          offer_status:
+            selectedOffer
+              ? 'selected'
+              : 'none',
+
+          host_decision:
+            'pending',
+
+          guest_discount_requested:
+            Boolean(
+              selectedOffer
+            ),
+
+          verification_status:
+            'not_required',
+
+          taxable_amount:
+            taxableAmount,
+
+          gst_rate:
+            18,
+
+          gst_amount:
+            gstAmount,
+
+          amount_including_gst:
+            finalAmount,
+
+          property_offer_id:
+            selectedOffer?.id ||
+            null,
+        };
 
       const {
-        data: createdBooking,
-        error: bookingInsertError,
-      } = await supabase
-        .from('bookings')
-        .insert(
-          bookingPayload
-        )
-        .select('*')
-        .single();
+        data:
+          createdBooking,
+        error:
+          bookingInsertError,
+      } =
+        await supabase
+          .from(
+            'bookings'
+          )
+          .insert(
+            bookingPayload
+          )
+          .select('*')
+          .single();
 
       if (
         bookingInsertError
@@ -1430,12 +2220,38 @@ export default function PropertyPage() {
         throw bookingInsertError;
       }
 
+      /*
+        BOOKING CREATED
+        SUCCESSFULLY
+      */
+
       setBookingSuccess(
         createdBooking
       );
 
-      setGuestMessage('');
-    } catch (error) {
+      setGuestMessage(
+        ''
+      );
+
+      /*
+        Keep name / phone /
+        email on screen.
+      */
+
+      setGuestName(
+        cleanName
+      );
+
+      setGuestPhone(
+        phoneDigits
+      );
+
+      setGuestEmail(
+        cleanEmail
+      );
+    } catch (
+      error
+    ) {
       console.error(
         'Booking request failed:',
         error
@@ -1446,14 +2262,28 @@ export default function PropertyPage() {
           'Unable to send booking request.'
       );
     } finally {
-      setBookingLoading(false);
+      setBookingLoading(
+        false
+      );
     }
   }
 
+  /* =========================
+     LOADING / ERROR
+  ========================= */
+
   if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.centerMessage}>
+      <main
+        style={
+          styles.page
+        }
+      >
+        <div
+          style={
+            styles.centerMessage
+          }
+        >
           Loading property...
         </div>
       </main>
@@ -1465,8 +2295,16 @@ export default function PropertyPage() {
     !property
   ) {
     return (
-      <main style={styles.page}>
-        <div style={styles.centerMessage}>
+      <main
+        style={
+          styles.page
+        }
+      >
+        <div
+          style={
+            styles.centerMessage
+          }
+        >
           <h2>
             Property unavailable
           </h2>
@@ -1478,7 +2316,9 @@ export default function PropertyPage() {
 
           <a
             href="/"
-            style={styles.homeLink}
+            style={
+              styles.homeLink
+            }
           >
             Back to NightOutStays
           </a>
@@ -1488,7 +2328,9 @@ export default function PropertyPage() {
   }
 
   const coverPhoto =
-    photos[activePhoto] ||
+    photos[
+      activePhoto
+    ] ||
     photos[0] ||
     null;
 
@@ -1498,7 +2340,8 @@ export default function PropertyPage() {
           checkIn,
           Math.max(
             Number(
-              property.min_stay_nights || 1
+              property.min_stay_nights ||
+                1
             ),
             1
           )
@@ -1506,28 +2349,46 @@ export default function PropertyPage() {
       : todayString();
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main
+      style={
+        styles.page
+      }
+    >
+      <header
+        style={
+          styles.header
+        }
+      >
         <a
           href="/"
-          style={styles.logo}
+          style={
+            styles.logo
+          }
         >
           NightOutStays
         </a>
 
-        <div style={styles.headerActions}>
+        <div
+          style={
+            styles.headerActions
+          }
+        >
           {session ? (
             <>
               <a
                 href="/account/bookings"
-                style={styles.headerLink}
+                style={
+                  styles.headerLink
+                }
               >
                 My Bookings
               </a>
 
               <a
                 href="/account/messages"
-                style={styles.headerLink}
+                style={
+                  styles.headerLink
+                }
               >
                 Messages
               </a>
@@ -1537,7 +2398,9 @@ export default function PropertyPage() {
               href={`/login?redirect=${encodeURIComponent(
                 `/property/${property.slug}`
               )}`}
-              style={styles.loginButton}
+              style={
+                styles.loginButton
+              }
             >
               Guest Login
             </a>
@@ -1545,21 +2408,45 @@ export default function PropertyPage() {
         </div>
       </header>
 
-      <div style={styles.container}>
-        <section style={styles.titleSection}>
+      <div
+        style={
+          styles.container
+        }
+      >
+        <section
+          style={
+            styles.titleSection
+          }
+        >
           <div>
-            <h1 style={styles.propertyTitle}>
+            <h1
+              style={
+                styles.propertyTitle
+              }
+            >
               {property.name}
             </h1>
 
-            <div style={styles.location}>
-              {property.location_name}
+            <div
+              style={
+                styles.location
+              }
+            >
+              {
+                property.location_name
+              }
             </div>
           </div>
 
-          <div style={styles.basePrice}>
+          <div
+            style={
+              styles.basePrice
+            }
+          >
             <strong>
-              {money(property.base_price)}
+              {money(
+                property.base_price
+              )}
             </strong>
 
             <span>
@@ -1569,26 +2456,47 @@ export default function PropertyPage() {
           </div>
         </section>
 
-        <section style={styles.gallery}>
-          <div style={styles.mainPhotoBox}>
+        <section
+          style={
+            styles.gallery
+          }
+        >
+          <div
+            style={
+              styles.mainPhotoBox
+            }
+          >
             {coverPhoto?.image_url ? (
               <img
-                src={coverPhoto.image_url}
+                src={
+                  coverPhoto.image_url
+                }
                 alt={
                   coverPhoto.alt_text ||
                   property.name
                 }
-                style={styles.mainPhoto}
+                style={
+                  styles.mainPhoto
+                }
               />
             ) : (
-              <div style={styles.noPhoto}>
+              <div
+                style={
+                  styles.noPhoto
+                }
+              >
                 Property photo
               </div>
             )}
           </div>
 
-          {photos.length > 1 && (
-            <div style={styles.thumbnailRow}>
+          {photos.length >
+            1 && (
+            <div
+              style={
+                styles.thumbnailRow
+              }
+            >
               {photos.map(
                 (
                   photo,
@@ -1621,7 +2529,8 @@ export default function PropertyPage() {
                       alt={
                         photo.alt_text ||
                         `${property.name} ${
-                          index + 1
+                          index +
+                          1
                         }`
                       }
                       style={
@@ -1635,15 +2544,27 @@ export default function PropertyPage() {
           )}
         </section>
 
-        <div style={styles.contentGrid}>
+        <div
+          style={
+            styles.contentGrid
+          }
+        >
           <div>
-            <section style={styles.infoCard}>
+            <section
+              style={
+                styles.infoCard
+              }
+            >
               <h2>
                 About this stay
               </h2>
 
               {property.short_description && (
-                <p style={styles.description}>
+                <p
+                  style={
+                    styles.description
+                  }
+                >
                   {
                     property.short_description
                   }
@@ -1651,50 +2572,70 @@ export default function PropertyPage() {
               )}
 
               {property.description && (
-                <p style={styles.description}>
+                <p
+                  style={
+                    styles.description
+                  }
+                >
                   {
                     property.description
                   }
                 </p>
               )}
 
-              <div style={styles.quickFacts}>
+              <div
+                style={
+                  styles.quickFacts
+                }
+              >
                 <Fact
                   label="Bedrooms"
                   value={
-                    property.bedrooms || 0
+                    property.bedrooms ||
+                    0
                   }
                 />
 
                 <Fact
                   label="Bathrooms"
                   value={
-                    property.bathrooms || 0
+                    property.bathrooms ||
+                    0
                   }
                 />
 
                 <Fact
                   label="Guests"
                   value={`Up to ${
-                    property.max_guests || 1
+                    property.max_guests ||
+                    1
                   }`}
                 />
 
                 <Fact
                   label="Minimum stay"
                   value={`${
-                    property.min_stay_nights || 1
+                    property.min_stay_nights ||
+                    1
                   } night(s)`}
                 />
               </div>
             </section>
 
-            <section style={styles.infoCard}>
+            <section
+              style={
+                styles.infoCard
+              }
+            >
               <h2>
                 Stay details
               </h2>
 
-              <div style={styles.detailGrid}>
+              <div
+                style={
+                  styles.detailGrid
+                }
+              >
                 <Detail
                   label="Check-in"
                   value={
@@ -1725,19 +2666,28 @@ export default function PropertyPage() {
                 <Detail
                   label="Maximum guests"
                   value={
-                    property.max_guests || 1
+                    property.max_guests ||
+                    1
                   }
                 />
               </div>
             </section>
 
             {property.amenities && (
-              <section style={styles.infoCard}>
+              <section
+                style={
+                  styles.infoCard
+                }
+              >
                 <h2>
                   Amenities
                 </h2>
 
-                <p style={styles.description}>
+                <p
+                  style={
+                    styles.description
+                  }
+                >
                   {Array.isArray(
                     property.amenities
                   )
@@ -1750,12 +2700,20 @@ export default function PropertyPage() {
             )}
 
             {property.house_rules && (
-              <section style={styles.infoCard}>
+              <section
+                style={
+                  styles.infoCard
+                }
+              >
                 <h2>
                   House rules
                 </h2>
 
-                <p style={styles.description}>
+                <p
+                  style={
+                    styles.description
+                  }
+                >
                   {Array.isArray(
                     property.house_rules
                   )
@@ -1767,12 +2725,20 @@ export default function PropertyPage() {
               </section>
             )}
 
-            <section style={styles.infoCard}>
+            <section
+              style={
+                styles.infoCard
+              }
+            >
               <h2>
                 Availability
               </h2>
 
-              <p style={styles.description}>
+              <p
+                style={
+                  styles.description
+                }
+              >
                 Check live availability and nightly rates below.
                 Rates can vary by date. Host special rates are
                 automatically shown. Pending booking requests
@@ -1780,16 +2746,36 @@ export default function PropertyPage() {
               </p>
 
               <GuestAvailabilityCalendar
-                property={property}
-                pricingRules={pricingRules}
-                rateOverrides={rateOverrides}
-                blockedDates={blockedDates}
-                existingBookings={existingBookings}
-                guestCount={guestCount}
-                checkIn={checkIn}
-                checkOut={checkOut}
-                onCheckInChange={changeCheckIn}
-                onCheckOutChange={changeCheckOut}
+                property={
+                  property
+                }
+                pricingRules={
+                  pricingRules
+                }
+                rateOverrides={
+                  rateOverrides
+                }
+                blockedDates={
+                  blockedDates
+                }
+                existingBookings={
+                  existingBookings
+                }
+                guestCount={
+                  guestCount
+                }
+                checkIn={
+                  checkIn
+                }
+                checkOut={
+                  checkOut
+                }
+                onCheckInChange={
+                  changeCheckIn
+                }
+                onCheckOutChange={
+                  changeCheckOut
+                }
               />
             </section>
           </div>
@@ -2002,11 +2988,19 @@ export default function PropertyPage() {
                         }
                         onChange={(
                           event
-                        ) =>
+                        ) => {
                           setSelectedOfferId(
                             event.target.value
-                          )
-                        }
+                          );
+
+                          setBookingError(
+                            ''
+                          );
+
+                          setBookingSuccess(
+                            null
+                          );
+                        }}
                         style={
                           styles.input
                         }
@@ -2101,23 +3095,34 @@ export default function PropertyPage() {
                     value={
                       money(
                         pricing.staySubtotal ||
-                          pricing.subtotalBeforeDiscount ||
                           0
                       )
                     }
                   />
 
                   {Number(
+                    pricing.extraGuestCharge ||
+                      0
+                  ) > 0 && (
+                    <PriceRow
+                      label="Extra guest charge"
+                      value={
+                        money(
+                          pricing.extraGuestCharge
+                        )
+                      }
+                    />
+                  )}
+
+                  {Number(
                     pricing.cleaningFee ||
-                      property.cleaning_fee ||
                       0
                   ) > 0 && (
                     <PriceRow
                       label="Cleaning fee"
                       value={
                         money(
-                          pricing.cleaningFee ||
-                            property.cleaning_fee
+                          pricing.cleaningFee
                         )
                       }
                     />
@@ -2144,7 +3149,8 @@ export default function PropertyPage() {
                     label="Taxable amount"
                     value={
                       money(
-                        pricing.subtotalAfterDiscount ||
+                        pricing.taxableAmount ||
+                          pricing.subtotalAfterDiscount ||
                           0
                       )
                     }
@@ -2159,6 +3165,20 @@ export default function PropertyPage() {
                       )
                     }
                   />
+
+                  {Number(
+                    pricing.securityDeposit ||
+                      0
+                  ) > 0 && (
+                    <PriceRow
+                      label="Security deposit"
+                      value={
+                        money(
+                          pricing.securityDeposit
+                        )
+                      }
+                    />
+                  )}
 
                   <div
                     style={
@@ -2185,7 +3205,7 @@ export default function PropertyPage() {
                   styles.label
                 }
               >
-                FULL NAME
+                FULL NAME *
 
                 <input
                   type="text"
@@ -2194,14 +3214,21 @@ export default function PropertyPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setGuestName(
                       event.target.value
-                    )
-                  }
+                    );
+
+                    setBookingError(
+                      ''
+                    );
+                  }}
+                  required
+                  autoComplete="name"
                   style={
                     styles.input
                   }
+                  placeholder="Your full name"
                 />
               </label>
 
@@ -2210,7 +3237,7 @@ export default function PropertyPage() {
                   styles.label
                 }
               >
-                PHONE
+                PHONE *
 
                 <input
                   type="tel"
@@ -2219,14 +3246,21 @@ export default function PropertyPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setGuestPhone(
                       event.target.value
-                    )
-                  }
+                    );
+
+                    setBookingError(
+                      ''
+                    );
+                  }}
+                  required
+                  autoComplete="tel"
                   style={
                     styles.input
                   }
+                  placeholder="10 digit mobile number"
                 />
               </label>
 
@@ -2235,7 +3269,7 @@ export default function PropertyPage() {
                   styles.label
                 }
               >
-                EMAIL
+                EMAIL *
 
                 <input
                   type="email"
@@ -2244,14 +3278,21 @@ export default function PropertyPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
                     setGuestEmail(
                       event.target.value
-                    )
-                  }
+                    );
+
+                    setBookingError(
+                      ''
+                    );
+                  }}
+                  required
+                  autoComplete="email"
                   style={
                     styles.input
                   }
+                  placeholder="Email address"
                 />
               </label>
 
@@ -2280,6 +3321,14 @@ export default function PropertyPage() {
                 />
               </label>
 
+              <div
+                style={
+                  styles.requiredNote
+                }
+              >
+                * Full Name, Phone and Email are required before a booking request can be sent.
+              </div>
+
               {bookingError && (
                 <div
                   style={
@@ -2303,6 +3352,7 @@ export default function PropertyPage() {
                   {bookingSuccess.booking_code && (
                     <>
                       <br />
+
                       Booking ID:{' '}
                       <strong>
                         {
@@ -2329,18 +3379,22 @@ export default function PropertyPage() {
                 type="submit"
                 disabled={
                   bookingLoading ||
-                  selectedDatesUnavailable
+                  selectedDatesUnavailable ||
+                  authChecking
                 }
                 style={{
                   ...styles.bookButton,
 
                   ...(bookingLoading ||
-                  selectedDatesUnavailable
+                  selectedDatesUnavailable ||
+                  authChecking
                     ? styles.disabledButton
                     : {}),
                 }}
               >
-                {bookingLoading
+                {authChecking
+                  ? 'Checking account...'
+                  : bookingLoading
                   ? 'Sending Request...'
                   : session
                   ? 'Request Booking'
@@ -2361,6 +3415,10 @@ export default function PropertyPage() {
     </main>
   );
 }
+
+/* =========================
+   SMALL COMPONENTS
+========================= */
 
 function Fact({
   label,
@@ -2446,385 +3504,834 @@ function PriceRow({
   );
 }
 
+/* =========================
+   STYLES
+========================= */
+
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: '#f6f7f9',
-    color: '#0b2447',
-    fontFamily: 'Arial, sans-serif',
+    minHeight:
+      '100vh',
+
+    background:
+      '#f6f7f9',
+
+    color:
+      '#0b2447',
+
+    fontFamily:
+      'Arial, sans-serif',
   },
 
   header: {
-    height: 72,
-    background: '#ffffff',
-    borderBottom: '1px solid #e4e7ec',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 5%',
-    position: 'sticky',
-    top: 0,
-    zIndex: 50,
+    height:
+      72,
+
+    background:
+      '#ffffff',
+
+    borderBottom:
+      '1px solid #e4e7ec',
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'space-between',
+
+    padding:
+      '0 5%',
+
+    position:
+      'sticky',
+
+    top:
+      0,
+
+    zIndex:
+      50,
   },
 
   logo: {
-    fontSize: 24,
-    fontWeight: 800,
-    textDecoration: 'none',
-    color: '#174f91',
+    fontSize:
+      24,
+
+    fontWeight:
+      800,
+
+    textDecoration:
+      'none',
+
+    color:
+      '#174f91',
   },
 
   headerActions: {
-    display: 'flex',
-    gap: 18,
-    alignItems: 'center',
+    display:
+      'flex',
+
+    gap:
+      18,
+
+    alignItems:
+      'center',
   },
 
   headerLink: {
-    color: '#174f91',
-    textDecoration: 'none',
-    fontWeight: 600,
+    color:
+      '#174f91',
+
+    textDecoration:
+      'none',
+
+    fontWeight:
+      600,
   },
 
   loginButton: {
-    background: '#174f91',
-    color: '#ffffff',
-    padding: '10px 18px',
-    borderRadius: 8,
-    textDecoration: 'none',
-    fontWeight: 700,
+    background:
+      '#174f91',
+
+    color:
+      '#ffffff',
+
+    padding:
+      '10px 18px',
+
+    borderRadius:
+      8,
+
+    textDecoration:
+      'none',
+
+    fontWeight:
+      700,
   },
 
   container: {
-    width: '90%',
-    maxWidth: 1220,
-    margin: '0 auto',
-    padding: '30px 0 70px',
+    width:
+      '90%',
+
+    maxWidth:
+      1220,
+
+    margin:
+      '0 auto',
+
+    padding:
+      '30px 0 70px',
   },
 
   centerMessage: {
-    width: '90%',
-    maxWidth: 700,
-    margin: '100px auto',
-    background: '#ffffff',
-    padding: 40,
-    borderRadius: 18,
-    textAlign: 'center',
+    width:
+      '90%',
+
+    maxWidth:
+      700,
+
+    margin:
+      '100px auto',
+
+    background:
+      '#ffffff',
+
+    padding:
+      40,
+
+    borderRadius:
+      18,
+
+    textAlign:
+      'center',
   },
 
   homeLink: {
-    color: '#174f91',
-    fontWeight: 700,
+    color:
+      '#174f91',
+
+    fontWeight:
+      700,
   },
 
   titleSection: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 20,
-    alignItems: 'flex-end',
-    marginBottom: 24,
-    flexWrap: 'wrap',
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      20,
+
+    alignItems:
+      'flex-end',
+
+    marginBottom:
+      24,
+
+    flexWrap:
+      'wrap',
   },
 
   propertyTitle: {
-    margin: 0,
-    fontSize: 34,
+    margin:
+      0,
+
+    fontSize:
+      34,
   },
 
   location: {
-    marginTop: 8,
-    color: '#667085',
+    marginTop:
+      8,
+
+    color:
+      '#667085',
   },
 
   basePrice: {
-    fontSize: 16,
-    color: '#667085',
+    fontSize:
+      16,
+
+    color:
+      '#667085',
   },
 
   gallery: {
-    marginBottom: 30,
+    marginBottom:
+      30,
   },
 
   mainPhotoBox: {
-    width: '100%',
-    height: 520,
-    borderRadius: 18,
-    overflow: 'hidden',
-    background: '#e9edf2',
+    width:
+      '100%',
+
+    height:
+      520,
+
+    borderRadius:
+      18,
+
+    overflow:
+      'hidden',
+
+    background:
+      '#e9edf2',
   },
 
   mainPhoto: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+    width:
+      '100%',
+
+    height:
+      '100%',
+
+    objectFit:
+      'cover',
+
+    display:
+      'block',
   },
 
   noPhoto: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width:
+      '100%',
+
+    height:
+      '100%',
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'center',
+
+    color:
+      '#667085',
   },
 
   thumbnailRow: {
-    display: 'flex',
-    gap: 10,
-    marginTop: 10,
-    overflowX: 'auto',
+    display:
+      'flex',
+
+    gap:
+      10,
+
+    marginTop:
+      10,
+
+    overflowX:
+      'auto',
+
+    paddingBottom:
+      4,
   },
 
   thumbnailButton: {
-    width: 105,
-    height: 75,
-    padding: 0,
-    border: '2px solid transparent',
-    borderRadius: 10,
-    overflow: 'hidden',
-    background: '#ffffff',
-    cursor: 'pointer',
+    width:
+      105,
+
+    height:
+      75,
+
+    flex:
+      '0 0 auto',
+
+    padding:
+      0,
+
+    border:
+      '2px solid transparent',
+
+    borderRadius:
+      10,
+
+    overflow:
+      'hidden',
+
+    background:
+      '#ffffff',
+
+    cursor:
+      'pointer',
   },
 
   activeThumbnail: {
-    border: '2px solid #174f91',
+    border:
+      '2px solid #174f91',
   },
 
   thumbnail: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+    width:
+      '100%',
+
+    height:
+      '100%',
+
+    objectFit:
+      'cover',
+
+    display:
+      'block',
   },
 
   contentGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 385px',
-    gap: 28,
-    alignItems: 'start',
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      'minmax(0, 1fr) 385px',
+
+    gap:
+      28,
+
+    alignItems:
+      'start',
   },
 
   infoCard: {
-    background: '#ffffff',
-    border: '1px solid #e4e7ec',
-    borderRadius: 18,
-    padding: 24,
-    marginBottom: 20,
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #e4e7ec',
+
+    borderRadius:
+      18,
+
+    padding:
+      24,
+
+    marginBottom:
+      20,
   },
 
   description: {
-    lineHeight: 1.7,
-    color: '#475467',
+    lineHeight:
+      1.7,
+
+    color:
+      '#475467',
   },
 
   quickFacts: {
-    display: 'grid',
+    display:
+      'grid',
+
     gridTemplateColumns:
       'repeat(auto-fit, minmax(130px, 1fr))',
-    gap: 12,
-    marginTop: 20,
+
+    gap:
+      12,
+
+    marginTop:
+      20,
   },
 
   fact: {
-    background: '#f7f8fa',
-    borderRadius: 12,
-    padding: 16,
+    background:
+      '#f7f8fa',
+
+    borderRadius:
+      12,
+
+    padding:
+      16,
   },
 
   factValue: {
-    fontWeight: 800,
-    fontSize: 18,
+    fontWeight:
+      800,
+
+    fontSize:
+      18,
   },
 
   factLabel: {
-    color: '#667085',
-    marginTop: 5,
-    fontSize: 13,
+    color:
+      '#667085',
+
+    marginTop:
+      5,
+
+    fontSize:
+      13,
   },
 
   detailGrid: {
-    display: 'grid',
+    display:
+      'grid',
+
     gridTemplateColumns:
       'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: 12,
+
+    gap:
+      12,
   },
 
   detail: {
-    border: '1px solid #e4e7ec',
-    borderRadius: 12,
-    padding: 14,
+    border:
+      '1px solid #e4e7ec',
+
+    borderRadius:
+      12,
+
+    padding:
+      14,
   },
 
   detailLabel: {
-    fontSize: 12,
-    color: '#667085',
-    marginBottom: 8,
+    fontSize:
+      12,
+
+    color:
+      '#667085',
+
+    marginBottom:
+      8,
   },
 
   detailValue: {
-    fontWeight: 800,
-    fontSize: 17,
+    fontWeight:
+      800,
+
+    fontSize:
+      17,
   },
 
   bookingColumn: {
-    position: 'relative',
+    position:
+      'relative',
   },
 
   bookingCard: {
-    position: 'sticky',
-    top: 92,
-    background: '#ffffff',
-    border: '1px solid #dfe3e8',
-    borderRadius: 18,
-    padding: 22,
+    position:
+      'sticky',
+
+    top:
+      92,
+
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #dfe3e8',
+
+    borderRadius:
+      18,
+
+    padding:
+      22,
+
     boxShadow:
       '0 12px 35px rgba(16,24,40,0.08)',
-    display: 'grid',
-    gap: 16,
+
+    display:
+      'grid',
+
+    gap:
+      16,
   },
 
   bookingPrice: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: '#174f91',
+    fontSize:
+      28,
+
+    fontWeight:
+      800,
+
+    color:
+      '#174f91',
   },
 
   formGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 10,
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      '1fr 1fr',
+
+    gap:
+      10,
   },
 
   label: {
-    display: 'grid',
-    gap: 7,
-    fontSize: 11,
-    fontWeight: 800,
-    color: '#0b2447',
+    display:
+      'grid',
+
+    gap:
+      7,
+
+    fontSize:
+      11,
+
+    fontWeight:
+      800,
+
+    letterSpacing:
+      0.5,
+
+    color:
+      '#0b2447',
   },
 
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    border: '1px solid #cfd6df',
-    borderRadius: 9,
-    padding: 12,
-    background: '#ffffff',
-    fontSize: 14,
+    width:
+      '100%',
+
+    boxSizing:
+      'border-box',
+
+    border:
+      '1px solid #cfd6df',
+
+    borderRadius:
+      9,
+
+    padding:
+      '12px 12px',
+
+    background:
+      '#ffffff',
+
+    color:
+      '#101828',
+
+    fontSize:
+      14,
+
+    outline:
+      'none',
   },
 
   textarea: {
-    width: '100%',
-    minHeight: 100,
-    resize: 'vertical',
-    boxSizing: 'border-box',
-    border: '1px solid #cfd6df',
-    borderRadius: 9,
-    padding: 12,
-    background: '#ffffff',
-    fontSize: 14,
+    width:
+      '100%',
+
+    minHeight:
+      100,
+
+    resize:
+      'vertical',
+
+    boxSizing:
+      'border-box',
+
+    border:
+      '1px solid #cfd6df',
+
+    borderRadius:
+      9,
+
+    padding:
+      12,
+
+    background:
+      '#ffffff',
+
+    color:
+      '#101828',
+
+    fontSize:
+      14,
+
+    outline:
+      'none',
   },
 
   availableBox: {
-    padding: 12,
-    background: '#eaf7ee',
-    color: '#24723a',
-    borderRadius: 10,
-    fontWeight: 700,
-    fontSize: 13,
+    padding:
+      12,
+
+    background:
+      '#eaf7ee',
+
+    color:
+      '#24723a',
+
+    borderRadius:
+      10,
+
+    fontWeight:
+      700,
+
+    fontSize:
+      13,
   },
 
   discountBox: {
-    background: '#fff8e7',
-    border: '1px solid #efd493',
-    borderRadius: 12,
-    padding: 12,
-    display: 'grid',
-    gap: 10,
+    background:
+      '#fff8e7',
+
+    border:
+      '1px solid #efd493',
+
+    borderRadius:
+      12,
+
+    padding:
+      12,
+
+    display:
+      'grid',
+
+    gap:
+      10,
   },
 
   offerDescription: {
-    background: '#fff1c9',
-    padding: 10,
-    borderRadius: 8,
-    fontSize: 12,
-    color: '#805b00',
+    background:
+      '#fff1c9',
+
+    padding:
+      10,
+
+    borderRadius:
+      8,
+
+    fontSize:
+      12,
+
+    color:
+      '#805b00',
+
+    lineHeight:
+      1.5,
   },
 
   priceSummary: {
-    background: '#f7f8fa',
-    borderRadius: 12,
-    padding: 14,
-    display: 'grid',
-    gap: 10,
+    background:
+      '#f7f8fa',
+
+    borderRadius:
+      12,
+
+    padding:
+      14,
+
+    display:
+      'grid',
+
+    gap:
+      10,
   },
 
   priceRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 14,
-    color: '#344054',
-    fontSize: 13,
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      14,
+
+    color:
+      '#344054',
+
+    fontSize:
+      13,
   },
 
   discountRow: {
-    color: '#24723a',
-    fontWeight: 700,
+    color:
+      '#24723a',
+
+    fontWeight:
+      700,
   },
 
   totalRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 14,
-    paddingTop: 12,
-    borderTop: '1px solid #dfe3e8',
-    fontSize: 17,
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      14,
+
+    paddingTop:
+      12,
+
+    marginTop:
+      3,
+
+    borderTop:
+      '1px solid #dfe3e8',
+
+    fontSize:
+      17,
+  },
+
+  requiredNote: {
+    fontSize:
+      11,
+
+    color:
+      '#667085',
+
+    lineHeight:
+      1.5,
   },
 
   errorBox: {
-    padding: 12,
-    background: '#fdeaea',
-    color: '#a12828',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 600,
+    padding:
+      12,
+
+    background:
+      '#fdeaea',
+
+    color:
+      '#a12828',
+
+    borderRadius:
+      10,
+
+    fontSize:
+      13,
+
+    fontWeight:
+      600,
+
+    lineHeight:
+      1.5,
   },
 
   successBox: {
-    padding: 12,
-    background: '#eaf7ee',
-    color: '#24723a',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 700,
+    padding:
+      12,
+
+    background:
+      '#eaf7ee',
+
+    color:
+      '#24723a',
+
+    borderRadius:
+      10,
+
+    fontSize:
+      13,
+
+    fontWeight:
+      700,
+
+    lineHeight:
+      1.5,
   },
 
   loginNotice: {
-    padding: 12,
-    background: '#fff8e7',
-    color: '#805b00',
-    borderRadius: 10,
-    fontSize: 13,
+    padding:
+      12,
+
+    background:
+      '#fff8e7',
+
+    color:
+      '#805b00',
+
+    borderRadius:
+      10,
+
+    fontSize:
+      13,
   },
 
   bookButton: {
-    width: '100%',
-    border: 0,
-    borderRadius: 10,
-    padding: '15px 16px',
-    background: '#174f91',
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: 800,
-    cursor: 'pointer',
+    width:
+      '100%',
+
+    border:
+      0,
+
+    borderRadius:
+      10,
+
+    padding:
+      '15px 16px',
+
+    background:
+      '#174f91',
+
+    color:
+      '#ffffff',
+
+    fontSize:
+      15,
+
+    fontWeight:
+      800,
+
+    cursor:
+      'pointer',
   },
 
   disabledButton: {
-    opacity: 0.55,
-    cursor: 'not-allowed',
+    opacity:
+      0.55,
+
+    cursor:
+      'not-allowed',
   },
 
   bookingNote: {
-    textAlign: 'center',
-    color: '#667085',
-    fontSize: 11,
+    textAlign:
+      'center',
+
+    color:
+      '#667085',
+
+    fontSize:
+      11,
+
+    lineHeight:
+      1.5,
   },
 };
