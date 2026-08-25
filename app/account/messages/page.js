@@ -1,823 +1,495 @@
 'use client';
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-import {
-  createClient,
-} from '@supabase/supabase-js';
-
-const supabase =
-  createClient(
-    'https://gxwemplbykjxhezefykh.supabase.co',
-    'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
-  );
+const supabase = createClient(
+  'https://gxwemplbykjxhezefykh.supabase.co',
+  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
+);
 
 function money(value) {
-  return `₹${Number(
-    value || 0
-  ).toLocaleString(
-    'en-IN',
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }
-  )}`;
+  return `₹${Number(value || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function formatDateTime(value) {
-  if (!value) {
-    return '';
-  }
+  if (!value) return '';
 
   try {
-    return new Date(
-      value
-    ).toLocaleString(
-      'en-IN',
-      {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }
-    );
+    return new Date(value).toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   } catch {
     return value;
   }
 }
 
 function formatStayDate(value) {
-  if (!value) {
-    return '—';
-  }
+  if (!value) return '—';
 
   try {
-    return new Date(
-      `${value}T12:00:00`
-    ).toLocaleDateString(
-      'en-IN',
-      {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }
-    );
+    return new Date(`${value}T12:00:00`).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   } catch {
     return value;
   }
 }
 
 export default function GuestMessagesPage() {
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  const [
-    error,
-    setError,
-  ] = useState('');
+  const [session, setSession] = useState(null);
+  const [guest, setGuest] = useState(null);
 
-  const [
-    session,
-    setSession,
-  ] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [messages, setMessages] = useState([]);
 
-  const [
-    guest,
-    setGuest,
-  ] = useState(null);
+  const [activeBookingId, setActiveBookingId] = useState('');
 
-  const [
-    bookings,
-    setBookings,
-  ] = useState([]);
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const [
-    messages,
-    setMessages,
-  ] = useState([]);
+  const [discountText, setDiscountText] = useState('');
+  const [discountSending, setDiscountSending] = useState(false);
 
-  const [
-    activeBookingId,
-    setActiveBookingId,
-  ] = useState('');
+  useEffect(() => {
+    initialisePage();
+  }, []);
 
-  const [
-    messageText,
-    setMessageText,
-  ] = useState('');
+  useEffect(() => {
+    if (activeBookingId) {
+      loadMessages(activeBookingId);
+    }
+  }, [activeBookingId]);
 
-  const [
-    sending,
-    setSending,
-  ] = useState(false);
+  useEffect(() => {
+    if (!activeBookingId) return;
 
-  const [
-    discountText,
-    setDiscountText,
-  ] = useState('');
+    const channel = supabase
+      .channel(`guest-booking-${activeBookingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'booking_messages',
+          filter: `booking_id=eq.${activeBookingId}`,
+        },
+        () => {
+          loadMessages(activeBookingId);
+        }
+      )
+      .subscribe();
 
-  const [
-    discountSending,
-    setDiscountSending,
-  ] = useState(false);
-
-  const [
-    notice,
-    setNotice,
-  ] = useState('');
-
-  useEffect(
-    () => {
-      initialisePage();
-    },
-    []
-  );
-
-  useEffect(
-    () => {
-      if (
-        activeBookingId
-      ) {
-        loadMessages(
-          activeBookingId
-        );
-      }
-    },
-    [
-      activeBookingId,
-    ]
-  );
-
-  useEffect(
-    () => {
-      if (
-        !activeBookingId
-      ) {
-        return;
-      }
-
-      const channel =
-        supabase
-          .channel(
-            `guest-booking-${activeBookingId}`
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table:
-                'booking_messages',
-              filter:
-                `booking_id=eq.${activeBookingId}`,
-            },
-            () => {
-              loadMessages(
-                activeBookingId
-              );
-            }
-          )
-          .subscribe();
-
-      return () => {
-        supabase.removeChannel(
-          channel
-        );
-      };
-    },
-    [
-      activeBookingId,
-    ]
-  );
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeBookingId]);
 
   async function initialisePage() {
-    setLoading(
-      true
-    );
-
-    setError(
-      ''
-    );
+    setLoading(true);
+    setError('');
+    setNotice('');
 
     try {
       const {
-        data: {
-          session:
-            currentSession,
-        },
-        error:
-          sessionError,
-      } =
-        await supabase.auth.getSession();
+        data: { session: currentSession },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (
-        sessionError
-      ) {
+      if (sessionError) {
         throw sessionError;
       }
 
-      if (
-        !currentSession?.user
-      ) {
-        if (
-          typeof window !==
-          'undefined'
-        ) {
-          window.location.href =
-            `/login?redirect=${encodeURIComponent(
-              '/account/messages'
-            )}`;
-        }
-
+      if (!currentSession?.user) {
+        window.location.href =
+          `/login?redirect=${encodeURIComponent('/account/messages')}`;
         return;
       }
 
-      setSession(
-        currentSession
-      );
+      setSession(currentSession);
 
-      const email =
-        String(
-          currentSession.user
-            .email || ''
-        )
-          .trim()
-          .toLowerCase();
+      const email = String(
+        currentSession.user.email || ''
+      )
+        .trim()
+        .toLowerCase();
 
       if (!email) {
-        throw new Error(
-          'No email address is linked to this account.'
-        );
+        throw new Error('No email address is linked to this login.');
       }
 
       const {
-        data:
-          guestRows,
-        error:
-          guestError,
-      } =
-        await supabase
-          .from(
-            'guests'
-          )
-          .select(
-            'id, full_name, phone, email, created_at'
-          )
-          .eq(
-            'email',
-            email
-          )
-          .order(
-            'created_at',
-            {
-              ascending:
-                true,
-            }
-          )
-          .limit(1);
+        data: guestRows,
+        error: guestError,
+      } = await supabase
+        .from('guests')
+        .select('id, full_name, phone, email, created_at')
+        .eq('email', email)
+        .order('created_at', {
+          ascending: true,
+        })
+        .limit(1);
 
-      if (
-        guestError
-      ) {
+      if (guestError) {
         throw guestError;
       }
 
-      const foundGuest =
-        guestRows?.[0] ||
-        null;
+      const foundGuest = guestRows?.[0] || null;
 
-      if (
-        !foundGuest
-      ) {
+      if (!foundGuest) {
         throw new Error(
-          'No guest profile was found for this account.'
+          'No guest profile was found for this login.'
         );
       }
 
-      setGuest(
-        foundGuest
-      );
+      setGuest(foundGuest);
 
-      await loadBookings(
-        foundGuest.id
-      );
-    } catch (
-      pageError
-    ) {
-      console.error(
-        pageError
-      );
+      await loadBookings(foundGuest.id);
+    } catch (pageError) {
+      console.error(pageError);
 
       setError(
-        pageError.message ||
-          'Unable to open messages.'
+        pageError?.message ||
+          'Unable to open your messages.'
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
   async function logoutGuest() {
     await supabase.auth.signOut();
-
-    if (
-      typeof window !==
-      'undefined'
-    ) {
-      window.location.href =
-        '/';
-    }
+    window.location.href = '/';
   }
 
-  async function loadBookings(
-    guestId
-  ) {
+  async function loadBookings(guestId) {
     const {
       data,
-      error:
-        bookingsError,
-    } =
-      await supabase
-        .from(
-          'bookings'
-        )
-        .select(`
+      error: bookingsError,
+    } = await supabase
+      .from('bookings')
+      .select(`
+        id,
+        booking_code,
+        property_id,
+        guest_id,
+        check_in,
+        check_out,
+        guests_count,
+        nights,
+        nightly_rate,
+        cleaning_fee,
+        security_deposit,
+        total_amount,
+        booking_status,
+        payment_status,
+        notes,
+        created_at,
+        base_amount,
+        auto_discount_amount,
+        host_discount_amount,
+        final_payable_amount,
+        offer_note,
+        offer_status,
+        guest_discount_requested,
+        guest_discount_message,
+        taxable_amount,
+        gst_amount,
+        amount_including_gst,
+        properties (
           id,
-          booking_code,
-          property_id,
-          guest_id,
-          check_in,
-          check_out,
-          guests_count,
-          nights,
-          nightly_rate,
-          cleaning_fee,
-          security_deposit,
-          total_amount,
-          booking_status,
-          payment_status,
-          notes,
-          created_at,
-          base_amount,
-          auto_discount_amount,
-          host_discount_amount,
-          final_payable_amount,
-          offer_note,
-          offer_status,
-          guest_discount_requested,
-          guest_discount_message,
-          taxable_amount,
-          gst_amount,
-          amount_including_gst,
-          properties (
-            id,
-            name,
-            slug,
-            location_name
-          )
-        `)
-        .eq(
-          'guest_id',
-          guestId
+          name,
+          slug,
+          location_name
         )
-        .order(
-          'created_at',
-          {
-            ascending:
-              false,
-          }
-        );
+      `)
+      .eq('guest_id', guestId)
+      .order('created_at', {
+        ascending: false,
+      });
 
-    if (
-      bookingsError
-    ) {
+    if (bookingsError) {
       throw bookingsError;
     }
 
-    const rows =
-      data || [];
+    const rows = data || [];
 
-    setBookings(
-      rows
-    );
+    setBookings(rows);
 
-    if (
-      rows.length &&
-      !activeBookingId
-    ) {
-      setActiveBookingId(
-        rows[0].id
-      );
+    if (rows.length) {
+      setActiveBookingId((current) => {
+        if (
+          current &&
+          rows.some((booking) => booking.id === current)
+        ) {
+          return current;
+        }
+
+        return rows[0].id;
+      });
+    } else {
+      setActiveBookingId('');
     }
   }
 
-  async function loadMessages(
-    bookingId
-  ) {
-    if (
-      !bookingId
-    ) {
-      setMessages(
-        []
-      );
-
+  async function loadMessages(bookingId) {
+    if (!bookingId) {
+      setMessages([]);
       return;
     }
 
     const {
       data,
-      error:
-        messagesError,
-    } =
-      await supabase
-        .from(
-          'booking_messages'
-        )
-        .select(
-          'id, booking_id, sender_type, sender_name, message, message_type, is_read, created_at'
-        )
-        .eq(
-          'booking_id',
-          bookingId
-        )
-        .order(
-          'created_at',
-          {
-            ascending:
-              true,
-          }
-        );
+      error: messagesError,
+    } = await supabase
+      .from('booking_messages')
+      .select(
+        'id, booking_id, sender_type, sender_name, message, message_type, is_read, created_at'
+      )
+      .eq('booking_id', bookingId)
+      .order('created_at', {
+        ascending: true,
+      });
 
-    if (
-      messagesError
-    ) {
-      console.error(
-        messagesError
-      );
-
-      setError(
-        messagesError.message
-      );
-
+    if (messagesError) {
+      console.error(messagesError);
+      setError(messagesError.message);
       return;
     }
 
-    setMessages(
-      data || []
-    );
+    setMessages(data || []);
 
-    await supabase
-      .from(
-        'booking_messages'
-      )
+    const { error: readError } = await supabase
+      .from('booking_messages')
       .update({
-        is_read:
-          true,
+        is_read: true,
       })
-      .eq(
-        'booking_id',
-        bookingId
-      )
-      .neq(
-        'sender_type',
-        'guest'
-      )
-      .eq(
-        'is_read',
-        false
-      );
+      .eq('booking_id', bookingId)
+      .neq('sender_type', 'guest')
+      .eq('is_read', false);
+
+    if (readError) {
+      console.warn('Unable to update read status:', readError);
+    }
   }
 
-  const activeBooking =
-    useMemo(
-      () =>
-        bookings.find(
-          (booking) =>
-            booking.id ===
-            activeBookingId
-        ) || null,
-      [
-        bookings,
-        activeBookingId,
-      ]
+  const activeBooking = useMemo(() => {
+    return (
+      bookings.find(
+        (booking) => booking.id === activeBookingId
+      ) || null
     );
+  }, [bookings, activeBookingId]);
 
   const activeProperty =
-    activeBooking
-      ?.properties ||
-    null;
+    activeBooking?.properties || null;
 
-  const finalPayable =
-    Number(
-      activeBooking
-        ?.final_payable_amount ??
-        activeBooking
-          ?.amount_including_gst ??
-        activeBooking
-          ?.total_amount ??
-        0
-    );
+  const finalPayable = Number(
+    activeBooking?.final_payable_amount ??
+      activeBooking?.amount_including_gst ??
+      activeBooking?.total_amount ??
+      0
+  );
 
-  const hostDiscount =
-    Number(
-      activeBooking
-        ?.host_discount_amount ||
-        0
-    );
+  const hostDiscount = Number(
+    activeBooking?.host_discount_amount || 0
+  );
 
-  async function sendMessage(
-    event
-  ) {
+  async function sendMessage(event) {
     event.preventDefault();
 
-    setError(
-      ''
-    );
+    setError('');
+    setNotice('');
 
-    setNotice(
-      ''
-    );
+    const cleanMessage = String(
+      messageText || ''
+    ).trim();
 
-    const cleanMessage =
-      String(
-        messageText || ''
-      ).trim();
+    if (!cleanMessage) return;
 
-    if (
-      !cleanMessage
-    ) {
+    if (!activeBooking?.id || !guest?.id) {
+      setError('Please select a booking first.');
       return;
     }
 
-    if (
-      !activeBooking?.id ||
-      !guest?.id
-    ) {
-      setError(
-        'Booking conversation is unavailable.'
-      );
-
-      return;
-    }
-
-    setSending(
-      true
-    );
+    setSending(true);
 
     try {
       const {
-        error:
-          insertError,
-      } =
-        await supabase
-          .from(
-            'booking_messages'
-          )
-          .insert({
-            booking_id:
-              activeBooking.id,
+        error: insertError,
+      } = await supabase
+        .from('booking_messages')
+        .insert({
+          booking_id: activeBooking.id,
+          sender_type: 'guest',
+          sender_name:
+            guest.full_name || 'Guest',
+          message: cleanMessage,
 
-            sender_type:
-              'guest',
+          // IMPORTANT:
+          // "message" is an allowed database message type.
+          message_type: 'message',
 
-            sender_name:
-              guest.full_name ||
-              'Guest',
+          is_read: false,
+        });
 
-            message:
-              cleanMessage,
-
-            message_type:
-              'message',
-
-            is_read:
-              false,
-          });
-
-      if (
-        insertError
-      ) {
+      if (insertError) {
         throw insertError;
       }
 
-      setMessageText(
-        ''
-      );
+      setMessageText('');
 
-      await loadMessages(
-        activeBooking.id
-      );
-    } catch (
-      sendError
-    ) {
-      console.error(
-        sendError
-      );
+      await loadMessages(activeBooking.id);
+    } catch (sendError) {
+      console.error(sendError);
 
       setError(
-        sendError.message ||
+        sendError?.message ||
           'Message could not be sent.'
       );
     } finally {
-      setSending(
-        false
-      );
+      setSending(false);
     }
   }
 
   async function requestDiscount() {
-    setError(
-      ''
-    );
+    setError('');
+    setNotice('');
 
-    setNotice(
-      ''
-    );
-
-    if (
-      !activeBooking?.id ||
-      !guest?.id
-    ) {
-      setError(
-        'Please select a booking first.'
-      );
-
+    if (!activeBooking?.id || !guest?.id) {
+      setError('Please select a booking first.');
       return;
     }
 
-    const cleanRequest =
-      String(
-        discountText || ''
-      ).trim();
+    const cleanRequest = String(
+      discountText || ''
+    ).trim();
 
-    if (
-      !cleanRequest
-    ) {
+    if (!cleanRequest) {
       setError(
-        'Please write your discount request.'
+        'Please write your discount request first.'
       );
-
       return;
     }
 
-    setDiscountSending(
-      true
-    );
+    setDiscountSending(true);
 
     try {
+      /*
+        IMPORTANT FIX:
+
+        booking_messages.message_type currently allows:
+        message
+        booking_request
+        approval
+        decline
+        special_offer
+        payment
+        confirmation
+        system
+
+        Therefore we DO NOT insert "discount_request".
+        Guest discount requests are stored as a normal message
+        with a clear DISCOUNT REQUEST prefix.
+      */
+
+      const discountMessage =
+        `DISCOUNT REQUEST: ${cleanRequest}`;
+
       const {
-        error:
-          messageError,
-      } =
-        await supabase
-          .from(
-            'booking_messages'
-          )
-          .insert({
-            booking_id:
-              activeBooking.id,
+        error: messageError,
+      } = await supabase
+        .from('booking_messages')
+        .insert({
+          booking_id: activeBooking.id,
+          sender_type: 'guest',
+          sender_name:
+            guest.full_name || 'Guest',
+          message: discountMessage,
+          message_type: 'message',
+          is_read: false,
+        });
 
-            sender_type:
-              'guest',
-
-            sender_name:
-              guest.full_name ||
-              'Guest',
-
-            message:
-              cleanRequest,
-
-            message_type:
-              'discount_request',
-
-            is_read:
-              false,
-          });
-
-      if (
-        messageError
-      ) {
+      if (messageError) {
         throw messageError;
       }
 
+      /*
+        Keep the booking-level discount request flag also,
+        so the host/admin can identify that this booking
+        has an active guest discount request.
+      */
+
       const {
-        error:
-          bookingUpdateError,
-      } =
-        await supabase
-          .from(
-            'bookings'
-          )
-          .update({
-            guest_discount_requested:
-              true,
+        error: bookingUpdateError,
+      } = await supabase
+        .from('bookings')
+        .update({
+          guest_discount_requested: true,
+          guest_discount_message:
+            cleanRequest,
+        })
+        .eq('id', activeBooking.id);
 
-            guest_discount_message:
-              cleanRequest,
-          })
-          .eq(
-            'id',
-            activeBooking.id
-          );
-
-      if (
-        bookingUpdateError
-      ) {
+      if (bookingUpdateError) {
         console.warn(
-          'Booking discount flag not updated:',
+          'Discount request message was sent, but booking flag could not be updated:',
           bookingUpdateError
         );
       }
 
-      setDiscountText(
-        ''
-      );
+      setDiscountText('');
 
       setNotice(
-        'Discount request sent to the host.'
+        'Discount request sent successfully. The host can reply or send you a special offer.'
       );
 
-      await loadMessages(
-        activeBooking.id
-      );
+      await loadMessages(activeBooking.id);
 
-      if (
-        guest?.id
-      ) {
-        await loadBookings(
-          guest.id
-        );
-      }
-    } catch (
-      discountError
-    ) {
-      console.error(
-        discountError
-      );
+      await loadBookings(guest.id);
+    } catch (discountError) {
+      console.error(discountError);
 
       setError(
-        discountError.message ||
+        discountError?.message ||
           'Discount request could not be sent.'
       );
     } finally {
-      setDiscountSending(
-        false
-      );
+      setDiscountSending(false);
     }
   }
 
   if (loading) {
     return (
-      <main
-        style={
-          styles.page
-        }
-      >
-        <div
-          style={
-            styles.centerBox
-          }
-        >
+      <main style={styles.page}>
+        <div style={styles.centerBox}>
           Loading your messages...
         </div>
       </main>
     );
   }
 
-  if (
-    error &&
-    !guest
-  ) {
+  if (error && !guest) {
     return (
-      <main
-        style={
-          styles.page
-        }
-      >
-        <div
-          style={
-            styles.centerBox
-          }
-        >
-          <h2>
-            Messages unavailable
-          </h2>
+      <main style={styles.page}>
+        <div style={styles.centerBox}>
+          <h2>Messages unavailable</h2>
 
-          <p>
-            {error}
-          </p>
+          <p>{error}</p>
 
           <a
             href="/"
-            style={
-              styles.primaryLink
-            }
+            style={styles.primaryLink}
           >
             Back to NightOutStays
           </a>
@@ -827,92 +499,52 @@ export default function GuestMessagesPage() {
   }
 
   return (
-    <main
-      style={
-        styles.page
-      }
-    >
-      <header
-        style={
-          styles.header
-        }
-      >
+    <main style={styles.page}>
+      <header style={styles.header}>
         <a
           href="/"
-          style={
-            styles.logo
-          }
+          style={styles.logo}
         >
           NightOutStays
         </a>
 
-        <div
-          style={
-            styles.headerRight
-          }
-        >
-          <nav
-            style={
-              styles.nav
-            }
-          >
+        <div style={styles.headerRight}>
+          <nav style={styles.nav}>
             <a
               href="/account/bookings"
-              style={
-                styles.navLink
-              }
+              style={styles.navLink}
             >
               My Bookings
             </a>
 
             <a
               href="/account/messages"
-              style={
-                styles.activeNavLink
-              }
+              style={styles.activeNavLink}
             >
               Messages
             </a>
           </nav>
 
-          <div
-            style={
-              styles.loginStatus
-            }
-          >
+          <div style={styles.loginStatus}>
             <div>
-              <div
-                style={
-                  styles.loggedInLabel
-                }
-              >
+              <div style={styles.loggedInLabel}>
                 Logged in as
               </div>
 
               <strong>
-                {guest?.full_name ||
-                  'Guest'}
+                {guest?.full_name || 'Guest'}
               </strong>
 
-              <div
-                style={
-                  styles.loggedInEmail
-                }
-              >
-                {session?.user
-                  ?.email ||
+              <div style={styles.loggedInEmail}>
+                {session?.user?.email ||
                   guest?.email}
               </div>
             </div>
 
             <button
               type="button"
-              onClick={
-                logoutGuest
-              }
-              style={
-                styles.logoutButton
-              }
+              onClick={logoutGuest}
+              style={styles.logoutButton}
             >
               Logout
             </button>
@@ -920,54 +552,29 @@ export default function GuestMessagesPage() {
         </div>
       </header>
 
-      <div
-        style={
-          styles.container
-        }
-      >
-        <div
-          style={
-            styles.pageHeader
-          }
-        >
+      <div style={styles.container}>
+        <div style={styles.pageHeader}>
           <div>
-            <h1
-              style={
-                styles.title
-              }
-            >
+            <h1 style={styles.title}>
               Messages
             </h1>
 
-            <p
-              style={
-                styles.subtitle
-              }
-            >
+            <p style={styles.subtitle}>
               Chat with the host about your booking or request a better rate.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              initialisePage()
-            }
-            style={
-              styles.refreshButton
-            }
+            onClick={initialisePage}
+            style={styles.refreshButton}
           >
             Refresh
           </button>
         </div>
 
-        {bookings.length ===
-        0 ? (
-          <div
-            style={
-              styles.emptyCard
-            }
-          >
+        {bookings.length === 0 ? (
+          <div style={styles.emptyCard}>
             <h3>
               No booking conversations yet
             </h3>
@@ -978,152 +585,88 @@ export default function GuestMessagesPage() {
 
             <a
               href="/"
-              style={
-                styles.primaryLink
-              }
+              style={styles.primaryLink}
             >
               Browse Properties
             </a>
           </div>
         ) : (
-          <div
-            style={
-              styles.chatLayout
-            }
-          >
-            <aside
-              style={
-                styles.conversationList
-              }
-            >
-              <div
-                style={
-                  styles.listHeading
-                }
-              >
+          <div style={styles.chatLayout}>
+            <aside style={styles.conversationList}>
+              <div style={styles.listHeading}>
                 Your Bookings
               </div>
 
-              {bookings.map(
-                (
-                  booking
-                ) => {
-                  const property =
-                    booking.properties;
+              {bookings.map((booking) => {
+                const property =
+                  booking.properties;
 
-                  const active =
-                    booking.id ===
-                    activeBookingId;
+                const active =
+                  booking.id ===
+                  activeBookingId;
 
-                  return (
-                    <button
-                      type="button"
-                      key={
+                return (
+                  <button
+                    type="button"
+                    key={booking.id}
+                    onClick={() => {
+                      setActiveBookingId(
                         booking.id
-                      }
-                      onClick={() => {
-                        setActiveBookingId(
-                          booking.id
-                        );
+                      );
 
-                        setNotice(
-                          ''
-                        );
+                      setNotice('');
+                      setError('');
+                    }}
+                    style={{
+                      ...styles.conversationButton,
+                      ...(active
+                        ? styles.activeConversation
+                        : {}),
+                    }}
+                  >
+                    <strong style={styles.bookingCode}>
+                      {booking.booking_code}
+                    </strong>
 
-                        setError(
-                          ''
-                        );
-                      }}
-                      style={{
-                        ...styles.conversationButton,
+                    <span style={styles.propertyName}>
+                      {property?.name ||
+                        'Property'}
+                    </span>
 
-                        ...(active
-                          ? styles.activeConversation
-                          : {}),
-                      }}
-                    >
-                      <strong
-                        style={
-                          styles.bookingCode
-                        }
-                      >
-                        {
-                          booking.booking_code
-                        }
-                      </strong>
+                    <span style={styles.bookingDates}>
+                      {formatStayDate(
+                        booking.check_in
+                      )}
+                      {' → '}
+                      {formatStayDate(
+                        booking.check_out
+                      )}
+                    </span>
 
-                      <span
-                        style={
-                          styles.propertyName
-                        }
-                      >
-                        {property?.name ||
-                          'Property'}
-                      </span>
-
-                      <span
-                        style={
-                          styles.bookingDates
-                        }
-                      >
-                        {formatStayDate(
-                          booking.check_in
-                        )}
-                        {' → '}
-                        {formatStayDate(
-                          booking.check_out
-                        )}
-                      </span>
-
-                      <span
-                        style={
-                          styles.bookingStatus
-                        }
-                      >
-                        {
-                          booking.booking_status
-                        }
-                        {' • '}
-                        {
-                          booking.payment_status
-                        }
-                      </span>
-                    </button>
-                  );
-                }
-              )}
+                    <span style={styles.bookingStatus}>
+                      {booking.booking_status ||
+                        'pending'}
+                      {' • '}
+                      {booking.payment_status ||
+                        'unpaid'}
+                    </span>
+                  </button>
+                );
+              })}
             </aside>
 
-            <section
-              style={
-                styles.chatPanel
-              }
-            >
+            <section style={styles.chatPanel}>
               {activeBooking && (
                 <>
-                  <div
-                    style={
-                      styles.chatHeader
-                    }
-                  >
+                  <div style={styles.chatHeader}>
                     <div>
-                      <h2
-                        style={
-                          styles.chatTitle
-                        }
-                      >
+                      <h2 style={styles.chatTitle}>
                         {activeProperty?.name ||
                           'Booking Conversation'}
                       </h2>
 
-                      <div
-                        style={
-                          styles.chatMeta
-                        }
-                      >
-                        {
-                          activeBooking.booking_code
-                        }
+                      <div style={styles.chatMeta}>
+                        {activeBooking.booking_code}
                         {' • '}
                         {formatStayDate(
                           activeBooking.check_in
@@ -1137,213 +680,148 @@ export default function GuestMessagesPage() {
 
                     <a
                       href="/account/bookings"
-                      style={
-                        styles.bookingLink
-                      }
+                      style={styles.bookingLink}
                     >
                       View Booking
                     </a>
                   </div>
 
-                  <div
-                    style={
-                      styles.priceStrip
-                    }
-                  >
+                  <div style={styles.priceStrip}>
                     <div>
-                      <span
-                        style={
-                          styles.priceLabel
-                        }
-                      >
+                      <span style={styles.priceLabel}>
                         Current Payable
                       </span>
 
                       <strong>
-                        {money(
-                          finalPayable
-                        )}
+                        {money(finalPayable)}
                       </strong>
                     </div>
 
-                    {hostDiscount >
-                      0 && (
+                    {hostDiscount > 0 && (
                       <div>
-                        <span
-                          style={
-                            styles.priceLabel
-                          }
-                        >
+                        <span style={styles.priceLabel}>
                           Host Discount
                         </span>
 
-                        <strong
-                          style={
-                            styles.discountAmount
-                          }
-                        >
-                          -
-                          {money(
-                            hostDiscount
-                          )}
+                        <strong style={styles.discountAmount}>
+                          -{money(hostDiscount)}
                         </strong>
                       </div>
                     )}
 
                     <div>
-                      <span
-                        style={
-                          styles.priceLabel
-                        }
-                      >
+                      <span style={styles.priceLabel}>
                         Offer Status
                       </span>
 
                       <strong>
                         {activeBooking.offer_status ||
-                          'none'}
+                          'None'}
                       </strong>
                     </div>
                   </div>
 
-                  <div
-                    style={
-                      styles.messagesArea
-                    }
-                  >
+                  <div style={styles.messagesArea}>
                     {messages.length === 0 ? (
-                      <div
-                        style={
-                          styles.noMessages
-                        }
-                      >
+                      <div style={styles.noMessages}>
                         No messages yet. Start the conversation with the host.
                       </div>
                     ) : (
-                      messages.map(
-                        (item) => {
-                          const isGuest =
-                            item.sender_type ===
-                            'guest';
+                      messages.map((item) => {
+                        const isGuest =
+                          item.sender_type === 'guest';
 
-                          const isDiscountRequest =
-                            item.message_type ===
-                            'discount_request';
+                        const isDiscountRequest =
+                          String(
+                            item.message || ''
+                          ).startsWith(
+                            'DISCOUNT REQUEST:'
+                          );
 
-                          return (
+                        const isSpecialOffer =
+                          item.message_type ===
+                          'special_offer';
+
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              ...styles.messageRow,
+                              justifyContent:
+                                isGuest
+                                  ? 'flex-end'
+                                  : 'flex-start',
+                            }}
+                          >
                             <div
-                              key={
-                                item.id
-                              }
                               style={{
-                                ...styles.messageRow,
+                                ...styles.messageBubble,
 
-                                justifyContent:
-                                  isGuest
-                                    ? 'flex-end'
-                                    : 'flex-start',
+                                ...(isGuest
+                                  ? styles.guestBubble
+                                  : styles.hostBubble),
+
+                                ...(isDiscountRequest
+                                  ? styles.discountRequestBubble
+                                  : {}),
+
+                                ...(isSpecialOffer
+                                  ? styles.specialOfferBubble
+                                  : {}),
                               }}
                             >
-                              <div
-                                style={{
-                                  ...styles.messageBubble,
+                              <div style={styles.messageSender}>
+                                {isSpecialOffer
+                                  ? 'Host Special Offer'
+                                  : isDiscountRequest
+                                  ? 'Discount Request'
+                                  : item.sender_name ||
+                                    (isGuest
+                                      ? guest?.full_name ||
+                                        'You'
+                                      : 'Host')}
+                              </div>
 
-                                  ...(isGuest
-                                    ? styles.guestBubble
-                                    : styles.hostBubble),
+                              <div style={styles.messageText}>
+                                {item.message}
+                              </div>
 
-                                  ...(isDiscountRequest
-                                    ? styles.discountRequestBubble
-                                    : {}),
-                                }}
-                              >
-                                <div
-                                  style={
-                                    styles.messageSender
-                                  }
-                                >
-                                  {isDiscountRequest
-                                    ? 'Discount Request'
-                                    : item.sender_name ||
-                                      (isGuest
-                                        ? guest?.full_name ||
-                                          'You'
-                                        : 'Host')}
-                                </div>
-
-                                <div
-                                  style={
-                                    styles.messageText
-                                  }
-                                >
-                                  {
-                                    item.message
-                                  }
-                                </div>
-
-                                <div
-                                  style={
-                                    styles.messageTime
-                                  }
-                                >
-                                  {formatDateTime(
-                                    item.created_at
-                                  )}
-                                </div>
+                              <div style={styles.messageTime}>
+                                {formatDateTime(
+                                  item.created_at
+                                )}
                               </div>
                             </div>
-                          );
-                        }
-                      )
+                          </div>
+                        );
+                      })
                     )}
                   </div>
 
-                  <div
-                    style={
-                      styles.discountRequestCard
-                    }
-                  >
-                    <h3
-                      style={
-                        styles.sectionTitle
-                      }
-                    >
+                  <div style={styles.discountRequestCard}>
+                    <h3 style={styles.sectionTitle}>
                       Ask Host for a Better Rate
                     </h3>
 
-                    <p
-                      style={
-                        styles.sectionHelp
-                      }
-                    >
-                      You can request a discount before payment. This request does not change the booking price. If the host agrees, the host will send you a special offer.
+                    <p style={styles.sectionHelp}>
+                      You can request a discount before payment. This request does not change your booking price. If the host agrees, the host can send you a formal special offer.
                     </p>
 
                     <textarea
-                      value={
-                        discountText
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={discountText}
+                      onChange={(event) =>
                         setDiscountText(
                           event.target.value
                         )
                       }
                       placeholder="Example: Can you offer a better rate for this booking?"
-                      style={
-                        styles.discountTextarea
-                      }
+                      style={styles.discountTextarea}
                     />
 
                     <button
                       type="button"
-                      onClick={
-                        requestDiscount
-                      }
-                      disabled={
-                        discountSending
-                      }
+                      onClick={requestDiscount}
+                      disabled={discountSending}
                       style={{
                         ...styles.discountButton,
 
@@ -1359,59 +837,35 @@ export default function GuestMessagesPage() {
                   </div>
 
                   {notice && (
-                    <div
-                      style={
-                        styles.noticeBox
-                      }
-                    >
-                      {
-                        notice
-                      }
+                    <div style={styles.noticeBox}>
+                      {notice}
                     </div>
                   )}
 
                   {error && (
-                    <div
-                      style={
-                        styles.errorBox
-                      }
-                    >
-                      {
-                        error
-                      }
+                    <div style={styles.errorBox}>
+                      {error}
                     </div>
                   )}
 
                   <form
-                    onSubmit={
-                      sendMessage
-                    }
-                    style={
-                      styles.messageComposer
-                    }
+                    onSubmit={sendMessage}
+                    style={styles.messageComposer}
                   >
                     <textarea
-                      value={
-                        messageText
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                      value={messageText}
+                      onChange={(event) =>
                         setMessageText(
                           event.target.value
                         )
                       }
                       placeholder="Write a message to the host..."
-                      style={
-                        styles.messageInput
-                      }
+                      style={styles.messageInput}
                     />
 
                     <button
                       type="submit"
-                      disabled={
-                        sending
-                      }
+                      disabled={sending}
                       style={{
                         ...styles.sendButton,
 
@@ -1440,20 +894,17 @@ const styles = {
     minHeight: '100vh',
     background: '#f5f7fb',
     color: '#0b2447',
-    fontFamily:
-      'Arial, sans-serif',
+    fontFamily: 'Arial, sans-serif',
   },
 
   header: {
     minHeight: 74,
     padding: '10px 5%',
     background: '#ffffff',
-    borderBottom:
-      '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
     display: 'flex',
     alignItems: 'center',
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
     gap: 20,
     position: 'sticky',
     top: 0,
@@ -1470,8 +921,7 @@ const styles = {
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent:
-      'flex-end',
+    justifyContent: 'flex-end',
     gap: 22,
     flexWrap: 'wrap',
   },
@@ -1504,8 +954,7 @@ const styles = {
     alignItems: 'center',
     gap: 12,
     paddingLeft: 18,
-    borderLeft:
-      '1px solid #e5e7eb',
+    borderLeft: '1px solid #e5e7eb',
   },
 
   loggedInLabel: {
@@ -1523,8 +972,7 @@ const styles = {
   },
 
   logoutButton: {
-    border:
-      '1px solid #d0d5dd',
+    border: '1px solid #d0d5dd',
     background: '#ffffff',
     color: '#0b2447',
     padding: '8px 13px',
@@ -1537,14 +985,12 @@ const styles = {
     width: '92%',
     maxWidth: 1220,
     margin: '0 auto',
-    padding:
-      '30px 0 60px',
+    padding: '30px 0 60px',
   },
 
   pageHeader: {
     display: 'flex',
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 20,
     marginBottom: 22,
@@ -1577,32 +1023,28 @@ const styles = {
       '310px minmax(0, 1fr)',
     minHeight: 650,
     background: '#ffffff',
-    border:
-      '1px solid #dfe3e8',
+    border: '1px solid #dfe3e8',
     borderRadius: 16,
     overflow: 'hidden',
   },
 
   conversationList: {
-    borderRight:
-      '1px solid #dfe3e8',
+    borderRight: '1px solid #dfe3e8',
     maxHeight: 760,
     overflowY: 'auto',
     background: '#ffffff',
   },
 
   listHeading: {
-    padding: '16px',
+    padding: 16,
     fontWeight: 800,
-    borderBottom:
-      '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
   },
 
   conversationButton: {
     width: '100%',
     border: 0,
-    borderBottom:
-      '1px solid #edf0f4',
+    borderBottom: '1px solid #edf0f4',
     background: '#ffffff',
     padding: 15,
     textAlign: 'left',
@@ -1613,8 +1055,7 @@ const styles = {
 
   activeConversation: {
     background: '#edf4ff',
-    borderLeft:
-      '4px solid #174f91',
+    borderLeft: '4px solid #174f91',
   },
 
   bookingCode: {
@@ -1635,8 +1076,7 @@ const styles = {
   bookingStatus: {
     fontSize: 11,
     color: '#667085',
-    textTransform:
-      'capitalize',
+    textTransform: 'capitalize',
   },
 
   chatPanel: {
@@ -1649,11 +1089,9 @@ const styles = {
   chatHeader: {
     padding: 18,
     background: '#ffffff',
-    borderBottom:
-      '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
     display: 'flex',
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 16,
   },
@@ -1683,8 +1121,7 @@ const styles = {
     gap: 10,
     padding: 14,
     background: '#ffffff',
-    borderBottom:
-      '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
   },
 
   priceLabel: {
@@ -1692,8 +1129,7 @@ const styles = {
     marginBottom: 5,
     color: '#667085',
     fontSize: 10,
-    textTransform:
-      'uppercase',
+    textTransform: 'uppercase',
     fontWeight: 700,
   },
 
@@ -1734,20 +1170,22 @@ const styles = {
 
   guestBubble: {
     background: '#e8f1ff',
-    border:
-      '1px solid #c6dbff',
+    border: '1px solid #c6dbff',
   },
 
   hostBubble: {
     background: '#ffffff',
-    border:
-      '1px solid #e1e5ea',
+    border: '1px solid #e1e5ea',
   },
 
   discountRequestBubble: {
     background: '#fff6df',
-    border:
-      '1px solid #efd493',
+    border: '1px solid #efd493',
+  },
+
+  specialOfferBubble: {
+    background: '#ecfdf3',
+    border: '1px solid #9adbb0',
   },
 
   messageSender: {
@@ -1769,12 +1207,10 @@ const styles = {
   },
 
   discountRequestCard: {
-    margin:
-      '0 18px 14px',
+    margin: '0 18px 14px',
     padding: 14,
     background: '#fffaf0',
-    border:
-      '1px solid #efd493',
+    border: '1px solid #efd493',
     borderRadius: 12,
     display: 'grid',
     gap: 10,
@@ -1794,12 +1230,10 @@ const styles = {
 
   discountTextarea: {
     width: '100%',
-    boxSizing:
-      'border-box',
+    boxSizing: 'border-box',
     minHeight: 70,
     resize: 'vertical',
-    border:
-      '1px solid #dcc57e',
+    border: '1px solid #dcc57e',
     borderRadius: 9,
     padding: 10,
     fontSize: 13,
@@ -1818,8 +1252,7 @@ const styles = {
   },
 
   noticeBox: {
-    margin:
-      '0 18px 12px',
+    margin: '0 18px 12px',
     padding: 11,
     borderRadius: 9,
     background: '#eaf7ee',
@@ -1829,8 +1262,7 @@ const styles = {
   },
 
   errorBox: {
-    margin:
-      '0 18px 12px',
+    margin: '0 18px 12px',
     padding: 11,
     borderRadius: 9,
     background: '#fdeaea',
@@ -1841,23 +1273,19 @@ const styles = {
 
   messageComposer: {
     display: 'grid',
-    gridTemplateColumns:
-      '1fr auto',
+    gridTemplateColumns: '1fr auto',
     gap: 10,
     padding: 18,
-    borderTop:
-      '1px solid #e5e7eb',
+    borderTop: '1px solid #e5e7eb',
     background: '#ffffff',
   },
 
   messageInput: {
     width: '100%',
-    boxSizing:
-      'border-box',
+    boxSizing: 'border-box',
     minHeight: 60,
     resize: 'vertical',
-    border:
-      '1px solid #cfd6df',
+    border: '1px solid #cfd6df',
     borderRadius: 9,
     padding: 11,
     fontSize: 13,
@@ -1882,16 +1310,14 @@ const styles = {
 
   emptyCard: {
     background: '#ffffff',
-    border:
-      '1px solid #e5e7eb',
+    border: '1px solid #e5e7eb',
     borderRadius: 14,
     padding: 28,
     textAlign: 'center',
   },
 
   primaryLink: {
-    display:
-      'inline-block',
+    display: 'inline-block',
     marginTop: 10,
     color: '#ffffff',
     background: '#174f91',
@@ -1904,8 +1330,7 @@ const styles = {
   centerBox: {
     width: '90%',
     maxWidth: 600,
-    margin:
-      '100px auto',
+    margin: '100px auto',
     background: '#ffffff',
     borderRadius: 14,
     padding: 30,
