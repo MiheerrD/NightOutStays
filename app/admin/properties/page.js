@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+
 import PropertyPhotoManager from './PropertyPhotoManager';
 import PropertyDiscountManager from './PropertyDiscountManager';
 import PropertyCalendarManager from './PropertyCalendarManager';
@@ -11,7 +12,7 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-const commonKitchenFeatures = [
+const kitchenOptions = [
   'Gas Stove',
   'Induction',
   'Microwave',
@@ -24,7 +25,7 @@ const commonKitchenFeatures = [
   'Toaster',
 ];
 
-const commonAmenities = [
+const amenityOptions = [
   'Wi-Fi',
   'Free Parking',
   'Covered Parking',
@@ -45,6 +46,7 @@ const commonAmenities = [
 
 const emptyForm = {
   id: '',
+
   name: '',
   slug: '',
   short_description: '',
@@ -55,6 +57,10 @@ const emptyForm = {
 
   bedrooms: 1,
   bathrooms: 1,
+
+  queen_bed_count: 0,
+  single_bed_count: 0,
+  sofa_cum_bed_count: 0,
 
   min_guests: 1,
   included_guests: 4,
@@ -72,18 +78,15 @@ const emptyForm = {
   check_out_time: '11:00',
   late_checkout_hourly_fee: 0,
 
-  fridge_available: false,
-  tv_available: false,
-  washing_machine_available: false,
   wifi_available: false,
+  tv_available: false,
+  fridge_available: false,
+  washing_machine_available: false,
 
   ac_available: false,
   ac_count: 0,
 
   water_heater_count: 0,
-  sofa_cum_bed_count: 0,
-  single_bed_count: 0,
-  queen_bed_count: 0,
 
   pets_allowed: false,
   parties_allowed: false,
@@ -95,265 +98,405 @@ const emptyForm = {
   quiet_hours_start: '22:00',
   quiet_hours_end: '07:00',
 
+  kitchen_features: [],
+  amenities: [],
+  features: [],
+
+  house_rules_text: '',
+  direction_instructions: '',
+
   dynamic_pricing_enabled: false,
+
   weekend_markup_percent: 0,
   long_weekend_markup_percent: 0,
   festival_markup_percent: 0,
   season_markup_percent: 0,
 
-  direction_instructions: '',
-
-  features: [],
-  amenities: [],
-  kitchen_features: [],
-  house_rules_text: '',
-
   is_active: true,
 };
 
-function slugify(text) {
-  return String(text || '')
+function numberValue(value, fallback = 0) {
+  const result = Number(value);
+
+  return Number.isNaN(result)
+    ? fallback
+    : result;
+}
+
+function slugify(value) {
+  return String(value || '')
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
 
-function toNumber(value, fallback = 0) {
-  const result = Number(value);
+function normalizeProperty(property) {
+  return {
+    ...emptyForm,
+    ...property,
 
-  if (Number.isNaN(result)) {
-    return fallback;
-  }
+    check_in_time:
+      property?.check_in_time?.slice(
+        0,
+        5
+      ) || '14:00',
 
-  return result;
+    check_out_time:
+      property?.check_out_time?.slice(
+        0,
+        5
+      ) || '11:00',
+
+    quiet_hours_start:
+      property?.quiet_hours_start?.slice(
+        0,
+        5
+      ) || '22:00',
+
+    quiet_hours_end:
+      property?.quiet_hours_end?.slice(
+        0,
+        5
+      ) || '07:00',
+
+    amenities:
+      Array.isArray(
+        property?.amenities
+      )
+        ? property.amenities
+        : [],
+
+    kitchen_features:
+      Array.isArray(
+        property?.kitchen_features
+      )
+        ? property.kitchen_features
+        : [],
+
+    features:
+      Array.isArray(
+        property?.features
+      )
+        ? property.features
+        : [],
+
+    house_rules_text:
+      Array.isArray(
+        property?.house_rules
+      )
+        ? property.house_rules.join(
+            '\n'
+          )
+        : '',
+  };
 }
 
 export default function AdminPropertiesPage() {
-  const [checkingSession, setCheckingSession] =
-    useState(true);
+  const [
+    checkingSession,
+    setCheckingSession,
+  ] = useState(true);
 
-  const [session, setSession] =
-    useState(null);
+  const [
+    session,
+    setSession,
+  ] = useState(null);
 
-  const [adminProfile, setAdminProfile] =
-    useState(null);
+  const [
+    adminProfile,
+    setAdminProfile,
+  ] = useState(null);
 
-  const [properties, setProperties] =
-    useState([]);
+  const [
+    properties,
+    setProperties,
+  ] = useState([]);
 
-  const [form, setForm] =
-    useState(emptyForm);
+  const [
+    form,
+    setForm,
+  ] = useState(emptyForm);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [
+    loadingProperties,
+    setLoadingProperties,
+  ] = useState(false);
 
-  const [loadingProperties, setLoadingProperties] =
-    useState(false);
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState('');
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
 
-  const [successMessage, setSuccessMessage] =
-    useState('');
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState('');
 
   useEffect(() => {
     startPage();
   }, []);
 
   async function startPage() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      const {
+        data: {
+          session,
+        },
+        error,
+      } =
+        await supabase.auth.getSession();
 
-    setSession(session);
-    setCheckingSession(false);
+      if (error) {
+        throw error;
+      }
 
-    if (!session) {
-      return;
-    }
+      setSession(session);
 
-    await verifyAdmin(session.user.id);
-  }
+      if (!session) {
+        return;
+      }
 
-  async function verifyAdmin(userId) {
-    const { data, error } = await supabase
-      .from('admin_profiles')
-      .select(
-        'user_id, full_name, role, is_active'
-      )
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single();
+      const {
+        data: profile,
+        error:
+          profileError,
+      } =
+        await supabase
+          .from(
+            'admin_profiles'
+          )
+          .select(
+            'user_id, full_name, role, is_active'
+          )
+          .eq(
+            'user_id',
+            session.user.id
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .single();
 
-    if (error || !data) {
-      setErrorMessage(
-        'This account does not have permission to manage properties.'
+      if (
+        profileError ||
+        !profile
+      ) {
+        throw new Error(
+          'This account does not have permission to manage properties.'
+        );
+      }
+
+      setAdminProfile(
+        profile
       );
 
-      return;
+      await loadProperties();
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setErrorMessage(
+        error.message ||
+          'Unable to open property management.'
+      );
+    } finally {
+      setCheckingSession(
+        false
+      );
     }
-
-    setAdminProfile(data);
-
-    await loadProperties();
   }
 
   async function loadProperties() {
-    setLoadingProperties(true);
+    setLoadingProperties(
+      true
+    );
 
-    const { data, error } = await supabase
-      .from('properties')
-      .select('*')
-      .order('created_at', {
-        ascending: false,
-      });
+    try {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            'properties'
+          )
+          .select('*')
+          .order(
+            'created_at',
+            {
+              ascending:
+                false,
+            }
+          );
 
-    setLoadingProperties(false);
+      if (error) {
+        throw error;
+      }
 
-    if (error) {
-      setErrorMessage(
-        `Unable to load properties: ${error.message}`
+      setProperties(
+        data || []
       );
-
-      return;
+    } catch (error) {
+      setErrorMessage(
+        `Unable to load properties: ${
+          error.message
+        }`
+      );
+    } finally {
+      setLoadingProperties(
+        false
+      );
     }
-
-    setProperties(data || []);
   }
 
-  function updateField(field, value) {
-    setForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-
-    setErrorMessage('');
-    setSuccessMessage('');
-  }
-
-  function toggleListItem(field, item) {
-    setForm((previous) => {
-      const current = previous[field] || [];
-
-      const exists =
-        current.includes(item);
-
-      return {
+  function updateField(
+    field,
+    value
+  ) {
+    setForm(
+      (previous) => ({
         ...previous,
+        [field]: value,
+      })
+    );
 
-        [field]: exists
-          ? current.filter(
-              (value) => value !== item
+    setErrorMessage('');
+    setSuccessMessage('');
+  }
+
+  function toggleArrayItem(
+    field,
+    value
+  ) {
+    setForm(
+      (previous) => {
+        const existing =
+          Array.isArray(
+            previous[
+              field
+            ]
+          )
+            ? previous[
+                field
+              ]
+            : [];
+
+        return {
+          ...previous,
+
+          [field]:
+            existing.includes(
+              value
             )
-          : [...current, item],
-      };
-    });
+              ? existing.filter(
+                  (item) =>
+                    item !==
+                    value
+                )
+              : [
+                  ...existing,
+                  value,
+                ],
+        };
+      }
+    );
   }
 
-  function newProperty() {
-    setForm(emptyForm);
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  }
-
-  function editProperty(property) {
-    setErrorMessage('');
-    setSuccessMessage('');
-
+  function startNewProperty() {
     setForm({
       ...emptyForm,
-      ...property,
-
-      check_in_time:
-        property.check_in_time?.slice(0, 5) ||
-        '14:00',
-
-      check_out_time:
-        property.check_out_time?.slice(0, 5) ||
-        '11:00',
-
-      quiet_hours_start:
-        property.quiet_hours_start?.slice(
-          0,
-          5
-        ) || '22:00',
-
-      quiet_hours_end:
-        property.quiet_hours_end?.slice(
-          0,
-          5
-        ) || '07:00',
-
-      features:
-        Array.isArray(property.features)
-          ? property.features
-          : [],
-
-      amenities:
-        Array.isArray(property.amenities)
-          ? property.amenities
-          : [],
-
-      kitchen_features:
-        Array.isArray(
-          property.kitchen_features
-        )
-          ? property.kitchen_features
-          : [],
-
-      house_rules_text:
-        Array.isArray(
-          property.house_rules
-        )
-          ? property.house_rules.join('\n')
-          : '',
     });
+
+    setErrorMessage('');
+    setSuccessMessage('');
 
     window.scrollTo({
       top: 0,
-      behavior: 'smooth',
+      behavior:
+        'smooth',
     });
   }
 
-  async function saveProperty(event) {
+  function editProperty(
+    property
+  ) {
+    setForm(
+      normalizeProperty(
+        property
+      )
+    );
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    window.scrollTo({
+      top: 0,
+      behavior:
+        'smooth',
+    });
+  }
+
+  async function saveProperty(
+    event
+  ) {
     event.preventDefault();
 
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!form.name.trim()) {
+    if (
+      !form.name.trim()
+    ) {
       setErrorMessage(
         'Property name is required.'
       );
+
       return;
     }
 
-    if (!form.location_name.trim()) {
+    if (
+      !form.location_name.trim()
+    ) {
       setErrorMessage(
         'Location is required.'
       );
+
       return;
     }
 
     const minGuests =
-      toNumber(form.min_guests, 1);
+      numberValue(
+        form.min_guests,
+        1
+      );
 
     const includedGuests =
-      toNumber(form.included_guests, 1);
+      numberValue(
+        form.included_guests,
+        1
+      );
 
     const maxGuests =
-      toNumber(form.max_guests, 1);
+      numberValue(
+        form.max_guests,
+        1
+      );
 
-    if (minGuests < 1) {
+    if (
+      minGuests < 1
+    ) {
       setErrorMessage(
         'Minimum guests must be at least 1.'
       );
+
       return;
     }
 
@@ -362,8 +505,9 @@ export default function AdminPropertiesPage() {
       minGuests
     ) {
       setErrorMessage(
-        'Guests included in base price cannot be less than minimum guests.'
+        'Guests included in base price cannot be lower than minimum guests.'
       );
+
       return;
     }
 
@@ -374,6 +518,7 @@ export default function AdminPropertiesPage() {
       setErrorMessage(
         'Guests included in base price cannot exceed maximum guests.'
       );
+
       return;
     }
 
@@ -382,86 +527,102 @@ export default function AdminPropertiesPage() {
       minGuests
     ) {
       setErrorMessage(
-        'Maximum guests cannot be less than minimum guests.'
+        'Maximum guests cannot be lower than minimum guests.'
       );
+
       return;
     }
 
-    const minNights =
-      toNumber(
+    const minStay =
+      numberValue(
         form.min_stay_nights,
         1
       );
 
-    const maxNights =
-      toNumber(
+    const maxStay =
+      numberValue(
         form.max_stay_nights,
         30
       );
 
     if (
-      minNights < 1
+      minStay < 1
     ) {
       setErrorMessage(
         'Minimum stay must be at least one night.'
       );
+
       return;
     }
 
     if (
-      maxNights <
-      minNights
+      maxStay <
+      minStay
     ) {
       setErrorMessage(
         'Maximum stay cannot be lower than minimum stay.'
       );
+
       return;
     }
 
-    const slug =
-      form.slug?.trim() ||
-      slugify(form.name);
-
     const houseRules =
       String(
-        form.house_rules_text || ''
+        form.house_rules_text ||
+          ''
       )
         .split('\n')
-        .map((rule) =>
-          rule.trim()
+        .map(
+          (item) =>
+            item.trim()
         )
         .filter(Boolean);
 
-    const featureList = [
-      ...form.features,
+    const automaticFeatures = [
+      'Wi-Fi',
+      'TV',
+      'Fridge',
+      'Washing Machine',
+      'Air Conditioning',
     ];
 
+    const featureList =
+      (
+        form.features ||
+        []
+      ).filter(
+        (item) =>
+          !automaticFeatures.includes(
+            item
+          )
+      );
+
     if (
-      form.wifi_available &&
-      !featureList.includes('Wi-Fi')
+      form.wifi_available
     ) {
-      featureList.push('Wi-Fi');
+      featureList.push(
+        'Wi-Fi'
+      );
     }
 
     if (
-      form.tv_available &&
-      !featureList.includes('TV')
+      form.tv_available
     ) {
-      featureList.push('TV');
+      featureList.push(
+        'TV'
+      );
     }
 
     if (
-      form.fridge_available &&
-      !featureList.includes('Fridge')
+      form.fridge_available
     ) {
-      featureList.push('Fridge');
+      featureList.push(
+        'Fridge'
+      );
     }
 
     if (
-      form.washing_machine_available &&
-      !featureList.includes(
-        'Washing Machine'
-      )
+      form.washing_machine_available
     ) {
       featureList.push(
         'Washing Machine'
@@ -469,10 +630,7 @@ export default function AdminPropertiesPage() {
     }
 
     if (
-      form.ac_available &&
-      !featureList.includes(
-        'Air Conditioning'
-      )
+      form.ac_available
     ) {
       featureList.push(
         'Air Conditioning'
@@ -483,7 +641,11 @@ export default function AdminPropertiesPage() {
       name:
         form.name.trim(),
 
-      slug,
+      slug:
+        form.slug.trim() ||
+        slugify(
+          form.name
+        ),
 
       short_description:
         form.short_description?.trim() ||
@@ -505,15 +667,30 @@ export default function AdminPropertiesPage() {
         '',
 
       bedrooms:
-        toNumber(
+        numberValue(
           form.bedrooms,
           1
         ),
 
       bathrooms:
-        toNumber(
+        numberValue(
           form.bathrooms,
           1
+        ),
+
+      queen_bed_count:
+        numberValue(
+          form.queen_bed_count
+        ),
+
+      single_bed_count:
+        numberValue(
+          form.single_bed_count
+        ),
+
+      sofa_cum_bed_count:
+        numberValue(
+          form.sofa_cum_bed_count
         ),
 
       min_guests:
@@ -526,34 +703,30 @@ export default function AdminPropertiesPage() {
         maxGuests,
 
       base_price:
-        toNumber(
-          form.base_price,
-          0
+        numberValue(
+          form.base_price
         ),
 
       extra_guest_fee:
-        toNumber(
-          form.extra_guest_fee,
-          0
+        numberValue(
+          form.extra_guest_fee
         ),
 
       cleaning_fee:
-        toNumber(
-          form.cleaning_fee,
-          0
+        numberValue(
+          form.cleaning_fee
         ),
 
       security_deposit:
-        toNumber(
-          form.security_deposit,
-          0
+        numberValue(
+          form.security_deposit
         ),
 
       min_stay_nights:
-        minNights,
+        minStay,
 
       max_stay_nights:
-        maxNights,
+        maxStay,
 
       check_in_time:
         form.check_in_time,
@@ -562,30 +735,13 @@ export default function AdminPropertiesPage() {
         form.check_out_time,
 
       late_checkout_hourly_fee:
-        toNumber(
-          form.late_checkout_hourly_fee,
-          0
+        numberValue(
+          form.late_checkout_hourly_fee
         ),
 
-      features:
-        featureList,
-
-      amenities:
-        form.amenities,
-
-      kitchen_features:
-        form.kitchen_features,
-
-      house_rules:
-        houseRules,
-
-      direction_instructions:
-        form.direction_instructions?.trim() ||
-        '',
-
-      fridge_available:
+      wifi_available:
         Boolean(
-          form.fridge_available
+          form.wifi_available
         ),
 
       tv_available:
@@ -593,14 +749,14 @@ export default function AdminPropertiesPage() {
           form.tv_available
         ),
 
+      fridge_available:
+        Boolean(
+          form.fridge_available
+        ),
+
       washing_machine_available:
         Boolean(
           form.washing_machine_available
-        ),
-
-      wifi_available:
-        Boolean(
-          form.wifi_available
         ),
 
       ac_available:
@@ -610,34 +766,14 @@ export default function AdminPropertiesPage() {
 
       ac_count:
         form.ac_available
-          ? toNumber(
-              form.ac_count,
-              0
+          ? numberValue(
+              form.ac_count
             )
           : 0,
 
       water_heater_count:
-        toNumber(
-          form.water_heater_count,
-          0
-        ),
-
-      sofa_cum_bed_count:
-        toNumber(
-          form.sofa_cum_bed_count,
-          0
-        ),
-
-      single_bed_count:
-        toNumber(
-          form.single_bed_count,
-          0
-        ),
-
-      queen_bed_count:
-        toNumber(
-          form.queen_bed_count,
-          0
+        numberValue(
+          form.water_heater_count
         ),
 
       pets_allowed:
@@ -680,33 +816,51 @@ export default function AdminPropertiesPage() {
           ? form.quiet_hours_end
           : null,
 
+      kitchen_features:
+        form.kitchen_features ||
+        [],
+
+      amenities:
+        form.amenities ||
+        [],
+
+      features:
+        [
+          ...new Set(
+            featureList
+          ),
+        ],
+
+      house_rules:
+        houseRules,
+
+      direction_instructions:
+        form.direction_instructions?.trim() ||
+        '',
+
       dynamic_pricing_enabled:
         Boolean(
           form.dynamic_pricing_enabled
         ),
 
       weekend_markup_percent:
-        toNumber(
-          form.weekend_markup_percent,
-          0
+        numberValue(
+          form.weekend_markup_percent
         ),
 
       long_weekend_markup_percent:
-        toNumber(
-          form.long_weekend_markup_percent,
-          0
+        numberValue(
+          form.long_weekend_markup_percent
         ),
 
       festival_markup_percent:
-        toNumber(
-          form.festival_markup_percent,
-          0
+        numberValue(
+          form.festival_markup_percent
         ),
 
       season_markup_percent:
-        toNumber(
-          form.season_markup_percent,
-          0
+        numberValue(
+          form.season_markup_percent
         ),
 
       is_active:
@@ -721,86 +875,79 @@ export default function AdminPropertiesPage() {
     setSaving(true);
 
     try {
-      let propertyId =
-        form.id;
+      let savedProperty;
 
       if (form.id) {
         const {
           data,
           error,
-        } = await supabase
-          .from('properties')
-          .update(payload)
-          .eq(
-            'id',
-            form.id
-          )
-          .select('id')
-          .single();
+        } =
+          await supabase
+            .from(
+              'properties'
+            )
+            .update(
+              payload
+            )
+            .eq(
+              'id',
+              form.id
+            )
+            .select('*')
+            .single();
 
         if (error) {
           throw error;
         }
 
-        propertyId =
-          data.id;
-      } else {
-        const {
-          data,
-          error,
-        } = await supabase
-          .from('properties')
-          .insert(payload)
-          .select('id')
-          .single();
+        savedProperty =
+          data;
 
-        if (error) {
-          throw error;
-        }
-
-        propertyId =
-          data.id;
-      }
-
-      await loadProperties();
-
-      if (form.id) {
         setSuccessMessage(
           'Property updated successfully.'
         );
       } else {
-        setSuccessMessage(
-          'Property created successfully. Click Edit Property to add photos, discounts and calendar rates.'
-        );
+        const {
+          data,
+          error,
+        } =
+          await supabase
+            .from(
+              'properties'
+            )
+            .insert(
+              payload
+            )
+            .select('*')
+            .single();
 
-        const createdProperty =
-          properties.find(
-            (item) =>
-              item.id ===
-              propertyId
-          );
-
-        setForm({
-          ...emptyForm,
-          id: propertyId,
-          name:
-            form.name,
-          location_name:
-            form.location_name,
-        });
-
-        if (createdProperty) {
-          editProperty(
-            createdProperty
-          );
+        if (error) {
+          throw error;
         }
+
+        savedProperty =
+          data;
+
+        setSuccessMessage(
+          'Property created successfully. You can now manage photos, discounts and calendar rates.'
+        );
       }
+
+      setForm(
+        normalizeProperty(
+          savedProperty
+        )
+      );
+
+      await loadProperties();
     } catch (error) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       setErrorMessage(
         `Unable to save property: ${
-          error?.message ||
+          error.message ||
           'Unknown error'
         }`
       );
@@ -809,34 +956,57 @@ export default function AdminPropertiesPage() {
     }
   }
 
-  async function toggleProperty(property) {
+  async function toggleProperty(
+    property
+  ) {
     setErrorMessage('');
 
-    const {
-      error,
-    } = await supabase
-      .from('properties')
-      .update({
-        is_active:
-          !property.is_active,
+    try {
+      const {
+        error,
+      } =
+        await supabase
+          .from(
+            'properties'
+          )
+          .update({
+            is_active:
+              !property.is_active,
 
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq(
-        'id',
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            'id',
+            property.id
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      await loadProperties();
+
+      if (
+        form.id ===
         property.id
-      );
+      ) {
+        setForm(
+          (previous) => ({
+            ...previous,
 
-    if (error) {
+            is_active:
+              !property.is_active,
+          })
+        );
+      }
+    } catch (error) {
       setErrorMessage(
-        `Unable to update property status: ${error.message}`
+        `Unable to update property status: ${
+          error.message
+        }`
       );
-
-      return;
     }
-
-    await loadProperties();
   }
 
   async function logout() {
@@ -879,7 +1049,7 @@ export default function AdminPropertiesPage() {
               styles.primaryLink
             }
           >
-            Go to Admin Login
+            Go to Admin
           </a>
         </div>
       </main>
@@ -899,25 +1069,41 @@ export default function AdminPropertiesPage() {
           </div>
         </div>
 
-        <button
-          onClick={logout}
-          style={styles.logout}
-        >
-          Logout
-        </button>
+        <div style={styles.headerRight}>
+          <div>
+            <strong>
+              {adminProfile.full_name ||
+                'Admin'}
+            </strong>
+
+            <div style={styles.roleText}>
+              {adminProfile.role ||
+                'admin'}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={logout}
+            style={styles.logout}
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       <section style={styles.content}>
         <div style={styles.topRow}>
           <div>
-            <h1>
+            <h1 style={styles.pageTitle}>
               {form.id
                 ? 'Edit Property'
                 : 'Add New Property'}
             </h1>
 
             <p style={styles.muted}>
-              Manage property information, pricing, guest capacity, facilities, rules, photos, discounts and the availability calendar.
+              Manage property details, pricing, photos,
+              discounts, availability and calendar rates.
             </p>
           </div>
 
@@ -925,7 +1111,7 @@ export default function AdminPropertiesPage() {
             <button
               type="button"
               onClick={
-                newProperty
+                startNewProperty
               }
               style={
                 styles.secondaryButton
@@ -942,11 +1128,9 @@ export default function AdminPropertiesPage() {
           }
         >
           <Section title="Basic Property Information">
-            <Field
+            <TextField
               label="PROPERTY NAME"
-              value={
-                form.name
-              }
+              value={form.name}
               onChange={(value) =>
                 updateField(
                   'name',
@@ -955,7 +1139,7 @@ export default function AdminPropertiesPage() {
               }
             />
 
-            <Field
+            <TextField
               label="LOCATION"
               value={
                 form.location_name
@@ -968,21 +1152,19 @@ export default function AdminPropertiesPage() {
               }
             />
 
-            <Field
+            <TextField
               label="PROPERTY URL SLUG"
-              value={
-                form.slug
-              }
+              value={form.slug}
+              placeholder="Leave blank to generate automatically"
               onChange={(value) =>
                 updateField(
                   'slug',
                   value
                 )
               }
-              placeholder="Leave blank to generate automatically"
             />
 
-            <Field
+            <TextField
               label="GOOGLE MAPS LINK"
               value={
                 form.google_maps_url
@@ -997,9 +1179,7 @@ export default function AdminPropertiesPage() {
 
             <TextArea
               label="FULL ADDRESS"
-              value={
-                form.address
-              }
+              value={form.address}
               onChange={(value) =>
                 updateField(
                   'address',
@@ -1038,9 +1218,7 @@ export default function AdminPropertiesPage() {
           <Section title="Rooms, Beds & Capacity">
             <NumberField
               label="BEDROOMS"
-              value={
-                form.bedrooms
-              }
+              value={form.bedrooms}
               onChange={(value) =>
                 updateField(
                   'bedrooms',
@@ -1195,18 +1373,18 @@ export default function AdminPropertiesPage() {
             />
 
             <div style={styles.infoBox}>
-              ₹
-              {toNumber(
+              Base rate ₹
+              {numberValue(
                 form.base_price
               ).toLocaleString(
                 'en-IN'
               )}{' '}
-              includes up to{' '}
+              includes{' '}
               <strong>
                 {form.included_guests}
               </strong>{' '}
-              guests. Extra guest charge ₹
-              {toNumber(
+              guest(s). Extra guest charge ₹
+              {numberValue(
                 form.extra_guest_fee
               ).toLocaleString(
                 'en-IN'
@@ -1380,15 +1558,15 @@ export default function AdminPropertiesPage() {
           <Section title="Kitchen Features">
             <CheckboxGrid
               items={
-                commonKitchenFeatures
+                kitchenOptions
               }
               selected={
                 form.kitchen_features
               }
-              onToggle={(item) =>
-                toggleListItem(
+              onToggle={(value) =>
+                toggleArrayItem(
                   'kitchen_features',
-                  item
+                  value
                 )
               }
             />
@@ -1397,15 +1575,15 @@ export default function AdminPropertiesPage() {
           <Section title="Amenities">
             <CheckboxGrid
               items={
-                commonAmenities
+                amenityOptions
               }
               selected={
                 form.amenities
               }
-              onToggle={(item) =>
-                toggleListItem(
+              onToggle={(value) =>
+                toggleArrayItem(
                   'amenities',
-                  item
+                  value
                 )
               }
             />
@@ -1478,7 +1656,7 @@ export default function AdminPropertiesPage() {
             />
 
             <Toggle
-              label="Noise / Quiet Hours"
+              label="Enable Quiet Hours"
               checked={
                 form.quiet_hours_enabled
               }
@@ -1521,7 +1699,7 @@ export default function AdminPropertiesPage() {
             )}
 
             <TextArea
-              label="OTHER HOUSE RULES — one rule per line"
+              label="OTHER HOUSE RULES — ONE PER LINE"
               value={
                 form.house_rules_text
               }
@@ -1662,178 +1840,196 @@ export default function AdminPropertiesPage() {
 
         {form.id && (
           <PropertyPhotoManager
-            propertyId={form.id}
-            propertyName={form.name}
+            propertyId={
+              form.id
+            }
+            propertyName={
+              form.name
+            }
           />
         )}
 
         {form.id && (
           <PropertyDiscountManager
-            propertyId={form.id}
-            propertyName={form.name}
+            propertyId={
+              form.id
+            }
+            propertyName={
+              form.name
+            }
           />
         )}
 
         {form.id && (
           <PropertyCalendarManager
-            propertyId={form.id}
-            propertyName={form.name}
+            propertyId={
+              form.id
+            }
+            propertyName={
+              form.name
+            }
           />
         )}
 
         <hr style={styles.separator} />
 
-        <section style={styles.listSection}>
-          <div style={styles.topRow}>
-            <div>
-              <h2>
-                Existing Properties
-              </h2>
+        <div style={styles.topRow}>
+          <div>
+            <h2 style={styles.pageTitle}>
+              Existing Properties
+            </h2>
 
-              <p style={styles.muted}>
-                Edit any property to manage details, photos,
-                discounts, availability and date-specific rates.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={loadProperties}
-              style={styles.secondaryButton}
-            >
-              Refresh
-            </button>
+            <p style={styles.muted}>
+              Select a property to manage its details,
+              photos, discounts, availability and rates.
+            </p>
           </div>
 
-          {loadingProperties ? (
-            <div style={styles.loading}>
-              Loading properties...
-            </div>
-          ) : properties.length === 0 ? (
-            <div style={styles.empty}>
-              No properties added yet.
-            </div>
-          ) : (
-            <div style={styles.propertyGrid}>
-              {properties.map(
-                (property) => (
-                  <article
-                    key={property.id}
-                    style={styles.propertyCard}
-                  >
-                    <div style={styles.cardTop}>
-                      <div>
-                        <h3 style={styles.propertyName}>
-                          {property.name}
-                        </h3>
+          <button
+            type="button"
+            onClick={
+              startNewProperty
+            }
+            style={
+              styles.secondaryButton
+            }
+          >
+            + Add Property
+          </button>
+        </div>
 
-                        <div style={styles.muted}>
-                          {property.location_name}
-                        </div>
+        {loadingProperties ? (
+          <div style={styles.loading}>
+            Loading properties...
+          </div>
+        ) : properties.length ===
+          0 ? (
+          <div style={styles.empty}>
+            No properties found.
+          </div>
+        ) : (
+          <div style={styles.propertyGrid}>
+            {properties.map(
+              (property) => (
+                <article
+                  key={
+                    property.id
+                  }
+                  style={
+                    styles.propertyCard
+                  }
+                >
+                  <div style={styles.cardTop}>
+                    <div>
+                      <h3 style={styles.cardTitle}>
+                        {property.name}
+                      </h3>
+
+                      <div style={styles.muted}>
+                        {
+                          property.location_name
+                        }
                       </div>
-
-                      <span
-                        style={{
-                          ...styles.statusBadge,
-
-                          ...(property.is_active
-                            ? styles.activeBadge
-                            : styles.inactiveBadge),
-                        }}
-                      >
-                        {property.is_active
-                          ? 'Active'
-                          : 'Inactive'}
-                      </span>
                     </div>
 
-                    <div style={styles.propertyDetails}>
-                      <div>
-                        <strong>
-                          ₹
-                          {toNumber(
-                            property.base_price
-                          ).toLocaleString(
-                            'en-IN'
-                          )}
-                        </strong>
-                        {' / night'}
-                      </div>
+                    <span
+                      style={{
+                        ...styles.status,
 
-                      <div>
-                        {property.bedrooms || 0}
-                        {' Bedrooms · '}
-                        {property.bathrooms || 0}
-                        {' Bathrooms'}
-                      </div>
-
-                      <div>
-                        Up to{' '}
-                        {property.max_guests || 0}
-                        {' guests'}
-                      </div>
-
-                      <div>
-                        Base price includes{' '}
-                        {property.included_guests || 0}
-                        {' guests'}
-                      </div>
-
-                      {property.dynamic_pricing_enabled && (
-                        <div style={styles.dynamicTag}>
-                          Dynamic Pricing Active
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={styles.cardActions}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          editProperty(
-                            property
-                          )
-                        }
-                        style={styles.editButton}
-                      >
-                        Edit Property
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleProperty(
-                            property
-                          )
-                        }
-                        style={
+                        background:
                           property.is_active
-                            ? styles.deactivateButton
-                            : styles.activateButton
+                            ? '#e7f7ec'
+                            : '#eeeeee',
+
+                        color:
+                          property.is_active
+                            ? '#24663a'
+                            : '#666666',
+                      }}
+                    >
+                      {property.is_active
+                        ? 'Active'
+                        : 'Inactive'}
+                    </span>
+                  </div>
+
+                  <div style={styles.cardPrice}>
+                    ₹
+                    {numberValue(
+                      property.base_price
+                    ).toLocaleString(
+                      'en-IN'
+                    )}
+                    {' / night'}
+                  </div>
+
+                  <div style={styles.small}>
+                    Base price includes{' '}
+                    {property.included_guests}{' '}
+                    guest(s)
+                  </div>
+
+                  <div style={styles.small}>
+                    Maximum{' '}
+                    {property.max_guests}{' '}
+                    guests
+                  </div>
+
+                  {property.dynamic_pricing_enabled && (
+                    <div style={styles.dynamicBadge}>
+                      Dynamic Pricing Active
+                    </div>
+                  )}
+
+                  <div style={styles.cardButtons}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        editProperty(
+                          property
+                        )
+                      }
+                      style={
+                        styles.editButton
+                      }
+                    >
+                      Edit Property
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleProperty(
+                          property
+                        )
+                      }
+                      style={
+                        styles.statusButton
+                      }
+                    >
+                      {property.is_active
+                        ? 'Deactivate'
+                        : 'Activate'}
+                    </button>
+
+                    {property.slug && (
+                      <a
+                        href={`/property/${property.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={
+                          styles.viewButton
                         }
                       >
-                        {property.is_active
-                          ? 'Deactivate'
-                          : 'Activate'}
-                      </button>
-
-                      {property.slug && (
-                        <a
-                          href={`/property/${property.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.viewLink}
-                        >
-                          View Guest Page
-                        </a>
-                      )}
-                    </div>
-                  </article>
-                )
-              )}
-            </div>
-          )}
-        </section>
+                        View
+                      </a>
+                    )}
+                  </div>
+                </article>
+              )
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -1856,14 +2052,14 @@ function Section({
   );
 }
 
-function Field({
+function TextField({
   label,
   value,
   onChange,
   placeholder = '',
 }) {
   return (
-    <label style={styles.field}>
+    <label>
       <span style={styles.label}>
         {label}
       </span>
@@ -1871,12 +2067,12 @@ function Field({
       <input
         type="text"
         value={value ?? ''}
+        placeholder={placeholder}
         onChange={(event) =>
           onChange(
             event.target.value
           )
         }
-        placeholder={placeholder}
         style={styles.input}
       />
     </label>
@@ -1887,19 +2083,17 @@ function NumberField({
   label,
   value,
   onChange,
-  min = 0,
-  step = 1,
 }) {
   return (
-    <label style={styles.field}>
+    <label>
       <span style={styles.label}>
         {label}
       </span>
 
       <input
         type="number"
-        min={min}
-        step={step}
+        min="0"
+        step="0.01"
         value={value ?? ''}
         onChange={(event) =>
           onChange(
@@ -1918,7 +2112,7 @@ function TimeField({
   onChange,
 }) {
   return (
-    <label style={styles.field}>
+    <label>
       <span style={styles.label}>
         {label}
       </span>
@@ -1943,7 +2137,7 @@ function TextArea({
   onChange,
 }) {
   return (
-    <label style={styles.fullField}>
+    <label style={styles.fullWidth}>
       <span style={styles.label}>
         {label}
       </span>
@@ -1955,7 +2149,6 @@ function TextArea({
             event.target.value
           )
         }
-        rows={5}
         style={styles.textarea}
       />
     </label>
@@ -1968,12 +2161,12 @@ function Toggle({
   onChange,
 }) {
   return (
-    <label style={styles.toggleCard}>
+    <label style={styles.toggleRow}>
       <input
         type="checkbox"
-        checked={Boolean(
-          checked
-        )}
+        checked={
+          Boolean(checked)
+        }
         onChange={(event) =>
           onChange(
             event.target.checked
@@ -1994,13 +2187,15 @@ function CheckboxGrid({
   onToggle,
 }) {
   return (
-    <div style={styles.fullField}>
+    <div style={styles.fullWidth}>
       <div style={styles.checkboxGrid}>
         {items.map(
           (item) => (
             <label
               key={item}
-              style={styles.checkboxCard}
+              style={
+                styles.checkboxItem
+              }
             >
               <input
                 type="checkbox"
@@ -2029,391 +2224,572 @@ function CheckboxGrid({
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: '#f5f7fa',
-    color: '#11213c',
+    minHeight:
+      '100vh',
+
+    background:
+      '#f6f7f9',
+
+    color:
+      '#172033',
+
     fontFamily:
       'Arial, sans-serif',
   },
 
   header: {
-    background: '#ffffff',
-    borderBottom:
-      '1px solid #e1e5ea',
-    padding: '17px 3vw',
-    display: 'flex',
+    background:
+      '#ffffff',
+
+    padding:
+      '18px 5vw',
+
+    display:
+      'flex',
+
     justifyContent:
       'space-between',
-    alignItems: 'center',
-    gap: 20,
-    position: 'sticky',
-    top: 0,
-    zIndex: 20,
+
+    alignItems:
+      'center',
+
+    gap: 15,
+
+    borderBottom:
+      '1px solid #e4e6e9',
+  },
+
+  headerRight: {
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap: 16,
   },
 
   brand: {
-    fontSize: 25,
+    fontSize: 24,
     fontWeight: 900,
-    color: '#17457f',
+    color: '#163c74',
   },
 
-  muted: {
+  roleText: {
+    fontSize: 11,
     color: '#687080',
-    lineHeight: 1.5,
+    textTransform:
+      'capitalize',
   },
 
   logout: {
     border:
-      '1px solid #d6dae0',
-    background: '#ffffff',
-    color: '#11213c',
-    padding: '9px 15px',
+      '1px solid #dddddd',
+
+    background:
+      '#ffffff',
+
     borderRadius: 20,
-    cursor: 'pointer',
-    fontWeight: 700,
+
+    padding:
+      '9px 15px',
+
+    cursor:
+      'pointer',
   },
 
   content: {
-    maxWidth: 1450,
-    margin: '0 auto',
-    padding: '32px 3vw 80px',
+    maxWidth: 1400,
+
+    margin:
+      '0 auto',
+
+    padding:
+      '35px 5vw 80px',
+  },
+
+  pageTitle: {
+    marginTop: 0,
   },
 
   topRow: {
-    display: 'flex',
+    display:
+      'flex',
+
     justifyContent:
       'space-between',
-    alignItems: 'center',
+
+    alignItems:
+      'center',
+
+    flexWrap:
+      'wrap',
+
     gap: 20,
-    flexWrap: 'wrap',
+  },
+
+  muted: {
+    color:
+      '#687080',
+
+    lineHeight:
+      1.5,
   },
 
   section: {
     marginTop: 22,
-    padding: 22,
-    background: '#ffffff',
+
+    background:
+      '#ffffff',
+
+    padding: 24,
+
     border:
-      '1px solid #e1e5ea',
-    borderRadius: 15,
-    boxShadow:
-      '0 3px 12px rgba(0,0,0,0.03)',
+      '1px solid #e2e5e8',
+
+    borderRadius: 16,
   },
 
   sectionTitle: {
     marginTop: 0,
-    marginBottom: 18,
-    fontSize: 21,
-    color: '#11213c',
+    marginBottom: 20,
   },
 
   formGrid: {
-    display: 'grid',
+    display:
+      'grid',
+
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 16,
-    alignItems: 'start',
+      'repeat(auto-fit, minmax(230px, 1fr))',
+
+    gap: 18,
   },
 
-  field: {
-    display: 'block',
-  },
-
-  fullField: {
-    display: 'block',
-    gridColumn: '1 / -1',
+  fullWidth: {
+    gridColumn:
+      '1 / -1',
   },
 
   label: {
-    display: 'block',
-    marginBottom: 7,
+    display:
+      'block',
+
     fontSize: 10,
-    fontWeight: 900,
-    color: '#3d4653',
-    letterSpacing: 0.4,
+
+    fontWeight: 800,
+
+    letterSpacing: 1,
+
+    marginBottom: 6,
   },
 
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '11px 12px',
+    width:
+      '100%',
+
+    boxSizing:
+      'border-box',
+
+    padding: 12,
+
     border:
-      '1px solid #ccd2d9',
-    borderRadius: 9,
-    background: '#ffffff',
-    color: '#11213c',
-    fontSize: 14,
-    outline: 'none',
+      '1px solid #ccd1d7',
+
+    borderRadius: 10,
+
+    background:
+      '#ffffff',
   },
 
   textarea: {
-    width: '100%',
-    boxSizing: 'border-box',
+    width:
+      '100%',
+
+    boxSizing:
+      'border-box',
+
+    minHeight: 100,
+
     padding: 12,
+
     border:
-      '1px solid #ccd2d9',
-    borderRadius: 9,
-    background: '#ffffff',
-    color: '#11213c',
-    fontSize: 14,
-    resize: 'vertical',
-    lineHeight: 1.5,
-    outline: 'none',
+      '1px solid #ccd1d7',
+
+    borderRadius: 10,
+
+    resize:
+      'vertical',
   },
 
-  toggleCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 9,
-    minHeight: 43,
-    padding: '9px 12px',
+  toggleRow: {
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap: 10,
+
+    padding: 13,
+
     border:
-      '1px solid #dde1e6',
-    borderRadius: 9,
-    background: '#fafbfc',
-    cursor: 'pointer',
-    fontWeight: 700,
-    fontSize: 13,
+      '1px solid #e0e3e7',
+
+    borderRadius: 10,
+
+    background:
+      '#fafafa',
+
+    cursor:
+      'pointer',
   },
 
   checkboxGrid: {
-    display: 'grid',
+    display:
+      'grid',
+
     gridTemplateColumns:
       'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 9,
+
+    gap: 10,
   },
 
-  checkboxCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '10px 11px',
+  checkboxItem: {
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap: 9,
+
+    padding: 11,
+
     border:
-      '1px solid #dde1e6',
-    borderRadius: 9,
-    background: '#fafbfc',
-    cursor: 'pointer',
-    fontSize: 13,
+      '1px solid #e0e3e7',
+
+    borderRadius: 10,
+
+    background:
+      '#fafafa',
+
+    cursor:
+      'pointer',
   },
 
   infoBox: {
-    gridColumn: '1 / -1',
-    padding: 13,
-    background: '#edf4ff',
-    border:
-      '1px solid #ccdcf3',
-    color: '#17457f',
-    borderRadius: 9,
-    lineHeight: 1.5,
-  },
+    gridColumn:
+      '1 / -1',
 
-  saveButton: {
-    marginTop: 22,
-    width: '100%',
-    border: 0,
-    background: '#17457f',
-    color: '#ffffff',
-    padding: '14px 20px',
+    padding: 14,
+
+    background:
+      '#fff7e5',
+
     borderRadius: 10,
-    fontSize: 15,
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
 
-  secondaryButton: {
-    border:
-      '1px solid #17457f',
-    background: '#ffffff',
-    color: '#17457f',
-    padding: '10px 15px',
-    borderRadius: 9,
-    fontWeight: 800,
-    cursor: 'pointer',
+    fontWeight: 700,
   },
 
   error: {
-    marginTop: 18,
-    padding: 13,
-    borderRadius: 9,
-    background: '#ffe9e9',
-    border:
-      '1px solid #f2c5c5',
-    color: '#8d2424',
+    marginTop: 20,
+
+    padding: 14,
+
+    borderRadius: 10,
+
+    background:
+      '#ffeaea',
+
+    color:
+      '#8c2020',
+
     fontWeight: 700,
   },
 
   success: {
-    marginTop: 18,
-    padding: 13,
-    borderRadius: 9,
-    background: '#eaf8ee',
-    border:
-      '1px solid #c8e9d0',
-    color: '#24663a',
+    marginTop: 20,
+
+    padding: 14,
+
+    borderRadius: 10,
+
+    background:
+      '#eaf8ee',
+
+    color:
+      '#236339',
+
     fontWeight: 700,
   },
 
-  separator: {
+  saveButton: {
+    width:
+      '100%',
+
+    marginTop: 25,
+
+    padding: 16,
+
     border: 0,
-    borderTop:
-      '1px solid #dfe3e7',
-    margin: '42px 0',
+
+    borderRadius: 12,
+
+    background:
+      '#163c74',
+
+    color:
+      '#ffffff',
+
+    fontSize: 16,
+
+    fontWeight: 800,
+
+    cursor:
+      'pointer',
   },
 
-  listSection: {
-    marginTop: 20,
+  secondaryButton: {
+    padding:
+      '11px 17px',
+
+    borderRadius: 10,
+
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #163c74',
+
+    color:
+      '#163c74',
+
+    fontWeight: 700,
+
+    cursor:
+      'pointer',
+  },
+
+  separator: {
+    margin:
+      '55px 0 30px',
+
+    border: 0,
+
+    borderTop:
+      '1px solid #dddddd',
   },
 
   propertyGrid: {
-    display: 'grid',
+    display:
+      'grid',
+
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(310px, 1fr))',
-    gap: 16,
+      'repeat(auto-fit, minmax(280px, 1fr))',
+
+    gap: 20,
+
     marginTop: 20,
   },
 
   propertyCard: {
-    background: '#ffffff',
+    background:
+      '#ffffff',
+
     border:
-      '1px solid #dfe3e7',
-    borderRadius: 14,
-    padding: 18,
-    boxShadow:
-      '0 3px 12px rgba(0,0,0,0.03)',
+      '1px solid #e2e4e8',
+
+    borderRadius: 16,
+
+    padding: 20,
   },
 
   cardTop: {
-    display: 'flex',
+    display:
+      'flex',
+
     justifyContent:
       'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
+
+    gap: 15,
   },
 
-  propertyName: {
+  cardTitle: {
     margin: 0,
-    fontSize: 18,
   },
 
-  statusBadge: {
-    display: 'inline-flex',
-    padding: '5px 9px',
+  status: {
+    height:
+      'fit-content',
+
+    padding:
+      '6px 10px',
+
     borderRadius: 20,
-    fontSize: 10,
-    fontWeight: 900,
+
+    fontSize: 11,
+
+    fontWeight: 800,
   },
 
-  activeBadge: {
-    background: '#e7f7ec',
-    color: '#27713e',
+  cardPrice: {
+    marginTop: 20,
+
+    color:
+      '#163c74',
+
+    fontSize: 21,
+
+    fontWeight: 800,
   },
 
-  inactiveBadge: {
-    background: '#eeeeee',
-    color: '#656565',
-  },
+  small: {
+    marginTop: 5,
 
-  propertyDetails: {
-    display: 'grid',
-    gap: 6,
-    marginTop: 16,
-    color: '#505967',
     fontSize: 13,
+
+    color:
+      '#666666',
   },
 
-  dynamicTag: {
-    width: 'fit-content',
-    marginTop: 4,
-    padding: '5px 8px',
-    background: '#fff4d8',
-    color: '#7a5a00',
-    borderRadius: 7,
+  dynamicBadge: {
+    width:
+      'fit-content',
+
+    marginTop: 10,
+
+    padding:
+      '6px 9px',
+
+    borderRadius: 8,
+
+    background:
+      '#fff3d5',
+
+    color:
+      '#7c5900',
+
     fontSize: 10,
-    fontWeight: 900,
+
+    fontWeight: 800,
   },
-  cardActions: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginTop: 18,
+
+  cardButtons: {
+    display:
+      'flex',
+
+    gap: 10,
+
+    flexWrap:
+      'wrap',
+
+    marginTop: 20,
   },
 
   editButton: {
+    padding: 10,
+
     border: 0,
-    background: '#17457f',
-    color: '#ffffff',
-    padding: '9px 12px',
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: 'pointer',
+
+    borderRadius: 10,
+
+    background:
+      '#163c74',
+
+    color:
+      '#ffffff',
+
+    fontWeight: 700,
+
+    cursor:
+      'pointer',
   },
 
-  deactivateButton: {
-    border: 0,
-    background: '#fff0e8',
-    color: '#9a4a22',
-    padding: '9px 12px',
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: 'pointer',
+  statusButton: {
+    padding: 10,
+
+    border:
+      '1px solid #cccccc',
+
+    borderRadius: 10,
+
+    background:
+      '#ffffff',
+
+    cursor:
+      'pointer',
   },
 
-  activateButton: {
-    border: 0,
-    background: '#e8f7ed',
-    color: '#27713e',
-    padding: '9px 12px',
-    borderRadius: 8,
-    fontWeight: 800,
-    cursor: 'pointer',
-  },
+  viewButton: {
+    padding:
+      '9px 12px',
 
-  viewLink: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    textDecoration: 'none',
-    border: '1px solid #17457f',
-    color: '#17457f',
-    background: '#ffffff',
-    padding: '8px 12px',
-    borderRadius: 8,
-    fontWeight: 800,
+    border:
+      '1px solid #163c74',
+
+    borderRadius: 10,
+
+    background:
+      '#ffffff',
+
+    color:
+      '#163c74',
+
+    textDecoration:
+      'none',
+
+    fontWeight: 700,
+
     fontSize: 12,
   },
 
-  loading: {
+  empty: {
     padding: 30,
-    textAlign: 'center',
-    color: '#687080',
+
+    marginTop: 20,
+
+    background:
+      '#ffffff',
+
+    borderRadius: 15,
   },
 
-  empty: {
-    marginTop: 20,
-    padding: 25,
-    textAlign: 'center',
-    background: '#ffffff',
-    border: '1px solid #e1e5ea',
-    borderRadius: 12,
-    color: '#687080',
+  loading: {
+    padding: 40,
   },
 
   notice: {
-    maxWidth: 520,
-    margin: '80px auto',
+    maxWidth: 450,
+
+    margin:
+      '80px auto',
+
+    background:
+      '#ffffff',
+
     padding: 30,
-    background: '#ffffff',
-    border: '1px solid #e1e5ea',
-    borderRadius: 15,
-    textAlign: 'center',
+
+    borderRadius: 16,
   },
 
   primaryLink: {
-    display: 'inline-block',
-    marginTop: 12,
-    padding: '11px 16px',
-    borderRadius: 9,
-    background: '#17457f',
-    color: '#ffffff',
-    textDecoration: 'none',
-    fontWeight: 800,
+    display:
+      'inline-block',
+
+    marginTop: 15,
+
+    padding:
+      '11px 16px',
+
+    borderRadius: 10,
+
+    background:
+      '#163c74',
+
+    color:
+      '#ffffff',
+
+    textDecoration:
+      'none',
   },
 };
