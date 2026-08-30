@@ -15,37 +15,73 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-function money(value) {
-  return `₹${Number(
-    value || 0
-  ).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+function monthStart(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1
+  );
 }
 
-function formatDateTime(value) {
+function monthEnd(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0
+  );
+}
+
+function toDateString(date) {
+  return [
+    date.getFullYear(),
+    String(
+      date.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      date.getDate()
+    ).padStart(2, '0'),
+  ].join('-');
+}
+
+function parseDate(value) {
+  return new Date(
+    `${value}T12:00:00`
+  );
+}
+
+function addDays(
+  value,
+  count
+) {
+  const date =
+    typeof value === 'string'
+      ? parseDate(value)
+      : new Date(value);
+
+  date.setDate(
+    date.getDate() +
+      Number(count || 0)
+  );
+
+  return date;
+}
+
+function formatMonth(date) {
+  return date.toLocaleDateString(
+    'en-IN',
+    {
+      month: 'long',
+      year: 'numeric',
+    }
+  );
+}
+
+function formatDate(value) {
   if (!value) return '';
 
   try {
-    return new Date(value).toLocaleString(
-      'en-IN',
-      {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }
-    );
-  } catch {
-    return value;
-  }
-}
-
-function formatStayDate(value) {
-  if (!value) return '—';
-
-  try {
-    return new Date(
-      `${value}T12:00:00`
+    return parseDate(
+      value
     ).toLocaleDateString(
       'en-IN',
       {
@@ -59,83 +95,131 @@ function formatStayDate(value) {
   }
 }
 
-function loadRazorpayScript() {
-  return new Promise((resolve) => {
-    if (
-      typeof window !== 'undefined' &&
-      window.Razorpay
-    ) {
-      resolve(true);
-      return;
-    }
+function guestInitials(name) {
+  const words =
+    String(
+      name || ''
+    )
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
 
-    const existing =
-      document.querySelector(
-        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-      );
+  if (!words.length) {
+    return 'G';
+  }
 
-    if (existing) {
-      existing.addEventListener(
-        'load',
-        () => resolve(true)
-      );
+  if (words.length === 1) {
+    return words[0]
+      .slice(0, 2)
+      .toUpperCase();
+  }
 
-      existing.addEventListener(
-        'error',
-        () => resolve(false)
-      );
-
-      return;
-    }
-
-    const script =
-      document.createElement('script');
-
-    script.src =
-      'https://checkout.razorpay.com/v1/checkout.js';
-
-    script.async = true;
-
-    script.onload = () =>
-      resolve(true);
-
-    script.onerror = () =>
-      resolve(false);
-
-    document.body.appendChild(
-      script
-    );
-  });
+  return (
+    words[0][0] +
+    words[
+      words.length - 1
+    ][0]
+  ).toUpperCase();
 }
 
-async function readJsonResponse(
-  response
+function guestShortName(name) {
+  const words =
+    String(
+      name || ''
+    )
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+  if (!words.length) {
+    return 'Guest';
+  }
+
+  if (words.length === 1) {
+    return words[0];
+  }
+
+  return `${words[0]} ${words[1][0]}.`;
+}
+
+function dateInStay(
+  dateString,
+  checkIn,
+  checkOut
 ) {
-  const responseText =
-    await response.text();
-
-  if (!responseText) {
-    if (!response.ok) {
-      throw new Error(
-        `Server returned an empty response. Status: ${response.status}`
-      );
-    }
-
-    return {};
-  }
-
-  try {
-    return JSON.parse(
-      responseText
-    );
-  } catch {
-    throw new Error(
-      `Server returned an invalid response. Status: ${response.status}`
-    );
-  }
+  return (
+    dateString >= checkIn &&
+    dateString < checkOut
+  );
 }
 
-export default function GuestMessagesPage() {
+function dateInBlock(
+  dateString,
+  startDate,
+  endDate
+) {
+  return (
+    dateString >=
+      startDate &&
+    dateString <=
+      endDate
+  );
+}
+
+function sourceLabel(
+  source
+) {
+  const value =
+    String(
+      source || ''
+    ).toLowerCase();
+
+  if (
+    value ===
+    'airbnb'
+  ) {
+    return 'Airbnb';
+  }
+
+  if (
+    value ===
+      'booking_com' ||
+    value ===
+      'booking.com'
+  ) {
+    return 'Booking.com';
+  }
+
+  if (
+    value ===
+    'manual'
+  ) {
+    return 'Host Blocked';
+  }
+
+  if (
+    value ===
+    'nightoutstays'
+  ) {
+    return 'NightOutStays';
+  }
+
+  return source
+    ? source
+    : 'Other Portal';
+}
+
+export default function AdminCalendarPage() {
+  const [
+    session,
+    setSession,
+  ] = useState(null);
+
+  const [
+    adminProfile,
+    setAdminProfile,
+  ] = useState(null);
+
   const [
     loading,
     setLoading,
@@ -147,19 +231,14 @@ export default function GuestMessagesPage() {
   ] = useState('');
 
   const [
-    notice,
-    setNotice,
+    properties,
+    setProperties,
+  ] = useState([]);
+
+  const [
+    selectedPropertyId,
+    setSelectedPropertyId,
   ] = useState('');
-
-  const [
-    session,
-    setSession,
-  ] = useState(null);
-
-  const [
-    guest,
-    setGuest,
-  ] = useState(null);
 
   const [
     bookings,
@@ -167,71 +246,73 @@ export default function GuestMessagesPage() {
   ] = useState([]);
 
   const [
-    messages,
-    setMessages,
+    blockedDates,
+    setBlockedDates,
   ] = useState([]);
 
   const [
-    activeBookingId,
-    setActiveBookingId,
+    currentMonth,
+    setCurrentMonth,
+  ] = useState(
+    monthStart(
+      new Date()
+    )
+  );
+
+  const [
+    selectedDate,
+    setSelectedDate,
   ] = useState('');
-
-  const [
-    messageText,
-    setMessageText,
-  ] = useState('');
-
-  const [
-    sending,
-    setSending,
-  ] = useState(false);
-
-  const [
-    showDiscountRequest,
-    setShowDiscountRequest,
-  ] = useState(false);
-
-  const [
-    discountText,
-    setDiscountText,
-  ] = useState('');
-
-  const [
-    discountSending,
-    setDiscountSending,
-  ] = useState(false);
-
-  const [
-    acceptingOffer,
-    setAcceptingOffer,
-  ] = useState(false);
-
-  const [
-    paymentLoading,
-    setPaymentLoading,
-  ] = useState(false);
 
   useEffect(() => {
-    initialisePage();
+    initialise();
   }, []);
 
   useEffect(() => {
-    if (activeBookingId) {
-      loadMessages(
-        activeBookingId
+    if (
+      selectedPropertyId
+    ) {
+      loadCalendarData(
+        selectedPropertyId
       );
     }
-  }, [activeBookingId]);
+  }, [
+    selectedPropertyId,
+  ]);
 
   useEffect(() => {
-    if (!activeBookingId) {
+    if (
+      !selectedPropertyId
+    ) {
       return;
     }
 
-    const channel =
+    const bookingChannel =
       supabase
         .channel(
-          `guest-messages-${activeBookingId}`
+          `host-calendar-bookings-${selectedPropertyId}`
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings',
+            filter:
+              `property_id=eq.${selectedPropertyId}`,
+          },
+          () => {
+            loadCalendarData(
+              selectedPropertyId
+            );
+          }
+        )
+        .subscribe();
+
+    const blockedChannel =
+      supabase
+        .channel(
+          `host-calendar-blocks-${selectedPropertyId}`
         )
         .on(
           'postgres_changes',
@@ -239,59 +320,13 @@ export default function GuestMessagesPage() {
             event: '*',
             schema: 'public',
             table:
-              'booking_messages',
+              'blocked_dates',
             filter:
-              `booking_id=eq.${activeBookingId}`,
+              `property_id=eq.${selectedPropertyId}`,
           },
-          async () => {
-            await loadMessages(
-              activeBookingId
-            );
-
-            if (guest?.id) {
-              await loadBookings(
-                guest.id
-              );
-            }
-          }
-        )
-        .subscribe();
-
-    return () => {
-      supabase.removeChannel(
-        channel
-      );
-    };
-  }, [
-    activeBookingId,
-    guest?.id,
-  ]);
-
-  useEffect(() => {
-    if (
-      !activeBookingId ||
-      !guest?.id
-    ) {
-      return;
-    }
-
-    const channel =
-      supabase
-        .channel(
-          `guest-booking-${activeBookingId}`
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'bookings',
-            filter:
-              `id=eq.${activeBookingId}`,
-          },
-          async () => {
-            await loadBookings(
-              guest.id
+          () => {
+            loadCalendarData(
+              selectedPropertyId
             );
           }
         )
@@ -299,18 +334,20 @@ export default function GuestMessagesPage() {
 
     return () => {
       supabase.removeChannel(
-        channel
+        bookingChannel
+      );
+
+      supabase.removeChannel(
+        blockedChannel
       );
     };
   }, [
-    activeBookingId,
-    guest?.id,
+    selectedPropertyId,
   ]);
 
-  async function initialisePage() {
+  async function initialise() {
     setLoading(true);
     setError('');
-    setNotice('');
 
     try {
       const {
@@ -327,13 +364,9 @@ export default function GuestMessagesPage() {
         throw sessionError;
       }
 
-      if (
-        !currentSession?.user
-      ) {
+      if (!currentSession) {
         window.location.href =
-          `/login?redirect=${encodeURIComponent(
-            '/account/messages'
-          )}`;
+          '/admin/bookings';
 
         return;
       }
@@ -342,883 +375,592 @@ export default function GuestMessagesPage() {
         currentSession
       );
 
-      const email =
-        String(
-          currentSession.user
-            .email || ''
-        )
-          .trim()
-          .toLowerCase();
+      const {
+        data:
+          profile,
+        error:
+          profileError,
+      } =
+        await supabase
+          .from(
+            'admin_profiles'
+          )
+          .select(
+            'user_id, full_name, role, is_active'
+          )
+          .eq(
+            'user_id',
+            currentSession.user.id
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .single();
 
-      if (!email) {
+      if (
+        profileError ||
+        !profile
+      ) {
         throw new Error(
-          'No email address is linked to this account.'
+          'Admin access not available.'
         );
       }
 
+      setAdminProfile(
+        profile
+      );
+
       const {
         data:
-          guestRows,
+          propertyRows,
         error:
-          guestError,
+          propertyError,
       } =
         await supabase
-          .from('guests')
+          .from(
+            'properties'
+          )
           .select(
-            'id, full_name, phone, email, created_at'
+            'id, name, slug, location_name, is_active'
           )
           .eq(
-            'email',
-            email
+            'is_active',
+            true
           )
           .order(
-            'created_at',
+            'name',
             {
               ascending:
                 true,
             }
-          )
-          .limit(1);
+          );
 
-      if (guestError) {
-        throw guestError;
+      if (
+        propertyError
+      ) {
+        throw propertyError;
       }
 
-      const foundGuest =
-        guestRows?.[0] ||
-        null;
+      const rows =
+        propertyRows || [];
 
-      if (!foundGuest) {
-        throw new Error(
-          'No guest profile was found for this login.'
+      setProperties(
+        rows
+      );
+
+      if (
+        rows.length
+      ) {
+        setSelectedPropertyId(
+          rows[0].id
         );
       }
-
-      setGuest(
-        foundGuest
-      );
-
-      await loadBookings(
-        foundGuest.id
-      );
     } catch (
-      pageError
+      initError
     ) {
       console.error(
-        pageError
+        initError
       );
 
       setError(
-        pageError.message ||
-          'Unable to open messages.'
+        initError.message ||
+          'Unable to open calendar.'
       );
     } finally {
       setLoading(false);
     }
   }
 
-  async function logoutGuest() {
-    await supabase.auth.signOut();
-
-    window.location.href =
-      '/';
-  }
-
-  async function loadBookings(
-    guestId
+  async function loadCalendarData(
+    propertyId
   ) {
-    const {
-      data,
-      error:
-        bookingError,
-    } =
-      await supabase
-        .from('bookings')
-        .select(`
-          id,
-          booking_code,
-          property_id,
-          guest_id,
-          check_in,
-          check_out,
-          guests_count,
-          nights,
-          nightly_rate,
-          cleaning_fee,
-          security_deposit,
-          total_amount,
-          booking_status,
-          payment_status,
-          notes,
-          created_at,
-          base_amount,
-          auto_discount_amount,
-          host_discount_amount,
-          final_payable_amount,
-          offer_note,
-          offer_status,
-          guest_discount_requested,
-          guest_discount_message,
-          taxable_amount,
-          gst_rate,
-          gst_amount,
-          amount_including_gst,
-          razorpay_order_id,
-          paid_at,
-          properties (
-            id,
-            name,
-            slug,
-            location_name
-          )
-        `)
-        .eq(
-          'guest_id',
-          guestId
-        )
-        .order(
-          'created_at',
-          {
-            ascending:
-              false,
-          }
-        );
+    setError('');
 
-    if (bookingError) {
-      throw bookingError;
-    }
+    try {
+      const [
+        bookingResult,
+        blockedResult,
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              'bookings'
+            )
+            .select(`
+              id,
+              booking_code,
+              property_id,
+              guest_id,
+              check_in,
+              check_out,
+              booking_status,
+              payment_status,
+              created_at,
+              guests (
+                id,
+                full_name,
+                phone,
+                email
+              )
+            `)
+            .eq(
+              'property_id',
+              propertyId
+            )
+            .order(
+              'check_in',
+              {
+                ascending:
+                  true,
+              }
+            ),
 
-    const rows =
-      data || [];
+          supabase
+            .from(
+              'blocked_dates'
+            )
+            .select(`
+              id,
+              property_id,
+              start_date,
+              end_date,
+              reason,
+              source,
+              external_uid,
+              created_at
+            `)
+            .eq(
+              'property_id',
+              propertyId
+            )
+            .order(
+              'start_date',
+              {
+                ascending:
+                  true,
+              }
+            ),
+        ]);
 
-    setBookings(rows);
+      if (
+        bookingResult.error
+      ) {
+        throw bookingResult.error;
+      }
 
-    if (rows.length) {
-      setActiveBookingId(
-        (current) => {
-          const stillExists =
-            rows.some(
-              (booking) =>
-                booking.id ===
-                current
-            );
+      if (
+        blockedResult.error
+      ) {
+        throw blockedResult.error;
+      }
 
-          return stillExists
-            ? current
-            : rows[0].id;
-        }
+      setBookings(
+        bookingResult.data ||
+          []
       );
-    } else {
-      setActiveBookingId('');
-    }
-  }
 
-  async function loadMessages(
-    bookingId
-  ) {
-    if (!bookingId) {
-      setMessages([]);
-      return;
-    }
-
-    const {
-      data,
-      error:
-        messageError,
-    } =
-      await supabase
-        .from(
-          'booking_messages'
-        )
-        .select(
-          'id, booking_id, sender_type, sender_name, message, message_type, is_read, created_at'
-        )
-        .eq(
-          'booking_id',
-          bookingId
-        )
-        .order(
-          'created_at',
-          {
-            ascending:
-              true,
-          }
-        );
-
-    if (messageError) {
+      setBlockedDates(
+        blockedResult.data ||
+          []
+      );
+    } catch (
+      loadError
+    ) {
       console.error(
-        messageError
+        loadError
       );
 
       setError(
-        messageError.message
-      );
-
-      return;
-    }
-
-    setMessages(
-      data || []
-    );
-
-    const {
-      error:
-        readError,
-    } =
-      await supabase
-        .from(
-          'booking_messages'
-        )
-        .update({
-          is_read: true,
-        })
-        .eq(
-          'booking_id',
-          bookingId
-        )
-        .neq(
-          'sender_type',
-          'guest'
-        )
-        .eq(
-          'is_read',
-          false
-        );
-
-    if (readError) {
-      console.warn(
-        readError
+        loadError.message ||
+          'Unable to load calendar.'
       );
     }
   }
 
-  const activeBooking =
+  const selectedProperty =
     useMemo(
       () =>
-        bookings.find(
-          (booking) =>
-            booking.id ===
-            activeBookingId
+        properties.find(
+          (property) =>
+            property.id ===
+            selectedPropertyId
         ) || null,
       [
-        bookings,
-        activeBookingId,
+        properties,
+        selectedPropertyId,
       ]
     );
 
-  const activeProperty =
-    activeBooking
-      ?.properties ||
-    null;
-
-  const finalPayable =
-    Number(
-      activeBooking
-        ?.final_payable_amount ??
-        activeBooking
-          ?.amount_including_gst ??
-        activeBooking
-          ?.total_amount ??
-        0
-    );
-
-  const bookingPaid =
-    activeBooking
-      ?.payment_status ===
-      'paid';
-
-  const offerPending =
-    activeBooking
-      ?.offer_status ===
-      'host_offered';
-
-  const offerAccepted =
-    activeBooking
-      ?.offer_status ===
-      'accepted';
-
-  async function sendMessage(
-    event
-  ) {
-    event.preventDefault();
-
-    setError('');
-    setNotice('');
-
-    const text =
-      String(
-        messageText || ''
-      ).trim();
-
-    if (!text) {
-      return;
-    }
-
-    if (
-      !activeBooking ||
-      !guest
-    ) {
-      setError(
-        'Please select a booking first.'
-      );
-
-      return;
-    }
-
-    setSending(true);
-
-    try {
-      const {
-        error:
-          insertError,
-      } =
-        await supabase
-          .from(
-            'booking_messages'
-          )
-          .insert({
-            booking_id:
-              activeBooking.id,
-
-            sender_type:
-              'guest',
-
-            sender_name:
-              guest.full_name ||
-              'Guest',
-
-            message: text,
-
-            message_type:
-              'message',
-
-            is_read:
-              false,
-          });
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      setMessageText('');
-
-      await loadMessages(
-        activeBooking.id
-      );
-    } catch (
-      sendError
-    ) {
-      console.error(
-        sendError
-      );
-
-      setError(
-        sendError.message ||
-          'Message could not be sent.'
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function requestDiscount() {
-    setError('');
-    setNotice('');
-
-    if (
-      !activeBooking ||
-      !guest
-    ) {
-      setError(
-        'Please select a booking first.'
-      );
-
-      return;
-    }
-
-    if (bookingPaid) {
-      setError(
-        'Discount cannot be requested after payment.'
-      );
-
-      return;
-    }
-
-    if (offerAccepted) {
-      setError(
-        'You already accepted the host special offer.'
-      );
-
-      return;
-    }
-
-    const text =
-      String(
-        discountText || ''
-      ).trim();
-
-    if (!text) {
-      setError(
-        'Please write your request.'
-      );
-
-      return;
-    }
-
-    setDiscountSending(true);
-
-    try {
-      const {
-        error:
-          messageError,
-      } =
-        await supabase
-          .from(
-            'booking_messages'
-          )
-          .insert({
-            booking_id:
-              activeBooking.id,
-
-            sender_type:
-              'guest',
-
-            sender_name:
-              guest.full_name ||
-              'Guest',
-
-            message:
-              `DISCOUNT REQUEST: ${text}`,
-
-            message_type:
-              'message',
-
-            is_read:
-              false,
-          });
-
-      if (messageError) {
-        throw messageError;
-      }
-
-      const {
-        error:
-          updateError,
-      } =
-        await supabase
-          .from('bookings')
-          .update({
-            guest_discount_requested:
-              true,
-
-            guest_discount_message:
-              text,
-          })
-          .eq(
-            'id',
-            activeBooking.id
+  const calendarDays =
+    useMemo(
+      () => {
+        const first =
+          monthStart(
+            currentMonth
           );
 
-      if (updateError) {
-        console.warn(
-          updateError
-        );
-      }
+        const last =
+          monthEnd(
+            currentMonth
+          );
 
-      setDiscountText('');
+        const startOffset =
+          first.getDay();
 
-      setShowDiscountRequest(
-        false
-      );
+        const days = [];
 
-      setNotice(
-        'Better-rate request sent to the host.'
-      );
+        for (
+          let index = 0;
+          index <
+          startOffset;
+          index++
+        ) {
+          days.push(null);
+        }
 
-      await loadMessages(
-        activeBooking.id
-      );
-    } catch (
-      requestError
-    ) {
-      console.error(
-        requestError
-      );
-
-      setError(
-        requestError.message ||
-          'Request could not be sent.'
-      );
-    } finally {
-      setDiscountSending(false);
-    }
-  }
-
-  async function acceptSpecialOffer() {
-    if (!activeBooking) {
-      return;
-    }
-
-    if (bookingPaid) {
-      return;
-    }
-
-    setAcceptingOffer(true);
-    setError('');
-    setNotice('');
-
-    try {
-      const response =
-        await fetch(
-          '/api/bookings/accept-offer',
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body:
-              JSON.stringify({
-                bookingCode:
-                  activeBooking.booking_code,
-              }),
-          }
-        );
-
-      const result =
-        await readJsonResponse(
-          response
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            `Unable to accept offer. Status: ${response.status}`
-        );
-      }
-
-      if (!result.success) {
-        throw new Error(
-          result.error ||
-            'Unable to accept special offer.'
-        );
-      }
-
-      setNotice(
-        `Special offer accepted. Final payable: ${money(
-          result.finalPayableAmount ||
-            activeBooking.final_payable_amount
-        )}`
-      );
-
-      await loadBookings(
-        guest.id
-      );
-
-      await loadMessages(
-        activeBooking.id
-      );
-    } catch (
-      acceptError
-    ) {
-      console.error(
-        acceptError
-      );
-
-      setError(
-        acceptError.message ||
-          'Unable to accept special offer.'
-      );
-    } finally {
-      setAcceptingOffer(false);
-    }
-  }
-
-  async function payNow() {
-    if (
-      !activeBooking ||
-      !guest
-    ) {
-      return;
-    }
-
-    if (bookingPaid) {
-      setNotice(
-        'This booking is already paid.'
-      );
-
-      return;
-    }
-
-    if (
-      activeBooking.offer_status ===
-      'host_offered'
-    ) {
-      setError(
-        'Please accept the special offer before payment.'
-      );
-
-      return;
-    }
-
-    setPaymentLoading(true);
-    setError('');
-    setNotice('');
-
-    try {
-      const scriptReady =
-        await loadRazorpayScript();
-
-      if (!scriptReady) {
-        throw new Error(
-          'Unable to load Razorpay checkout.'
-        );
-      }
-
-      const orderResponse =
-        await fetch(
-          '/api/razorpay/create-order',
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body:
-              JSON.stringify({
-                bookingCode:
-                  activeBooking.booking_code,
-              }),
-          }
-        );
-
-      const order =
-        await readJsonResponse(
-          orderResponse
-        );
-
-      if (!orderResponse.ok) {
-        throw new Error(
-          order.error ||
-            `Unable to create payment order. Status: ${orderResponse.status}`
-        );
-      }
-
-      const options = {
-        key:
-          order.keyId,
-
-        amount:
-          order.amount,
-
-        currency:
-          order.currency ||
-          'INR',
-
-        name:
-          'NightOutStays',
-
-        description:
-          activeProperty?.name ||
-          `Booking ${activeBooking.booking_code}`,
-
-        order_id:
-          order.orderId,
-
-        prefill: {
-          name:
-            guest.full_name ||
-            '',
-
-          email:
-            guest.email ||
-            '',
-
-          contact:
-            guest.phone ||
-            '',
-        },
-
-        notes: {
-          booking_code:
-            activeBooking.booking_code,
-        },
-
-        handler:
-          async function (
-            paymentResponse
-          ) {
-            try {
-              const verifyResponse =
-                await fetch(
-                  '/api/razorpay/verify',
-                  {
-                    method:
-                      'POST',
-
-                    headers: {
-                      'Content-Type':
-                        'application/json',
-                    },
-
-                    body:
-                      JSON.stringify({
-                        bookingCode:
-                          activeBooking.booking_code,
-
-                        razorpay_order_id:
-                          paymentResponse.razorpay_order_id,
-
-                        razorpay_payment_id:
-                          paymentResponse.razorpay_payment_id,
-
-                        razorpay_signature:
-                          paymentResponse.razorpay_signature,
-                      }),
-                  }
-                );
-
-              const verified =
-                await readJsonResponse(
-                  verifyResponse
-                );
-
-              if (
-                !verifyResponse.ok
-              ) {
-                throw new Error(
-                  verified.error ||
-                    `Payment verification failed. Status: ${verifyResponse.status}`
-                );
-              }
-
-              setNotice(
-                'Payment successful. Your booking is confirmed and the dates are now blocked.'
-              );
-
-              await loadBookings(
-                guest.id
-              );
-
-              await loadMessages(
-                activeBooking.id
-              );
-            } catch (
-              verifyError
-            ) {
-              console.error(
-                verifyError
-              );
-
-              setError(
-                verifyError.message ||
-                  'Payment was received but verification failed.'
-              );
-            } finally {
-              setPaymentLoading(false);
-            }
-          },
-
-        modal: {
-          ondismiss: () => {
-            setPaymentLoading(false);
-          },
-        },
-      };
-
-      const razorpay =
-        new window.Razorpay(
-          options
-        );
-
-      razorpay.on(
-        'payment.failed',
-        (response) => {
-          setPaymentLoading(false);
-
-          setError(
-            response.error
-              ?.description ||
-              'Payment failed.'
+        for (
+          let day = 1;
+          day <=
+          last.getDate();
+          day++
+        ) {
+          days.push(
+            new Date(
+              currentMonth.getFullYear(),
+              currentMonth.getMonth(),
+              day
+            )
           );
         }
+
+        while (
+          days.length %
+            7 !==
+          0
+        ) {
+          days.push(null);
+        }
+
+        return days;
+      },
+      [
+        currentMonth,
+      ]
+    );
+
+  const selectedDayDetails =
+    useMemo(
+      () => {
+        if (
+          !selectedDate
+        ) {
+          return {
+            bookings: [],
+            blocks: [],
+          };
+        }
+
+        const dayBookings =
+          bookings.filter(
+            (booking) =>
+              dateInStay(
+                selectedDate,
+                booking.check_in,
+                booking.check_out
+              )
+          );
+
+        const dayBlocks =
+          blockedDates.filter(
+            (block) =>
+              dateInBlock(
+                selectedDate,
+                block.start_date,
+                block.end_date
+              )
+          );
+
+        return {
+          bookings:
+            dayBookings,
+          blocks:
+            dayBlocks,
+        };
+      },
+      [
+        selectedDate,
+        bookings,
+        blockedDates,
+      ]
+    );
+
+  function getDayInfo(
+    dateString
+  ) {
+    const dayBookings =
+      bookings.filter(
+        (booking) =>
+          dateInStay(
+            dateString,
+            booking.check_in,
+            booking.check_out
+          )
       );
 
-      razorpay.open();
-    } catch (
-      paymentError
-    ) {
-      console.error(
-        paymentError
+    const confirmedPaid =
+      dayBookings.find(
+        (booking) =>
+          booking.booking_status ===
+            'confirmed' &&
+          booking.payment_status ===
+            'paid'
       );
 
-      setPaymentLoading(false);
-
-      setError(
-        paymentError.message ||
-          'Unable to start payment.'
+    const confirmedUnpaid =
+      dayBookings.find(
+        (booking) =>
+          booking.booking_status ===
+            'confirmed' &&
+          booking.payment_status !==
+            'paid'
       );
+
+    const pending =
+      dayBookings.find(
+        (booking) =>
+          booking.booking_status ===
+          'pending'
+      );
+
+    const dayBlocks =
+      blockedDates.filter(
+        (block) =>
+          dateInBlock(
+            dateString,
+            block.start_date,
+            block.end_date
+          )
+      );
+
+    const externalBlock =
+      dayBlocks.find(
+        (block) =>
+          String(
+            block.source ||
+              ''
+          ).toLowerCase() !==
+          'manual'
+      );
+
+    const manualBlock =
+      dayBlocks.find(
+        (block) =>
+          String(
+            block.source ||
+              ''
+          ).toLowerCase() ===
+          'manual'
+      );
+
+    if (confirmedPaid) {
+      return {
+        type:
+          'booked',
+
+        booking:
+          confirmedPaid,
+
+        label:
+          guestShortName(
+            confirmedPaid
+              .guests
+              ?.full_name
+          ),
+
+        initials:
+          guestInitials(
+            confirmedPaid
+              .guests
+              ?.full_name
+          ),
+      };
     }
+
+    if (externalBlock) {
+      return {
+        type:
+          'external',
+
+        block:
+          externalBlock,
+
+        label:
+          externalBlock.reason ||
+          'Booked by other portal',
+
+        source:
+          sourceLabel(
+            externalBlock.source
+          ),
+      };
+    }
+
+    if (manualBlock) {
+      return {
+        type:
+          'manual',
+
+        block:
+          manualBlock,
+
+        label:
+          manualBlock.reason ||
+          'Host Blocked',
+      };
+    }
+
+    if (confirmedUnpaid) {
+      return {
+        type:
+          'accepted',
+
+        booking:
+          confirmedUnpaid,
+
+        label:
+          guestShortName(
+            confirmedUnpaid
+              .guests
+              ?.full_name
+          ),
+      };
+    }
+
+    if (pending) {
+      return {
+        type:
+          'pending',
+
+        booking:
+          pending,
+
+        label:
+          guestShortName(
+            pending.guests
+              ?.full_name
+          ),
+      };
+    }
+
+    return {
+      type:
+        'available',
+    };
+  }
+
+  function previousMonth() {
+    setCurrentMonth(
+      new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth() -
+          1,
+        1
+      )
+    );
+
+    setSelectedDate('');
+  }
+
+  function nextMonth() {
+    setCurrentMonth(
+      new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth() +
+          1,
+        1
+      )
+    );
+
+    setSelectedDate('');
+  }
+
+  function goToday() {
+    setCurrentMonth(
+      monthStart(
+        new Date()
+      )
+    );
+
+    setSelectedDate(
+      toDateString(
+        new Date()
+      )
+    );
   }
 
   if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.centerBox}>
-          Loading your messages...
-        </div>
-      </main>
-    );
-  }
-
-  if (
-    error &&
-    !guest
-  ) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.centerBox}>
-          <h2>
-            Messages unavailable
-          </h2>
-
-          <p>{error}</p>
-
-          <a
-            href="/"
-            style={
-              styles.primaryLink
-            }
-          >
-            Back to NightOutStays
-          </a>
-        </div>
+      <main
+        style={
+          styles.loading
+        }
+      >
+        Loading host calendar...
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <a
-          href="/"
-          style={styles.logo}
-        >
-          NightOutStays
-        </a>
+    <main
+      style={
+        styles.page
+      }
+    >
+      <header
+        style={
+          styles.header
+        }
+      >
+        <div>
+          <div
+            style={
+              styles.brand
+            }
+          >
+            NightOutStays
+          </div>
+
+          <div
+            style={
+              styles.subBrand
+            }
+          >
+            Host Calendar
+          </div>
+        </div>
 
         <div
           style={
             styles.headerRight
           }
         >
-          <nav style={styles.nav}>
+          <nav
+            style={
+              styles.nav
+            }
+          >
             <a
-              href="/"
+              href="/admin/bookings"
+              style={
+                styles.navLink
+              }
+            >
+              Bookings
+            </a>
+
+            <a
+              href="/admin/properties"
               style={
                 styles.navLink
               }
@@ -1227,997 +969,2148 @@ export default function GuestMessagesPage() {
             </a>
 
             <a
-              href="/account/messages"
+              href="/admin/calendar"
               style={
                 styles.activeNavLink
               }
             >
+              Calendar
+            </a>
+
+            <a
+              href="/admin/messages"
+              style={
+                styles.navLink
+              }
+            >
               Messages
+            </a>
+
+            <a
+              href="/admin/notifications"
+              style={
+                styles.navLink
+              }
+            >
+              Notifications
+            </a>
+
+            <a
+              href="/admin/reports"
+              style={
+                styles.navLink
+              }
+            >
+              Reports
             </a>
           </nav>
 
           <div
             style={
-              styles.loginStatus
+              styles.adminIdentity
             }
           >
-            <div>
-              <div
-                style={
-                  styles.loggedInLabel
-                }
-              >
-                Logged in as
-              </div>
+            <strong>
+              {adminProfile
+                ?.full_name ||
+                'Admin'}
+            </strong>
 
-              <strong>
-                {guest?.full_name ||
-                  'Guest'}
-              </strong>
-
-              <div
-                style={
-                  styles.loggedInEmail
-                }
-              >
-                {session?.user
-                  ?.email ||
-                  guest?.email}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={
-                logoutGuest
-              }
+            <div
               style={
-                styles.logoutButton
+                styles.adminRole
               }
             >
-              Logout
-            </button>
+              {adminProfile
+                ?.role ||
+                'admin'}
+            </div>
           </div>
         </div>
       </header>
 
-      <div style={styles.container}>
+      <section
+        style={
+          styles.container
+        }
+      >
         <div
           style={
-            styles.pageHeader
+            styles.pageHeadingRow
           }
         >
           <div>
-            <h1 style={styles.title}>
-              Messages
+            <h1
+              style={
+                styles.pageHeading
+              }
+            >
+              Property Calendar
             </h1>
 
             <p
               style={
-                styles.subtitle
+                styles.pageSubheading
               }
             >
-              Chat with the host about your booking.
+              View NightOutStays bookings, host-blocked dates and bookings imported from other portals.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={
-              initialisePage
-            }
+          <div
             style={
-              styles.refreshButton
+              styles.topActions
             }
           >
-            Refresh
-          </button>
+            <button
+              type="button"
+              onClick={
+                goToday
+              }
+              style={
+                styles.secondaryButton
+              }
+            >
+              Today
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                loadCalendarData(
+                  selectedPropertyId
+                )
+              }
+              style={
+                styles.primaryButton
+              }
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {bookings.length ===
-        0 ? (
+        {error && (
           <div
             style={
-              styles.emptyCard
+              styles.errorBox
             }
           >
-            <h3>
-              No booking conversations yet
-            </h3>
-
-            <p>
-              Once you request a stay, its conversation will appear here.
-            </p>
+            {error}
           </div>
-        ) : (
-          <div
+        )}
+
+        <div
+          style={
+            styles.propertyToolbar
+          }
+        >
+          <label
             style={
-              styles.chatLayout
+              styles.fieldLabel
             }
           >
-            <aside
+            PROPERTY
+
+            <select
+              value={
+                selectedPropertyId
+              }
+              onChange={(
+                event
+              ) => {
+                setSelectedPropertyId(
+                  event.target.value
+                );
+
+                setSelectedDate(
+                  ''
+                );
+              }}
               style={
-                styles.conversationList
+                styles.select
+              }
+            >
+              {properties.map(
+                (
+                  property
+                ) => (
+                  <option
+                    key={
+                      property.id
+                    }
+                    value={
+                      property.id
+                    }
+                  >
+                    {
+                      property.name
+                    }
+                    {property.location_name
+                      ? ` — ${property.location_name}`
+                      : ''}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+          <div
+            style={
+              styles.selectedPropertyInfo
+            }
+          >
+            <strong>
+              {selectedProperty
+                ?.name ||
+                'No property selected'}
+            </strong>
+
+            <span>
+              {selectedProperty
+                ?.location_name ||
+                ''}
+            </span>
+          </div>
+        </div>
+
+        <div
+          style={
+            styles.legend
+          }
+        >
+          <Legend
+            label="Property Booked"
+            type="booked"
+          />
+
+          <Legend
+            label="Booking Accepted"
+            type="accepted"
+          />
+
+          <Legend
+            label="Booking Requested"
+            type="pending"
+          />
+
+          <Legend
+            label="Booked by Other Portal"
+            type="external"
+          />
+
+          <Legend
+            label="Host Blocked"
+            type="manual"
+          />
+
+          <Legend
+            label="Available"
+            type="available"
+          />
+        </div>
+
+        <div
+          style={
+            styles.calendarLayout
+          }
+        >
+          <section
+            style={
+              styles.calendarCard
+            }
+          >
+            <div
+              style={
+                styles.calendarHeader
+              }
+            >
+              <button
+                type="button"
+                onClick={
+                  previousMonth
+                }
+                style={
+                  styles.monthButton
+                }
+              >
+                ‹
+              </button>
+
+              <h2
+                style={
+                  styles.monthTitle
+                }
+              >
+                {formatMonth(
+                  currentMonth
+                )}
+              </h2>
+
+              <button
+                type="button"
+                onClick={
+                  nextMonth
+                }
+                style={
+                  styles.monthButton
+                }
+              >
+                ›
+              </button>
+            </div>
+
+            <div
+              style={
+                styles.weekHeader
+              }
+            >
+              {[
+                'Sun',
+                'Mon',
+                'Tue',
+                'Wed',
+                'Thu',
+                'Fri',
+                'Sat',
+              ].map(
+                (
+                  day
+                ) => (
+                  <div
+                    key={
+                      day
+                    }
+                    style={
+                      styles.weekDay
+                    }
+                  >
+                    {day}
+                  </div>
+                )
+              )}
+            </div>
+
+            <div
+              style={
+                styles.calendarGrid
+              }
+            >
+              {calendarDays.map(
+                (
+                  date,
+                  index
+                ) => {
+                  if (!date) {
+                    return (
+                      <div
+                        key={`empty-${index}`}
+                        style={
+                          styles.emptyDay
+                        }
+                      />
+                    );
+                  }
+
+                  const dateString =
+                    toDateString(
+                      date
+                    );
+
+                  const info =
+                    getDayInfo(
+                      dateString
+                    );
+
+                  const isPast =
+                    dateString <
+                    toDateString(
+                      new Date()
+                    );
+
+                  const isSelected =
+                    selectedDate ===
+                    dateString;
+
+                  return (
+                    <button
+                      key={
+                        dateString
+                      }
+                      type="button"
+                      onClick={() =>
+                        setSelectedDate(
+                          dateString
+                        )
+                      }
+                      style={{
+                        ...styles.dayCell,
+
+                        ...(isSelected
+                          ? styles.selectedDay
+                          : {}),
+
+                        ...(info.type ===
+                        'booked'
+                          ? styles.bookedDay
+                          : {}),
+
+                        ...(info.type ===
+                        'accepted'
+                          ? styles.acceptedDay
+                          : {}),
+
+                        ...(info.type ===
+                        'pending'
+                          ? styles.pendingDay
+                          : {}),
+
+                        ...(info.type ===
+                        'external'
+                          ? styles.externalDay
+                          : {}),
+
+                        ...(info.type ===
+                        'manual'
+                          ? styles.manualDay
+                          : {}),
+                      }}
+                    >
+                      <div
+                        style={
+                          styles.dayTop
+                        }
+                      >
+                        <span
+                          style={
+                            styles.dayNumber
+                          }
+                        >
+                          {
+                            date.getDate()
+                          }
+                        </span>
+
+                        {info.type ===
+                          'booked' && (
+                          <span
+                            style={
+                              styles.initialBadge
+                            }
+                          >
+                            {
+                              info.initials
+                            }
+                          </span>
+                        )}
+                      </div>
+
+                      {info.type !==
+                        'available' && (
+                        <div
+                          style={
+                            styles.dayBookingLine
+                          }
+                        >
+                          {info.type ===
+                          'external'
+                            ? info.source
+                            : info.label}
+                        </div>
+                      )}
+
+                      {isPast &&
+                        info.type ===
+                          'available' && (
+                          <div
+                            style={
+                              styles.pastEmpty
+                            }
+                          >
+                            &nbsp;
+                          </div>
+                        )}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          </section>
+          <aside
+            style={
+              styles.detailsColumn
+            }
+          >
+            <section
+              style={
+                styles.detailsCard
+              }
+            >
+              <h3
+                style={
+                  styles.detailsTitle
+                }
+              >
+                Date Details
+              </h3>
+
+              {!selectedDate ? (
+                <div
+                  style={
+                    styles.detailsEmpty
+                  }
+                >
+                  Select any date on the calendar to view booking details.
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={
+                      styles.selectedDateTitle
+                    }
+                  >
+                    {formatDate(
+                      selectedDate
+                    )}
+                  </div>
+
+                  {selectedDayDetails.bookings.length ===
+                    0 &&
+                    selectedDayDetails.blocks.length ===
+                      0 && (
+                      <div
+                        style={
+                          styles.availableDetails
+                        }
+                      >
+                        Available
+                      </div>
+                    )}
+
+                  {selectedDayDetails.bookings.map(
+                    (booking) => {
+                      const guestName =
+                        booking.guests
+                          ?.full_name ||
+                        'Guest';
+
+                      const isPaid =
+                        booking.payment_status ===
+                        'paid';
+
+                      const isConfirmed =
+                        booking.booking_status ===
+                        'confirmed';
+
+                      let displayStatus =
+                        'Booking Requested';
+
+                      if (
+                        isConfirmed &&
+                        isPaid
+                      ) {
+                        displayStatus =
+                          'Property Booked';
+                      } else if (
+                        isConfirmed
+                      ) {
+                        displayStatus =
+                          'Booking Accepted';
+                      }
+
+                      return (
+                        <div
+                          key={
+                            booking.id
+                          }
+                          style={
+                            styles.bookingDetailCard
+                          }
+                        >
+                          <div
+                            style={
+                              styles.detailStatus
+                            }
+                          >
+                            {
+                              displayStatus
+                            }
+                          </div>
+
+                          <DetailRow
+                            label="Guest"
+                            value={
+                              guestName
+                            }
+                          />
+
+                          <DetailRow
+                            label="Booking ID"
+                            value={
+                              booking.booking_code
+                            }
+                          />
+
+                          <DetailRow
+                            label="Check-in"
+                            value={formatDate(
+                              booking.check_in
+                            )}
+                          />
+
+                          <DetailRow
+                            label="Check-out"
+                            value={formatDate(
+                              booking.check_out
+                            )}
+                          />
+
+                          <DetailRow
+                            label="Payment"
+                            value={
+                              booking.payment_status ||
+                              'pending'
+                            }
+                          />
+
+                          <DetailRow
+                            label="Source"
+                            value="NightOutStays"
+                          />
+
+                          {booking.guests
+                            ?.phone && (
+                            <DetailRow
+                              label="Phone"
+                              value={
+                                booking.guests.phone
+                              }
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+                  )}
+
+                  {selectedDayDetails.blocks.map(
+                    (block) => (
+                      <div
+                        key={
+                          block.id
+                        }
+                        style={
+                          styles.blockDetailCard
+                        }
+                      >
+                        <div
+                          style={
+                            styles.blockStatus
+                          }
+                        >
+                          {String(
+                            block.source ||
+                              ''
+                          ).toLowerCase() ===
+                          'manual'
+                            ? 'Host Blocked'
+                            : 'Booked by Other Portal'}
+                        </div>
+
+                        <DetailRow
+                          label="Source"
+                          value={sourceLabel(
+                            block.source
+                          )}
+                        />
+
+                        <DetailRow
+                          label="From"
+                          value={formatDate(
+                            block.start_date
+                          )}
+                        />
+
+                        <DetailRow
+                          label="To"
+                          value={formatDate(
+                            block.end_date
+                          )}
+                        />
+
+                        <DetailRow
+                          label="Remark"
+                          value={
+                            block.reason ||
+                            (String(
+                              block.source ||
+                                ''
+                            ).toLowerCase() ===
+                            'manual'
+                              ? 'Blocked by host'
+                              : 'Booked by other portal')
+                          }
+                        />
+
+                        {block.external_uid && (
+                          <DetailRow
+                            label="External Reference"
+                            value={
+                              block.external_uid
+                            }
+                          />
+                        )}
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+            </section>
+
+            <section
+              style={
+                styles.syncCard
               }
             >
               <div
                 style={
-                  styles.listHeading
+                  styles.syncHeader
                 }
               >
-                Your Bookings
+                <div>
+                  <h3
+                    style={
+                      styles.detailsTitle
+                    }
+                  >
+                    Calendar Sync
+                  </h3>
+
+                  <div
+                    style={
+                      styles.syncDescription
+                    }
+                  >
+                    Connect this property calendar with Airbnb, Booking.com and other portals.
+                  </div>
+                </div>
               </div>
 
-              {bookings.map(
-                (booking) => (
-                  <button
-                    type="button"
-                    key={booking.id}
-                    onClick={() => {
-                      setActiveBookingId(
-                        booking.id
-                      );
+              <div
+                style={
+                  styles.syncProperty
+                }
+              >
+                <span>
+                  Property
+                </span>
 
-                      setNotice('');
-                      setError('');
+                <strong>
+                  {selectedProperty
+                    ?.name ||
+                    'Select property'}
+                </strong>
+              </div>
 
-                      setShowDiscountRequest(
-                        false
-                      );
+              <div
+                style={
+                  styles.syncSection
+                }
+              >
+                <div
+                  style={
+                    styles.syncSectionTitle
+                  }
+                >
+                  NightOutStays Export Calendar
+                </div>
 
-                      setDiscountText(
-                        ''
-                      );
-                    }}
-                    style={{
-                      ...styles.conversationButton,
+                <p
+                  style={
+                    styles.syncHelp
+                  }
+                >
+                  This will be the calendar link you can add to Airbnb, Booking.com or another website.
+                </p>
 
-                      ...(booking.id ===
-                      activeBookingId
-                        ? styles.activeConversation
-                        : {}),
-                    }}
-                  >
-                    <strong
-                      style={
-                        styles.bookingCode
-                      }
-                    >
-                      {
-                        booking.booking_code
-                      }
-                    </strong>
-
-                    <span
-                      style={
-                        styles.propertyName
-                      }
-                    >
-                      {booking.properties
-                        ?.name ||
-                        'Property'}
-                    </span>
-
-                    <span
-                      style={
-                        styles.bookingDates
-                      }
-                    >
-                      {formatStayDate(
-                        booking.check_in
-                      )}
-                      {' → '}
-                      {formatStayDate(
-                        booking.check_out
-                      )}
-                    </span>
-
-                    <span
-                      style={
-                        styles.bookingStatus
-                      }
-                    >
-                      {
-                        booking.booking_status
-                      }
-                      {' • '}
-                      {
-                        booking.payment_status
-                      }
-                    </span>
-                  </button>
-                )
-              )}
-            </aside>
-
-            <section
-              style={
-                styles.chatPanel
-              }
-            >
-              {activeBooking && (
-                <>
+                {selectedPropertyId ? (
                   <div
                     style={
-                      styles.chatHeader
+                      styles.exportBox
                     }
                   >
-                    <div>
-                      <h2
-                        style={
-                          styles.chatTitle
-                        }
-                      >
-                        {activeProperty?.name ||
-                          'Booking Conversation'}
-                      </h2>
-
-                      <div
-                        style={
-                          styles.chatMeta
-                        }
-                      >
-                        {
-                          activeBooking.booking_code
-                        }
-                        {' • '}
-                        {formatStayDate(
-                          activeBooking.check_in
-                        )}
-                        {' → '}
-                        {formatStayDate(
-                          activeBooking.check_out
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={
-                      styles.priceStrip
-                    }
-                  >
-                    <div>
-                      <span
-                        style={
-                          styles.priceLabel
-                        }
-                      >
-                        Current Payable
-                      </span>
-
-                      <strong>
-                        {money(
-                          finalPayable
-                        )}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span
-                        style={
-                          styles.priceLabel
-                        }
-                      >
-                        GST
-                      </span>
-
-                      <strong>
-                        {money(
-                          activeBooking.gst_amount ||
-                            0
-                        )}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span
-                        style={
-                          styles.priceLabel
-                        }
-                      >
-                        Offer Status
-                      </span>
-
-                      <strong>
-                        {activeBooking.offer_status ||
-                          'none'}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div
-                    style={
-                      styles.messagesArea
-                    }
-                  >
-                    {messages.map(
-                      (item) => {
-                        const isGuest =
-                          item.sender_type ===
-                          'guest';
-
-                        const discountRequest =
-                          String(
-                            item.message ||
-                              ''
-                          ).startsWith(
-                            'DISCOUNT REQUEST:'
-                          );
-
-                        if (
-                          item.message_type ===
-                          'special_offer'
-                        ) {
-                          return (
-                            <div
-                              key={
-                                item.id
-                              }
-                              style={
-                                styles.specialOfferCard
-                              }
-                            >
-                              <strong>
-                                HOST SPECIAL OFFER
-                              </strong>
-
-                              <div
-                                style={
-                                  styles.messageText
-                                }
-                              >
-                                {
-                                  item.message
-                                }
-                              </div>
-
-                              <div
-                                style={
-                                  styles.offerAmounts
-                                }
-                              >
-                                <div>
-                                  Accommodation
-                                  <br />
-                                  <strong>
-                                    {money(
-                                      activeBooking.taxable_amount
-                                    )}
-                                  </strong>
-                                </div>
-
-                                <div>
-                                  GST
-                                  <br />
-                                  <strong>
-                                    {money(
-                                      activeBooking.gst_amount
-                                    )}
-                                  </strong>
-                                </div>
-
-                                <div>
-                                  Final Payable
-                                  <br />
-                                  <strong>
-                                    {money(
-                                      activeBooking.final_payable_amount
-                                    )}
-                                  </strong>
-                                </div>
-                              </div>
-
-                              {offerPending && (
-                                <button
-                                  type="button"
-                                  onClick={
-                                    acceptSpecialOffer
-                                  }
-                                  disabled={
-                                    acceptingOffer
-                                  }
-                                  style={
-                                    styles.acceptOfferButton
-                                  }
-                                >
-                                  {acceptingOffer
-                                    ? 'Accepting...'
-                                    : 'Accept Offer'}
-                                </button>
-                              )}
-
-                              {offerAccepted &&
-                                !bookingPaid && (
-                                  <button
-                                    type="button"
-                                    onClick={
-                                      payNow
-                                    }
-                                    disabled={
-                                      paymentLoading
-                                    }
-                                    style={
-                                      styles.payButton
-                                    }
-                                  >
-                                    {paymentLoading
-                                      ? 'Opening Payment...'
-                                      : `Pay Now ${money(
-                                          finalPayable
-                                        )}`}
-                                  </button>
-                                )}
-
-                              {bookingPaid && (
-                                <div
-                                  style={
-                                    styles.paidBox
-                                  }
-                                >
-                                  Paid and confirmed
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={
-                              item.id
-                            }
-                            style={{
-                              display:
-                                'flex',
-
-                              justifyContent:
-                                isGuest
-                                  ? 'flex-end'
-                                  : 'flex-start',
-                            }}
-                          >
-                            <div
-                              style={
-                                isGuest
-                                  ? styles.guestBubble
-                                  : styles.hostBubble
-                              }
-                            >
-                              <strong>
-                                {discountRequest
-                                  ? 'Better Rate Request'
-                                  : item.sender_name}
-                              </strong>
-
-                              <div>
-                                {discountRequest
-                                  ? String(
-                                      item.message
-                                    ).replace(
-                                      /^DISCOUNT REQUEST:\s*/,
-                                      ''
-                                    )
-                                  : item.message}
-                              </div>
-
-                              <small>
-                                {formatDateTime(
-                                  item.created_at
-                                )}
-                              </small>
-                            </div>
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-
-                  {notice && (
-                    <div
-                      style={
-                        styles.noticeBox
-                      }
-                    >
-                      {notice}
-                    </div>
-                  )}
-
-                  {error && (
-                    <div
-                      style={
-                        styles.errorBox
-                      }
-                    >
-                      {error}
-                    </div>
-                  )}
-
-                  <form
-                    onSubmit={
-                      sendMessage
-                    }
-                    style={
-                      styles.messageComposer
-                    }
-                  >
-                    <textarea
+                    <input
+                      readOnly
                       value={
-                        messageText
+                        typeof window !==
+                        'undefined'
+                          ? `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`
+                          : `/api/calendar/${selectedPropertyId}.ics`
                       }
-                      onChange={(e) =>
-                        setMessageText(
-                          e.target.value
-                        )
-                      }
-                      placeholder="Write a message to the host..."
                       style={
-                        styles.messageInput
+                        styles.exportInput
                       }
                     />
 
                     <button
-                      type="submit"
-                      disabled={
-                        sending ||
-                        !messageText.trim()
-                      }
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const url =
+                            `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`;
+
+                          await navigator.clipboard.writeText(
+                            url
+                          );
+
+                          alert(
+                            'Calendar link copied.'
+                          );
+                        } catch (
+                          copyError
+                        ) {
+                          console.error(
+                            copyError
+                          );
+
+                          alert(
+                            'Unable to copy calendar link.'
+                          );
+                        }
+                      }}
                       style={
-                        styles.sendButton
+                        styles.copyButton
                       }
                     >
-                      {sending
-                        ? 'Sending...'
-                        : 'Send'}
+                      Copy Link
                     </button>
-                  </form>
+                  </div>
+                ) : (
+                  <div
+                    style={
+                      styles.syncDisabled
+                    }
+                  >
+                    Select a property first.
+                  </div>
+                )}
 
-                  {!bookingPaid &&
-                    !offerAccepted && (
-                      <div
-                        style={
-                          styles.discountArea
-                        }
-                      >
-                        {!showDiscountRequest ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setShowDiscountRequest(
-                                true
-                              )
-                            }
-                            style={
-                              styles.discountLink
-                            }
-                          >
-                            Want a better rate? Ask host
-                          </button>
-                        ) : (
-                          <div
-                            style={
-                              styles.discountInline
-                            }
-                          >
-                            <input
-                              value={
-                                discountText
-                              }
-                              onChange={(e) =>
-                                setDiscountText(
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Ask host for a better rate..."
-                              style={
-                                styles.discountInput
-                              }
-                            />
+                <div
+                  style={
+                    styles.syncNote
+                  }
+                >
+                  We will activate this export link in the next step. Do not add it to Airbnb yet.
+                </div>
+              </div>
 
-                            <button
-                              type="button"
-                              onClick={
-                                requestDiscount
-                              }
-                            >
-                              Ask
-                            </button>
+              <div
+                style={
+                  styles.syncDivider
+                }
+              />
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowDiscountRequest(
-                                  false
-                                );
+              <div
+                style={
+                  styles.syncSection
+                }
+              >
+                <div
+                  style={
+                    styles.syncSectionTitle
+                  }
+                >
+                  Import External Calendar
+                </div>
 
-                                setDiscountText(
-                                  ''
-                                );
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                </>
-              )}
+                <p
+                  style={
+                    styles.syncHelp
+                  }
+                >
+                  Airbnb or another portal's iCal URL will be added here so externally booked dates automatically appear on this calendar.
+                </p>
+
+                <div
+                  style={
+                    styles.importPreview
+                  }
+                >
+                  <select
+                    disabled
+                    style={
+                      styles.disabledInput
+                    }
+                  >
+                    <option>
+                      Airbnb
+                    </option>
+
+                    <option>
+                      Booking.com
+                    </option>
+
+                    <option>
+                      Other Portal
+                    </option>
+                  </select>
+
+                  <input
+                    disabled
+                    placeholder="Paste external iCal URL"
+                    style={
+                      styles.disabledInput
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    disabled
+                    style={
+                      styles.disabledButton
+                    }
+                  >
+                    Add Calendar
+                  </button>
+                </div>
+
+                <div
+                  style={
+                    styles.syncNote
+                  }
+                >
+                  External calendar import will be activated after the internal calendar is tested.
+                </div>
+              </div>
             </section>
-          </div>
-        )}
-      </div>
+          </aside>
+        </div>
+      </section>
     </main>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+}) {
+  return (
+    <div
+      style={
+        styles.detailRow
+      }
+    >
+      <span
+        style={
+          styles.detailLabel
+        }
+      >
+        {label}
+      </span>
+
+      <strong
+        style={
+          styles.detailValue
+        }
+      >
+        {value || '—'}
+      </strong>
+    </div>
+  );
+}
+
+function Legend({
+  label,
+  type,
+}) {
+  const typeStyles = {
+    booked: {
+      background:
+        '#dff4e5',
+      border:
+        '#76b68a',
+    },
+
+    accepted: {
+      background:
+        '#e8f1ff',
+      border:
+        '#7da7df',
+    },
+
+    pending: {
+      background:
+        '#fff4d9',
+      border:
+        '#d5ad4c',
+    },
+
+    external: {
+      background:
+        '#f0e9ff',
+      border:
+        '#9d7bd1',
+    },
+
+    manual: {
+      background:
+        '#fbe7e7',
+      border:
+        '#d98d8d',
+    },
+
+    available: {
+      background:
+        '#ffffff',
+      border:
+        '#d7dce2',
+    },
+  };
+
+  const current =
+    typeStyles[type] ||
+    typeStyles.available;
+
+  return (
+    <div
+      style={
+        styles.legendItem
+      }
+    >
+      <span
+        style={{
+          ...styles.legendDot,
+
+          background:
+            current.background,
+
+          borderColor:
+            current.border,
+        }}
+      />
+
+      <span>
+        {label}
+      </span>
+    </div>
   );
 }
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: '#f5f7fb',
-    color: '#0b2447',
+    minHeight:
+      '100vh',
+
+    background:
+      '#f5f7fa',
+
+    color:
+      '#102a43',
+
     fontFamily:
       'Arial, sans-serif',
   },
 
-  header: {
-    minHeight: 72,
-    padding: '10px 5%',
-    background: '#ffffff',
-    borderBottom:
-      '1px solid #e5e7eb',
-    display: 'flex',
-    alignItems: 'center',
+  loading: {
+    minHeight:
+      '100vh',
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
     justifyContent:
-      'space-between',
+      'center',
+
+    background:
+      '#f5f7fa',
+
+    color:
+      '#174f91',
+
+    fontFamily:
+      'Arial, sans-serif',
+
+    fontWeight:
+      700,
   },
 
-  logo: {
-    fontSize: 24,
-    fontWeight: 800,
-    color: '#174f91',
-    textDecoration: 'none',
+  header: {
+    minHeight:
+      72,
+
+    background:
+      '#ffffff',
+
+    borderBottom:
+      '1px solid #e4e7ec',
+
+    padding:
+      '10px 4%',
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      20,
+
+    position:
+      'sticky',
+
+    top:
+      0,
+
+    zIndex:
+      50,
+  },
+
+  brand: {
+    color:
+      '#174f91',
+
+    fontWeight:
+      800,
+
+    fontSize:
+      21,
+  },
+
+  subBrand: {
+    color:
+      '#667085',
+
+    fontSize:
+      10,
+
+    marginTop:
+      2,
   },
 
   headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 20,
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap:
+      20,
   },
 
   nav: {
-    display: 'flex',
-    gap: 15,
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap:
+      8,
+
+    flexWrap:
+      'wrap',
   },
 
   navLink: {
-    color: '#174f91',
-    textDecoration: 'none',
-    fontWeight: 700,
+    color:
+      '#174f91',
+
+    textDecoration:
+      'none',
+
+    fontSize:
+      12,
+
+    fontWeight:
+      700,
+
+    padding:
+      '8px 10px',
+
+    borderRadius:
+      7,
   },
 
   activeNavLink: {
-    color: '#ffffff',
-    background: '#174f91',
-    padding: '8px 13px',
-    borderRadius: 20,
-    textDecoration: 'none',
-    fontWeight: 700,
+    color:
+      '#ffffff',
+
+    background:
+      '#174f91',
+
+    textDecoration:
+      'none',
+
+    fontSize:
+      12,
+
+    fontWeight:
+      800,
+
+    padding:
+      '8px 12px',
+
+    borderRadius:
+      7,
   },
 
-  loginStatus: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
+  adminIdentity: {
+    textAlign:
+      'right',
+
+    fontSize:
+      11,
   },
 
-  loggedInLabel: {
-    fontSize: 9,
-    color: '#667085',
-  },
+  adminRole: {
+    color:
+      '#667085',
 
-  loggedInEmail: {
-    fontSize: 10,
-    color: '#667085',
-  },
+    fontSize:
+      9,
 
-  logoutButton: {
-    border:
-      '1px solid #d0d5dd',
-    background: '#ffffff',
-    borderRadius: 20,
-    padding: '8px 12px',
-    cursor: 'pointer',
+    marginTop:
+      2,
+
+    textTransform:
+      'uppercase',
   },
 
   container: {
-    width: '92%',
-    maxWidth: 1220,
-    margin: '0 auto',
-    padding: '30px 0',
+    width:
+      '94%',
+
+    maxWidth:
+      1450,
+
+    margin:
+      '0 auto',
+
+    padding:
+      '28px 0 70px',
   },
 
-  pageHeader: {
-    display: 'flex',
+  pageHeadingRow: {
+    display:
+      'flex',
+
+    alignItems:
+      'flex-end',
+
     justifyContent:
       'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+
+    gap:
+      20,
+
+    flexWrap:
+      'wrap',
   },
 
-  title: {
-    margin: 0,
+  pageHeading: {
+    margin:
+      0,
+
+    fontSize:
+      27,
   },
 
-  subtitle: {
-    color: '#667085',
+  pageSubheading: {
+    margin:
+      '7px 0 0',
+
+    color:
+      '#667085',
+
+    fontSize:
+      12,
   },
 
-  refreshButton: {
-    border: 0,
-    background: '#174f91',
-    color: '#ffffff',
-    padding: '9px 14px',
-    borderRadius: 8,
+  topActions: {
+    display:
+      'flex',
+
+    gap:
+      8,
   },
 
-  chatLayout: {
-    display: 'grid',
-    gridTemplateColumns:
-      '310px 1fr',
-    background: '#ffffff',
+  primaryButton: {
     border:
-      '1px solid #dfe3e8',
-    borderRadius: 15,
-    overflow: 'hidden',
+      0,
+
+    background:
+      '#174f91',
+
+    color:
+      '#ffffff',
+
+    padding:
+      '9px 14px',
+
+    borderRadius:
+      8,
+
+    fontWeight:
+      700,
+
+    cursor:
+      'pointer',
   },
 
-  conversationList: {
-    borderRight:
-      '1px solid #e5e7eb',
-  },
-
-  listHeading: {
-    padding: 15,
-    fontWeight: 800,
-  },
-
-  conversationButton: {
-    width: '100%',
-    padding: 14,
-    border: 0,
-    borderTop:
-      '1px solid #edf0f4',
-    background: '#ffffff',
-    textAlign: 'left',
-    display: 'grid',
-    gap: 4,
-  },
-
-  activeConversation: {
-    background: '#edf4ff',
-  },
-
-  bookingCode: {
-    color: '#174f91',
-    fontWeight: 800,
-  },
-
-  propertyName: {
-    fontWeight: 700,
-  },
-
-  bookingDates: {
-    fontSize: 11,
-    color: '#667085',
-  },
-
-  bookingStatus: {
-    fontSize: 10,
-    color: '#667085',
-  },
-
-  chatPanel: {
-    minWidth: 0,
-  },
-
-  chatHeader: {
-    padding: 16,
-    borderBottom:
-      '1px solid #e5e7eb',
-  },
-
-  chatTitle: {
-    margin: 0,
-  },
-
-  chatMeta: {
-    marginTop: 5,
-    fontSize: 11,
-    color: '#667085',
-  },
-
-  priceStrip: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(3, 1fr)',
-    gap: 10,
-    padding: 14,
-    borderBottom:
-      '1px solid #e5e7eb',
-  },
-
-  priceLabel: {
-    display: 'block',
-    fontSize: 9,
-    color: '#667085',
-    marginBottom: 4,
-  },
-
-  messagesArea: {
-    minHeight: 350,
-    maxHeight: 500,
-    overflowY: 'auto',
-    padding: 15,
-    display: 'grid',
-    gap: 10,
-  },
-
-  guestBubble: {
-    maxWidth: 450,
-    background: '#e8f1ff',
-    padding: 10,
-    borderRadius: 12,
-  },
-
-  hostBubble: {
-    maxWidth: 450,
-    background: '#ffffff',
+  secondaryButton: {
     border:
-      '1px solid #e1e5ea',
-    padding: 10,
-    borderRadius: 12,
-  },
+      '1px solid #cfd6df',
 
-  specialOfferCard: {
-    maxWidth: 520,
-    background: '#effaf2',
-    border:
-      '1px solid #aad4b8',
-    padding: 14,
-    borderRadius: 13,
-  },
+    background:
+      '#ffffff',
 
-  messageText: {
-    whiteSpace: 'pre-wrap',
-    marginTop: 7,
-    lineHeight: 1.45,
-  },
+    color:
+      '#174f91',
 
-  offerAmounts: {
-    display: 'grid',
-    gridTemplateColumns:
-      'repeat(3, 1fr)',
-    gap: 10,
-    marginTop: 12,
-    background: '#ffffff',
-    padding: 10,
-    borderRadius: 8,
-  },
+    padding:
+      '9px 14px',
 
-  acceptOfferButton: {
-    marginTop: 12,
-    border:
-      '1px solid #79b78d',
-    background: '#ffffff',
-    color: '#23743c',
-    padding: '9px 13px',
-    borderRadius: 7,
-    fontWeight: 800,
-  },
+    borderRadius:
+      8,
 
-  payButton: {
-    marginTop: 12,
-    border: 0,
-    background: '#174f91',
-    color: '#ffffff',
-    padding: '10px 15px',
-    borderRadius: 7,
-    fontWeight: 800,
-  },
+    fontWeight:
+      700,
 
-  paidBox: {
-    marginTop: 10,
-    color: '#23743c',
-    fontWeight: 800,
-  },
-
-  noticeBox: {
-    margin: 12,
-    padding: 10,
-    background: '#eaf7ee',
-    color: '#24723a',
-    borderRadius: 8,
+    cursor:
+      'pointer',
   },
 
   errorBox: {
-    margin: 12,
-    padding: 10,
-    background: '#fdeaea',
-    color: '#a12828',
-    borderRadius: 8,
+    marginTop:
+      15,
+
+    background:
+      '#fdeaea',
+
+    color:
+      '#a12828',
+
+    padding:
+      11,
+
+    borderRadius:
+      8,
+
+    fontSize:
+      12,
   },
 
-  messageComposer: {
-    display: 'grid',
+  propertyToolbar: {
+    marginTop:
+      22,
+
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #e0e5eb',
+
+    borderRadius:
+      12,
+
+    padding:
+      14,
+
+    display:
+      'grid',
+
     gridTemplateColumns:
-      '1fr auto',
-    gap: 10,
-    padding: 14,
-    borderTop:
+      'minmax(260px, 430px) 1fr',
+
+    gap:
+      20,
+
+    alignItems:
+      'end',
+  },
+
+  fieldLabel: {
+    display:
+      'grid',
+
+    gap:
+      6,
+
+    fontSize:
+      9,
+
+    fontWeight:
+      800,
+
+    color:
+      '#475467',
+  },
+
+  select: {
+    width:
+      '100%',
+
+    padding:
+      '10px 11px',
+
+    border:
+      '1px solid #cfd6df',
+
+    borderRadius:
+      8,
+
+    background:
+      '#ffffff',
+
+    color:
+      '#102a43',
+  },
+
+  selectedPropertyInfo: {
+    display:
+      'grid',
+
+    gap:
+      3,
+
+    fontSize:
+      13,
+  },
+
+  legend: {
+    margin:
+      '14px 0',
+
+    display:
+      'flex',
+
+    gap:
+      14,
+
+    alignItems:
+      'center',
+
+    flexWrap:
+      'wrap',
+
+    fontSize:
+      10,
+
+    color:
+      '#475467',
+  },
+
+  legendItem: {
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap:
+      5,
+  },
+
+  legendDot: {
+    width:
+      12,
+
+    height:
+      12,
+
+    borderRadius:
+      3,
+
+    border:
+      '1px solid',
+  },
+
+  calendarLayout: {
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      'minmax(0, 1fr) 340px',
+
+    gap:
+      18,
+
+    alignItems:
+      'start',
+  },
+
+  calendarCard: {
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #e0e5eb',
+
+    borderRadius:
+      14,
+
+    overflow:
+      'hidden',
+  },
+
+  calendarHeader: {
+    minHeight:
+      60,
+
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      '50px 1fr 50px',
+
+    alignItems:
+      'center',
+
+    borderBottom:
       '1px solid #e5e7eb',
   },
 
-  messageInput: {
-    minHeight: 55,
-    padding: 10,
+  monthTitle: {
+    textAlign:
+      'center',
+
+    margin:
+      0,
+
+    fontSize:
+      20,
+  },
+
+  monthButton: {
     border:
-      '1px solid #cfd6df',
-    borderRadius: 8,
+      0,
+
+    background:
+      'transparent',
+
+    color:
+      '#174f91',
+
+    fontSize:
+      30,
+
+    cursor:
+      'pointer',
   },
 
-  sendButton: {
-    border: 0,
-    background: '#174f91',
-    color: '#ffffff',
-    padding: '0 18px',
-    borderRadius: 8,
-    fontWeight: 800,
+  weekHeader: {
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      'repeat(7, minmax(0, 1fr))',
+
+    background:
+      '#f8fafc',
+
+    borderBottom:
+      '1px solid #e5e7eb',
   },
 
-  discountArea: {
-    textAlign: 'right',
-    padding: '0 14px 12px',
+  weekDay: {
+    padding:
+      '10px 5px',
+
+    textAlign:
+      'center',
+
+    fontSize:
+      10,
+
+    fontWeight:
+      800,
+
+    color:
+      '#667085',
   },
 
-  discountLink: {
-    border: 0,
-    background: 'transparent',
-    color: '#7b8490',
-    fontSize: 10,
-    textDecoration: 'underline',
-    cursor: 'pointer',
+  calendarGrid: {
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      'repeat(7, minmax(0, 1fr))',
   },
 
-  discountInline: {
-    display: 'flex',
-    gap: 6,
-    justifyContent: 'flex-end',
+  emptyDay: {
+    minHeight:
+      105,
+
+    background:
+      '#fafbfc',
+
+    borderRight:
+      '1px solid #edf0f3',
+
+    borderBottom:
+      '1px solid #edf0f3',
   },
 
-  discountInput: {
-    width: 260,
-    padding: 7,
+  dayCell: {
+    minHeight:
+      105,
+
+    padding:
+      8,
+
+    background:
+      '#ffffff',
+
     border:
-      '1px solid #d6dbe1',
-    borderRadius: 7,
+      0,
+
+    borderRight:
+      '1px solid #edf0f3',
+
+    borderBottom:
+      '1px solid #edf0f3',
+
+    textAlign:
+      'left',
+
+    cursor:
+      'pointer',
+
+    overflow:
+      'hidden',
   },
 
-  centerBox: {
-    maxWidth: 600,
-    margin: '100px auto',
-    background: '#ffffff',
-    padding: 30,
-    textAlign: 'center',
+  selectedDay: {
+    outline:
+      '2px solid #174f91',
+
+    outlineOffset:
+      '-2px',
   },
 
-  emptyCard: {
-    background: '#ffffff',
-    padding: 25,
-    borderRadius: 12,
+  bookedDay: {
+    background:
+      '#e5f6ea',
   },
 
-  primaryLink: {
-    color: '#174f91',
+  acceptedDay: {
+    background:
+      '#eaf2ff',
+  },
+
+  pendingDay: {
+    background:
+      '#fff6dd',
+  },
+
+  externalDay: {
+    background:
+      '#f3edff',
+  },
+
+  manualDay: {
+    background:
+      '#fdecec',
+  },
+
+  dayTop: {
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    alignItems:
+      'center',
+
+    gap:
+      4,
+  },
+
+  dayNumber: {
+    fontSize:
+      12,
+
+    fontWeight:
+      800,
+
+    color:
+      '#344054',
+  },
+
+  initialBadge: {
+    background:
+      '#24723a',
+
+    color:
+      '#ffffff',
+
+    borderRadius:
+      20,
+
+    padding:
+      '3px 6px',
+
+    fontSize:
+      8,
+
+    fontWeight:
+      800,
+  },
+
+  dayBookingLine: {
+    marginTop:
+      14,
+
+    borderLeft:
+      '3px solid #174f91',
+
+    paddingLeft:
+      6,
+
+    fontSize:
+      9,
+
+    fontWeight:
+      700,
+
+    lineHeight:
+      1.35,
+
+    overflow:
+      'hidden',
+
+    textOverflow:
+      'ellipsis',
+  },
+
+  pastEmpty: {
+    minHeight:
+      25,
+  },
+
+  detailsColumn: {
+    display:
+      'grid',
+
+    gap:
+      15,
+  },
+
+  detailsCard: {
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #e0e5eb',
+
+    borderRadius:
+      14,
+
+    padding:
+      15,
+  },
+
+  detailsTitle: {
+    margin:
+      0,
+
+    fontSize:
+      16,
+  },
+
+  detailsEmpty: {
+    marginTop:
+      14,
+
+    color:
+      '#667085',
+
+    fontSize:
+      11,
+
+    lineHeight:
+      1.5,
+  },
+
+  selectedDateTitle: {
+    marginTop:
+      12,
+
+    paddingBottom:
+      9,
+
+    borderBottom:
+      '1px solid #edf0f3',
+
+    fontWeight:
+      800,
+  },
+
+  availableDetails: {
+    marginTop:
+      12,
+
+    background:
+      '#edf8f0',
+
+    color:
+      '#24723a',
+
+    borderRadius:
+      8,
+
+    padding:
+      10,
+
+    fontWeight:
+      800,
+
+    fontSize:
+      11,
+  },
+
+  bookingDetailCard: {
+    marginTop:
+      12,
+
+    background:
+      '#f8fafc',
+
+    border:
+      '1px solid #e1e6eb',
+
+    borderRadius:
+      9,
+
+    padding:
+      11,
+
+    display:
+      'grid',
+
+    gap:
+      7,
+  },
+
+  blockDetailCard: {
+    marginTop:
+      12,
+
+    background:
+      '#faf7ff',
+
+    border:
+      '1px solid #ded2f1',
+
+    borderRadius:
+      9,
+
+    padding:
+      11,
+
+    display:
+      'grid',
+
+    gap:
+      7,
+  },
+
+  detailStatus: {
+    color:
+      '#174f91',
+
+    fontSize:
+      11,
+
+    fontWeight:
+      800,
+
+    marginBottom:
+      3,
+  },
+
+  blockStatus: {
+    color:
+      '#7047a6',
+
+    fontSize:
+      11,
+
+    fontWeight:
+      800,
+
+    marginBottom:
+      3,
+  },
+
+  detailRow: {
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      10,
+
+    fontSize:
+      10,
+  },
+
+  detailLabel: {
+    color:
+      '#667085',
+  },
+
+  detailValue: {
+    textAlign:
+      'right',
+
+    wordBreak:
+      'break-word',
+  },
+
+  syncCard: {
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #e0e5eb',
+
+    borderRadius:
+      14,
+
+    padding:
+      15,
+  },
+
+  syncHeader: {
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      10,
+  },
+
+  syncDescription: {
+    color:
+      '#667085',
+
+    fontSize:
+      10,
+
+    marginTop:
+      5,
+
+    lineHeight:
+      1.45,
+  },
+
+  syncProperty: {
+    marginTop:
+      13,
+
+    display:
+      'grid',
+
+    gap:
+      3,
+
+    background:
+      '#f7f9fc',
+
+    padding:
+      9,
+
+    borderRadius:
+      7,
+
+    fontSize:
+      10,
+  },
+
+  syncSection: {
+    marginTop:
+      15,
+  },
+
+  syncSectionTitle: {
+    fontSize:
+      11,
+
+    fontWeight:
+      800,
+  },
+
+  syncHelp: {
+    fontSize:
+      9,
+
+    lineHeight:
+      1.45,
+
+    color:
+      '#667085',
+  },
+
+  exportBox: {
+    display:
+      'grid',
+
+    gridTemplateColumns:
+      '1fr auto',
+
+    gap:
+      6,
+  },
+
+  exportInput: {
+    minWidth:
+      0,
+
+    border:
+      '1px solid #d5dae1',
+
+    borderRadius:
+      7,
+
+    padding:
+      8,
+
+    fontSize:
+      9,
+
+    color:
+      '#475467',
+
+    background:
+      '#fafafa',
+  },
+
+  copyButton: {
+    border:
+      0,
+
+    background:
+      '#174f91',
+
+    color:
+      '#ffffff',
+
+    borderRadius:
+      7,
+
+    padding:
+      '8px 10px',
+
+    fontSize:
+      9,
+
+    fontWeight:
+      700,
+
+    cursor:
+      'pointer',
+  },
+
+  syncNote: {
+    marginTop:
+      7,
+
+    color:
+      '#8a6d1f',
+
+    background:
+      '#fff8e7',
+
+    padding:
+      7,
+
+    borderRadius:
+      6,
+
+    fontSize:
+      8,
+
+    lineHeight:
+      1.4,
+  },
+
+  syncDivider: {
+    height:
+      1,
+
+    background:
+      '#edf0f3',
+
+    margin:
+      '16px 0',
+  },
+
+  importPreview: {
+    display:
+      'grid',
+
+    gap:
+      6,
+  },
+
+  disabledInput: {
+    border:
+      '1px solid #d8dde4',
+
+    borderRadius:
+      7,
+
+    padding:
+      8,
+
+    background:
+      '#f4f5f7',
+
+    color:
+      '#98a2b3',
+
+    fontSize:
+      9,
+  },
+
+  disabledButton: {
+    border:
+      0,
+
+    background:
+      '#d0d5dd',
+
+    color:
+      '#ffffff',
+
+    borderRadius:
+      7,
+
+    padding:
+      8,
+
+    fontSize:
+      9,
+  },
+
+  syncDisabled: {
+    color:
+      '#98a2b3',
+
+    fontSize:
+      9,
   },
 };
