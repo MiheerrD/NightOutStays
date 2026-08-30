@@ -28,9 +28,7 @@ function formatDateTime(value) {
   if (!value) return '';
 
   try {
-    return new Date(
-      value
-    ).toLocaleString(
+    return new Date(value).toLocaleString(
       'en-IN',
       {
         dateStyle: 'medium',
@@ -43,9 +41,7 @@ function formatDateTime(value) {
 }
 
 function formatStayDate(value) {
-  if (!value) {
-    return '—';
-  }
+  if (!value) return '—';
 
   try {
     return new Date(
@@ -64,57 +60,79 @@ function formatStayDate(value) {
 }
 
 function loadRazorpayScript() {
-  return new Promise(
-    (resolve) => {
-      if (
-        typeof window !==
-        'undefined' &&
-        window.Razorpay
-      ) {
-        resolve(true);
-        return;
-      }
+  return new Promise((resolve) => {
+    if (
+      typeof window !== 'undefined' &&
+      window.Razorpay
+    ) {
+      resolve(true);
+      return;
+    }
 
-      const existing =
-        document.querySelector(
-          'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
-        );
+    const existing =
+      document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+      );
 
-      if (existing) {
-        existing.addEventListener(
-          'load',
-          () => resolve(true)
-        );
+    if (existing) {
+      existing.addEventListener(
+        'load',
+        () => resolve(true)
+      );
 
-        existing.addEventListener(
-          'error',
-          () => resolve(false)
-        );
+      existing.addEventListener(
+        'error',
+        () => resolve(false)
+      );
 
-        return;
-      }
+      return;
+    }
 
-      const script =
-        document.createElement(
-          'script'
-        );
+    const script =
+      document.createElement('script');
 
-      script.src =
-        'https://checkout.razorpay.com/v1/checkout.js';
+    script.src =
+      'https://checkout.razorpay.com/v1/checkout.js';
 
-      script.async = true;
+    script.async = true;
 
-      script.onload = () =>
-        resolve(true);
+    script.onload = () =>
+      resolve(true);
 
-      script.onerror = () =>
-        resolve(false);
+    script.onerror = () =>
+      resolve(false);
 
-      document.body.appendChild(
-        script
+    document.body.appendChild(
+      script
+    );
+  });
+}
+
+async function readJsonResponse(
+  response
+) {
+  const responseText =
+    await response.text();
+
+  if (!responseText) {
+    if (!response.ok) {
+      throw new Error(
+        `Server returned an empty response. Status: ${response.status}`
       );
     }
-  );
+
+    return {};
+  }
+
+  try {
+    return JSON.parse(
+      responseText
+    );
+  } catch {
+    throw new Error(
+      `Server returned an invalid response. Status: ${response.status}`
+    );
+  }
 }
 
 export default function GuestMessagesPage() {
@@ -193,142 +211,106 @@ export default function GuestMessagesPage() {
     setPaymentLoading,
   ] = useState(false);
 
-  useEffect(
-    () => {
-      initialisePage();
-    },
-    []
-  );
+  useEffect(() => {
+    initialisePage();
+  }, []);
 
-  useEffect(
-    () => {
-      if (
+  useEffect(() => {
+    if (activeBookingId) {
+      loadMessages(
         activeBookingId
-      ) {
-        loadMessages(
-          activeBookingId
-        );
-      }
-    },
-    [
-      activeBookingId,
-    ]
-  );
+      );
+    }
+  }, [activeBookingId]);
 
-  /*
-    REALTIME MESSAGES
-  */
+  useEffect(() => {
+    if (!activeBookingId) {
+      return;
+    }
 
-  useEffect(
-    () => {
-      if (
-        !activeBookingId
-      ) {
-        return;
-      }
+    const channel =
+      supabase
+        .channel(
+          `guest-messages-${activeBookingId}`
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table:
+              'booking_messages',
+            filter:
+              `booking_id=eq.${activeBookingId}`,
+          },
+          async () => {
+            await loadMessages(
+              activeBookingId
+            );
 
-      const channel =
-        supabase
-          .channel(
-            `guest-messages-${activeBookingId}`
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table:
-                'booking_messages',
-              filter:
-                `booking_id=eq.${activeBookingId}`,
-            },
-            async () => {
-              await loadMessages(
-                activeBookingId
-              );
-
-              if (
-                guest?.id
-              ) {
-                await loadBookings(
-                  guest.id
-                );
-              }
-            }
-          )
-          .subscribe();
-
-      return () => {
-        supabase.removeChannel(
-          channel
-        );
-      };
-    },
-    [
-      activeBookingId,
-      guest?.id,
-    ]
-  );
-
-  /*
-    REALTIME BOOKING STATUS / OFFER / PAYMENT
-  */
-
-  useEffect(
-    () => {
-      if (
-        !activeBookingId ||
-        !guest?.id
-      ) {
-        return;
-      }
-
-      const channel =
-        supabase
-          .channel(
-            `guest-booking-${activeBookingId}`
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'bookings',
-              filter:
-                `id=eq.${activeBookingId}`,
-            },
-            async () => {
+            if (guest?.id) {
               await loadBookings(
                 guest.id
               );
             }
-          )
-          .subscribe();
+          }
+        )
+        .subscribe();
 
-      return () => {
-        supabase.removeChannel(
-          channel
-        );
-      };
-    },
-    [
-      activeBookingId,
-      guest?.id,
-    ]
-  );
+    return () => {
+      supabase.removeChannel(
+        channel
+      );
+    };
+  }, [
+    activeBookingId,
+    guest?.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeBookingId ||
+      !guest?.id
+    ) {
+      return;
+    }
+
+    const channel =
+      supabase
+        .channel(
+          `guest-booking-${activeBookingId}`
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'bookings',
+            filter:
+              `id=eq.${activeBookingId}`,
+          },
+          async () => {
+            await loadBookings(
+              guest.id
+            );
+          }
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        channel
+      );
+    };
+  }, [
+    activeBookingId,
+    guest?.id,
+  ]);
 
   async function initialisePage() {
-    setLoading(
-      true
-    );
-
-    setError(
-      ''
-    );
-
-    setNotice(
-      ''
-    );
+    setLoading(true);
+    setError('');
+    setNotice('');
 
     try {
       const {
@@ -341,15 +323,12 @@ export default function GuestMessagesPage() {
       } =
         await supabase.auth.getSession();
 
-      if (
-        sessionError
-      ) {
+      if (sessionError) {
         throw sessionError;
       }
 
       if (
-        !currentSession
-          ?.user
+        !currentSession?.user
       ) {
         window.location.href =
           `/login?redirect=${encodeURIComponent(
@@ -384,9 +363,7 @@ export default function GuestMessagesPage() {
           guestError,
       } =
         await supabase
-          .from(
-            'guests'
-          )
+          .from('guests')
           .select(
             'id, full_name, phone, email, created_at'
           )
@@ -403,9 +380,7 @@ export default function GuestMessagesPage() {
           )
           .limit(1);
 
-      if (
-        guestError
-      ) {
+      if (guestError) {
         throw guestError;
       }
 
@@ -413,9 +388,7 @@ export default function GuestMessagesPage() {
         guestRows?.[0] ||
         null;
 
-      if (
-        !foundGuest
-      ) {
+      if (!foundGuest) {
         throw new Error(
           'No guest profile was found for this login.'
         );
@@ -440,9 +413,7 @@ export default function GuestMessagesPage() {
           'Unable to open messages.'
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
@@ -462,9 +433,7 @@ export default function GuestMessagesPage() {
         bookingError,
     } =
       await supabase
-        .from(
-          'bookings'
-        )
+        .from('bookings')
         .select(`
           id,
           booking_code,
@@ -515,31 +484,21 @@ export default function GuestMessagesPage() {
           }
         );
 
-    if (
-      bookingError
-    ) {
+    if (bookingError) {
       throw bookingError;
     }
 
     const rows =
       data || [];
 
-    setBookings(
-      rows
-    );
+    setBookings(rows);
 
-    if (
-      rows.length
-    ) {
+    if (rows.length) {
       setActiveBookingId(
-        (
-          current
-        ) => {
+        (current) => {
           const stillExists =
             rows.some(
-              (
-                booking
-              ) =>
+              (booking) =>
                 booking.id ===
                 current
             );
@@ -550,22 +509,15 @@ export default function GuestMessagesPage() {
         }
       );
     } else {
-      setActiveBookingId(
-        ''
-      );
+      setActiveBookingId('');
     }
   }
 
   async function loadMessages(
     bookingId
   ) {
-    if (
-      !bookingId
-    ) {
-      setMessages(
-        []
-      );
-
+    if (!bookingId) {
+      setMessages([]);
       return;
     }
 
@@ -593,9 +545,7 @@ export default function GuestMessagesPage() {
           }
         );
 
-    if (
-      messageError
-    ) {
+    if (messageError) {
       console.error(
         messageError
       );
@@ -620,8 +570,7 @@ export default function GuestMessagesPage() {
           'booking_messages'
         )
         .update({
-          is_read:
-            true,
+          is_read: true,
         })
         .eq(
           'booking_id',
@@ -636,9 +585,7 @@ export default function GuestMessagesPage() {
           false
         );
 
-    if (
-      readError
-    ) {
+    if (readError) {
       console.warn(
         readError
       );
@@ -649,9 +596,7 @@ export default function GuestMessagesPage() {
     useMemo(
       () =>
         bookings.find(
-          (
-            booking
-          ) =>
+          (booking) =>
             booking.id ===
             activeBookingId
         ) || null,
@@ -677,30 +622,6 @@ export default function GuestMessagesPage() {
         0
     );
 
-  const specialOfferMessage =
-    useMemo(
-      () => {
-        const offers =
-          messages.filter(
-            (
-              item
-            ) =>
-              item.message_type ===
-              'special_offer'
-          );
-
-        return offers.length
-          ? offers[
-              offers.length -
-                1
-            ]
-          : null;
-      },
-      [
-        messages,
-      ]
-    );
-
   const bookingPaid =
     activeBooking
       ?.payment_status ===
@@ -721,13 +642,8 @@ export default function GuestMessagesPage() {
   ) {
     event.preventDefault();
 
-    setError(
-      ''
-    );
-
-    setNotice(
-      ''
-    );
+    setError('');
+    setNotice('');
 
     const text =
       String(
@@ -749,19 +665,7 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    if (
-      bookingPaid
-    ) {
-      setError(
-        'This booking is already confirmed and paid.'
-      );
-
-      return;
-    }
-
-    setSending(
-      true
-    );
+    setSending(true);
 
     try {
       const {
@@ -783,8 +687,7 @@ export default function GuestMessagesPage() {
               guest.full_name ||
               'Guest',
 
-            message:
-              text,
+            message: text,
 
             message_type:
               'message',
@@ -793,15 +696,11 @@ export default function GuestMessagesPage() {
               false,
           });
 
-      if (
-        insertError
-      ) {
+      if (insertError) {
         throw insertError;
       }
 
-      setMessageText(
-        ''
-      );
+      setMessageText('');
 
       await loadMessages(
         activeBooking.id
@@ -818,20 +717,13 @@ export default function GuestMessagesPage() {
           'Message could not be sent.'
       );
     } finally {
-      setSending(
-        false
-      );
+      setSending(false);
     }
   }
 
   async function requestDiscount() {
-    setError(
-      ''
-    );
-
-    setNotice(
-      ''
-    );
+    setError('');
+    setNotice('');
 
     if (
       !activeBooking ||
@@ -844,9 +736,7 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    if (
-      bookingPaid
-    ) {
+    if (bookingPaid) {
       setError(
         'Discount cannot be requested after payment.'
       );
@@ -854,9 +744,7 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    if (
-      offerAccepted
-    ) {
+    if (offerAccepted) {
       setError(
         'You already accepted the host special offer.'
       );
@@ -877,9 +765,7 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    setDiscountSending(
-      true
-    );
+    setDiscountSending(true);
 
     try {
       const {
@@ -911,29 +797,16 @@ export default function GuestMessagesPage() {
               false,
           });
 
-      if (
-        messageError
-      ) {
+      if (messageError) {
         throw messageError;
       }
-
-      /*
-        This booking flag is useful
-        for the host dashboard.
-
-        If RLS blocks it, the chat
-        request is still successfully
-        saved.
-      */
 
       const {
         error:
           updateError,
       } =
         await supabase
-          .from(
-            'bookings'
-          )
+          .from('bookings')
           .update({
             guest_discount_requested:
               true,
@@ -946,17 +819,13 @@ export default function GuestMessagesPage() {
             activeBooking.id
           );
 
-      if (
-        updateError
-      ) {
+      if (updateError) {
         console.warn(
           updateError
         );
       }
 
-      setDiscountText(
-        ''
-      );
+      setDiscountText('');
 
       setShowDiscountRequest(
         false
@@ -981,44 +850,29 @@ export default function GuestMessagesPage() {
           'Request could not be sent.'
       );
     } finally {
-      setDiscountSending(
-        false
-      );
+      setDiscountSending(false);
     }
   }
 
   async function acceptSpecialOffer() {
-    if (
-      !activeBooking
-    ) {
+    if (!activeBooking) {
       return;
     }
 
-    if (
-      bookingPaid
-    ) {
+    if (bookingPaid) {
       return;
     }
 
-    setAcceptingOffer(
-      true
-    );
-
-    setError(
-      ''
-    );
-
-    setNotice(
-      ''
-    );
+    setAcceptingOffer(true);
+    setError('');
+    setNotice('');
 
     try {
       const response =
         await fetch(
           '/api/bookings/accept-offer',
           {
-            method:
-              'POST',
+            method: 'POST',
 
             headers: {
               'Content-Type':
@@ -1034,20 +888,28 @@ export default function GuestMessagesPage() {
         );
 
       const result =
-        await response.json();
+        await readJsonResponse(
+          response
+        );
 
-      if (
-        !response.ok
-      ) {
+      if (!response.ok) {
         throw new Error(
           result.error ||
-            'Unable to accept offer.'
+            `Unable to accept offer. Status: ${response.status}`
+        );
+      }
+
+      if (!result.success) {
+        throw new Error(
+          result.error ||
+            'Unable to accept special offer.'
         );
       }
 
       setNotice(
         `Special offer accepted. Final payable: ${money(
-          result.finalPayableAmount
+          result.finalPayableAmount ||
+            activeBooking.final_payable_amount
         )}`
       );
 
@@ -1070,9 +932,7 @@ export default function GuestMessagesPage() {
           'Unable to accept special offer.'
       );
     } finally {
-      setAcceptingOffer(
-        false
-      );
+      setAcceptingOffer(false);
     }
   }
 
@@ -1084,9 +944,7 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    if (
-      bookingPaid
-    ) {
+    if (bookingPaid) {
       setNotice(
         'This booking is already paid.'
       );
@@ -1105,25 +963,15 @@ export default function GuestMessagesPage() {
       return;
     }
 
-    setPaymentLoading(
-      true
-    );
-
-    setError(
-      ''
-    );
-
-    setNotice(
-      ''
-    );
+    setPaymentLoading(true);
+    setError('');
+    setNotice('');
 
     try {
       const scriptReady =
         await loadRazorpayScript();
 
-      if (
-        !scriptReady
-      ) {
+      if (!scriptReady) {
         throw new Error(
           'Unable to load Razorpay checkout.'
         );
@@ -1133,8 +981,7 @@ export default function GuestMessagesPage() {
         await fetch(
           '/api/razorpay/create-order',
           {
-            method:
-              'POST',
+            method: 'POST',
 
             headers: {
               'Content-Type':
@@ -1150,14 +997,14 @@ export default function GuestMessagesPage() {
         );
 
       const order =
-        await orderResponse.json();
+        await readJsonResponse(
+          orderResponse
+        );
 
-      if (
-        !orderResponse.ok
-      ) {
+      if (!orderResponse.ok) {
         throw new Error(
           order.error ||
-            'Unable to create payment order.'
+            `Unable to create payment order. Status: ${orderResponse.status}`
         );
       }
 
@@ -1201,8 +1048,6 @@ export default function GuestMessagesPage() {
             activeBooking.booking_code,
         },
 
-        theme: {},
-
         handler:
           async function (
             paymentResponse
@@ -1238,14 +1083,16 @@ export default function GuestMessagesPage() {
                 );
 
               const verified =
-                await verifyResponse.json();
+                await readJsonResponse(
+                  verifyResponse
+                );
 
               if (
                 !verifyResponse.ok
               ) {
                 throw new Error(
                   verified.error ||
-                    'Payment verification failed.'
+                    `Payment verification failed. Status: ${verifyResponse.status}`
                 );
               }
 
@@ -1272,17 +1119,13 @@ export default function GuestMessagesPage() {
                   'Payment was received but verification failed.'
               );
             } finally {
-              setPaymentLoading(
-                false
-              );
+              setPaymentLoading(false);
             }
           },
 
         modal: {
           ondismiss: () => {
-            setPaymentLoading(
-              false
-            );
+            setPaymentLoading(false);
           },
         },
       };
@@ -1294,12 +1137,8 @@ export default function GuestMessagesPage() {
 
       razorpay.on(
         'payment.failed',
-        (
-          response
-        ) => {
-          setPaymentLoading(
-            false
-          );
+        (response) => {
+          setPaymentLoading(false);
 
           setError(
             response.error
@@ -1317,9 +1156,7 @@ export default function GuestMessagesPage() {
         paymentError
       );
 
-      setPaymentLoading(
-        false
-      );
+      setPaymentLoading(false);
 
       setError(
         paymentError.message ||
@@ -1328,20 +1165,10 @@ export default function GuestMessagesPage() {
     }
   }
 
-  if (
-    loading
-  ) {
+  if (loading) {
     return (
-      <main
-        style={
-          styles.page
-        }
-      >
-        <div
-          style={
-            styles.centerBox
-          }
-        >
+      <main style={styles.page}>
+        <div style={styles.centerBox}>
           Loading your messages...
         </div>
       </main>
@@ -1353,23 +1180,13 @@ export default function GuestMessagesPage() {
     !guest
   ) {
     return (
-      <main
-        style={
-          styles.page
-        }
-      >
-        <div
-          style={
-            styles.centerBox
-          }
-        >
+      <main style={styles.page}>
+        <div style={styles.centerBox}>
           <h2>
             Messages unavailable
           </h2>
 
-          <p>
-            {error}
-          </p>
+          <p>{error}</p>
 
           <a
             href="/"
@@ -1385,21 +1202,11 @@ export default function GuestMessagesPage() {
   }
 
   return (
-    <main
-      style={
-        styles.page
-      }
-    >
-      <header
-        style={
-          styles.header
-        }
-      >
+    <main style={styles.page}>
+      <header style={styles.header}>
         <a
           href="/"
-          style={
-            styles.logo
-          }
+          style={styles.logo}
         >
           NightOutStays
         </a>
@@ -1409,11 +1216,7 @@ export default function GuestMessagesPage() {
             styles.headerRight
           }
         >
-          <nav
-            style={
-              styles.nav
-            }
-          >
+          <nav style={styles.nav}>
             <a
               href="/"
               style={
@@ -1478,22 +1281,14 @@ export default function GuestMessagesPage() {
         </div>
       </header>
 
-      <div
-        style={
-          styles.container
-        }
-      >
+      <div style={styles.container}>
         <div
           style={
             styles.pageHeader
           }
         >
           <div>
-            <h1
-              style={
-                styles.title
-              }
-            >
+            <h1 style={styles.title}>
               Messages
             </h1>
 
@@ -1533,15 +1328,6 @@ export default function GuestMessagesPage() {
             <p>
               Once you request a stay, its conversation will appear here.
             </p>
-
-            <a
-              href="/"
-              style={
-                styles.primaryLink
-              }
-            >
-              Browse Properties
-            </a>
           </div>
         ) : (
           <div
@@ -1563,98 +1349,84 @@ export default function GuestMessagesPage() {
               </div>
 
               {bookings.map(
-                (
-                  booking
-                ) => {
-                  const property =
-                    booking.properties;
-
-                  const active =
-                    booking.id ===
-                    activeBookingId;
-
-                  return (
-                    <button
-                      type="button"
-                      key={
+                (booking) => (
+                  <button
+                    type="button"
+                    key={booking.id}
+                    onClick={() => {
+                      setActiveBookingId(
                         booking.id
+                      );
+
+                      setNotice('');
+                      setError('');
+
+                      setShowDiscountRequest(
+                        false
+                      );
+
+                      setDiscountText(
+                        ''
+                      );
+                    }}
+                    style={{
+                      ...styles.conversationButton,
+
+                      ...(booking.id ===
+                      activeBookingId
+                        ? styles.activeConversation
+                        : {}),
+                    }}
+                  >
+                    <strong
+                      style={
+                        styles.bookingCode
                       }
-                      onClick={() => {
-                        setActiveBookingId(
-                          booking.id
-                        );
-
-                        setNotice(
-                          ''
-                        );
-
-                        setError(
-                          ''
-                        );
-
-                        setShowDiscountRequest(
-                          false
-                        );
-
-                        setDiscountText(
-                          ''
-                        );
-                      }}
-                      style={{
-                        ...styles.conversationButton,
-
-                        ...(active
-                          ? styles.activeConversation
-                          : {}),
-                      }}
                     >
-                      <strong
-                        style={
-                          styles.bookingCode
-                        }
-                      >
-                        {
-                          booking.booking_code
-                        }
-                      </strong>
+                      {
+                        booking.booking_code
+                      }
+                    </strong>
 
-                      <span
-                        style={
-                          styles.propertyName
-                        }
-                      >
-                        {property?.name ||
-                          'Property'}
-                      </span>
+                    <span
+                      style={
+                        styles.propertyName
+                      }
+                    >
+                      {booking.properties
+                        ?.name ||
+                        'Property'}
+                    </span>
 
-                      <span
-                        style={
-                          styles.bookingDates
-                        }
-                      >
-                        {formatStayDate(
-                          booking.check_in
-                        )}
-                        {' → '}
-                        {formatStayDate(
-                          booking.check_out
-                        )}
-                      </span>
+                    <span
+                      style={
+                        styles.bookingDates
+                      }
+                    >
+                      {formatStayDate(
+                        booking.check_in
+                      )}
+                      {' → '}
+                      {formatStayDate(
+                        booking.check_out
+                      )}
+                    </span>
 
-                      <span
-                        style={
-                          styles.bookingStatus
-                        }
-                      >
-                        {booking.booking_status ||
-                          'pending'}
-                        {' • '}
-                        {booking.payment_status ||
-                          'unpaid'}
-                      </span>
-                    </button>
-                  );
-                }
+                    <span
+                      style={
+                        styles.bookingStatus
+                      }
+                    >
+                      {
+                        booking.booking_status
+                      }
+                      {' • '}
+                      {
+                        booking.payment_status
+                      }
+                    </span>
+                  </button>
+                )
               )}
             </aside>
 
@@ -1698,32 +1470,6 @@ export default function GuestMessagesPage() {
                         )}
                       </div>
                     </div>
-
-                    <div
-                      style={
-                        styles.statusGroup
-                      }
-                    >
-                      <span
-                        style={
-                          styles.statusPill
-                        }
-                      >
-                        {
-                          activeBooking.booking_status
-                        }
-                      </span>
-
-                      <span
-                        style={
-                          styles.statusPill
-                        }
-                      >
-                        {
-                          activeBooking.payment_status
-                        }
-                      </span>
-                    </div>
                   </div>
 
                   <div
@@ -1746,32 +1492,6 @@ export default function GuestMessagesPage() {
                         )}
                       </strong>
                     </div>
-
-                    {Number(
-                      activeBooking.host_discount_amount ||
-                        0
-                    ) > 0 && (
-                      <div>
-                        <span
-                          style={
-                            styles.priceLabel
-                          }
-                        >
-                          Host Discount
-                        </span>
-
-                        <strong
-                          style={
-                            styles.discountAmount
-                          }
-                        >
-                          -
-                          {money(
-                            activeBooking.host_discount_amount
-                          )}
-                        </strong>
-                      </div>
-                    )}
 
                     <div>
                       <span
@@ -1811,357 +1531,185 @@ export default function GuestMessagesPage() {
                       styles.messagesArea
                     }
                   >
-                    {messages.length === 0 ? (
-                      <div
-                        style={
-                          styles.noMessages
-                        }
-                      >
-                        No messages yet. Start the conversation with the host.
-                      </div>
-                    ) : (
-                      messages.map(
-                        (
-                          item
-                        ) => {
-                          const isGuest =
-                            item.sender_type ===
-                            'guest';
+                    {messages.map(
+                      (item) => {
+                        const isGuest =
+                          item.sender_type ===
+                          'guest';
 
-                          const isDiscountRequest =
-                            String(
-                              item.message ||
-                                ''
-                            ).startsWith(
-                              'DISCOUNT REQUEST:'
-                            );
+                        const discountRequest =
+                          String(
+                            item.message ||
+                              ''
+                          ).startsWith(
+                            'DISCOUNT REQUEST:'
+                          );
 
-                          const isSpecialOffer =
-                            item.message_type ===
-                            'special_offer';
-
-                          const isSystem =
-                            item.sender_type ===
-                              'system' ||
-                            item.message_type ===
-                              'system' ||
-                            item.message_type ===
-                              'confirmation';
-
-                          if (
-                            isSystem
-                          ) {
-                            return (
-                              <div
-                                key={
-                                  item.id
-                                }
-                                style={
-                                  styles.systemMessage
-                                }
-                              >
-                                <div>
-                                  {
-                                    item.message
-                                  }
-                                </div>
-
-                                <div
-                                  style={
-                                    styles.messageTime
-                                  }
-                                >
-                                  {formatDateTime(
-                                    item.created_at
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          if (
-                            isSpecialOffer
-                          ) {
-                            return (
-                              <div
-                                key={
-                                  item.id
-                                }
-                                style={
-                                  styles.specialOfferMessageRow
-                                }
-                              >
-                                <div
-                                  style={
-                                    styles.specialOfferCard
-                                  }
-                                >
-                                  <div
-                                    style={
-                                      styles.specialOfferBadge
-                                    }
-                                  >
-                                    HOST SPECIAL OFFER
-                                  </div>
-
-                                  <div
-                                    style={
-                                      styles.specialOfferTitle
-                                    }
-                                  >
-                                    Special rate offered for this booking
-                                  </div>
-
-                                  <div
-                                    style={
-                                      styles.specialOfferText
-                                    }
-                                  >
-                                    {
-                                      item.message
-                                    }
-                                  </div>
-
-                                  <div
-                                    style={
-                                      styles.offerPriceBox
-                                    }
-                                  >
-                                    <div>
-                                      <span
-                                        style={
-                                          styles.offerPriceLabel
-                                        }
-                                      >
-                                        Accommodation
-                                      </span>
-
-                                      <strong>
-                                        {money(
-                                          activeBooking.taxable_amount ||
-                                            0
-                                        )}
-                                      </strong>
-                                    </div>
-
-                                    <div>
-                                      <span
-                                        style={
-                                          styles.offerPriceLabel
-                                        }
-                                      >
-                                        GST
-                                      </span>
-
-                                      <strong>
-                                        {money(
-                                          activeBooking.gst_amount ||
-                                            0
-                                        )}
-                                      </strong>
-                                    </div>
-
-                                    <div>
-                                      <span
-                                        style={
-                                          styles.offerPriceLabel
-                                        }
-                                      >
-                                        Final Payable
-                                      </span>
-
-                                      <strong
-                                        style={
-                                          styles.finalOfferAmount
-                                        }
-                                      >
-                                        {money(
-                                          activeBooking.final_payable_amount ||
-                                            0
-                                        )}
-                                      </strong>
-                                    </div>
-                                  </div>
-
-                                  {offerPending && (
-                                    <div
-                                      style={
-                                        styles.offerActions
-                                      }
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={
-                                          acceptSpecialOffer
-                                        }
-                                        disabled={
-                                          acceptingOffer
-                                        }
-                                        style={{
-                                          ...styles.acceptOfferButton,
-
-                                          ...(acceptingOffer
-                                            ? styles.disabledButton
-                                            : {}),
-                                        }}
-                                      >
-                                        {acceptingOffer
-                                          ? 'Accepting...'
-                                          : 'Accept Offer'}
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {offerAccepted &&
-                                    !bookingPaid && (
-                                      <div
-                                        style={
-                                          styles.offerActions
-                                        }
-                                      >
-                                        <div
-                                          style={
-                                            styles.acceptedText
-                                          }
-                                        >
-                                          Offer accepted
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          onClick={
-                                            payNow
-                                          }
-                                          disabled={
-                                            paymentLoading
-                                          }
-                                          style={{
-                                            ...styles.payButton,
-
-                                            ...(paymentLoading
-                                              ? styles.disabledButton
-                                              : {}),
-                                          }}
-                                        >
-                                          {paymentLoading
-                                            ? 'Opening Payment...'
-                                            : `Pay Now ${money(
-                                                finalPayable
-                                              )}`}
-                                        </button>
-                                      </div>
-                                    )}
-
-                                  {bookingPaid && (
-                                    <div
-                                      style={
-                                        styles.paidOfferBox
-                                      }
-                                    >
-                                      Payment received. Booking confirmed.
-                                    </div>
-                                  )}
-
-                                  <div
-                                    style={
-                                      styles.specialOfferNote
-                                    }
-                                  >
-                                    No additional discount will be applied to this host special offer.
-                                  </div>
-
-                                  <div
-                                    style={
-                                      styles.messageTime
-                                    }
-                                  >
-                                    {formatDateTime(
-                                      item.created_at
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-
+                        if (
+                          item.message_type ===
+                          'special_offer'
+                        ) {
                           return (
                             <div
                               key={
                                 item.id
                               }
-                              style={{
-                                ...styles.messageRow,
-
-                                justifyContent:
-                                  isGuest
-                                    ? 'flex-end'
-                                    : 'flex-start',
-                              }}
+                              style={
+                                styles.specialOfferCard
+                              }
                             >
+                              <strong>
+                                HOST SPECIAL OFFER
+                              </strong>
+
                               <div
-                                style={{
-                                  ...styles.messageBubble,
-
-                                  ...(isGuest
-                                    ? styles.guestBubble
-                                    : styles.hostBubble),
-
-                                  ...(isDiscountRequest
-                                    ? styles.discountRequestBubble
-                                    : {}),
-                                }}
+                                style={
+                                  styles.messageText
+                                }
                               >
-                                {isDiscountRequest && (
-                                  <div
-                                    style={
-                                      styles.discountBadge
-                                    }
-                                  >
-                                    Better Rate Request
-                                  </div>
-                                )}
+                                {
+                                  item.message
+                                }
+                              </div>
 
-                                <div
-                                  style={
-                                    styles.messageSender
-                                  }
-                                >
-                                  {item.sender_name ||
-                                    (isGuest
-                                      ? guest?.full_name ||
-                                        'You'
-                                      : 'Host')}
+                              <div
+                                style={
+                                  styles.offerAmounts
+                                }
+                              >
+                                <div>
+                                  Accommodation
+                                  <br />
+                                  <strong>
+                                    {money(
+                                      activeBooking.taxable_amount
+                                    )}
+                                  </strong>
                                 </div>
 
-                                <div
-                                  style={
-                                    styles.messageText
-                                  }
-                                >
-                                  {isDiscountRequest
-                                    ? String(
-                                        item.message
-                                      ).replace(
-                                        /^DISCOUNT REQUEST:\s*/,
-                                        ''
-                                      )
-                                    : item.message}
+                                <div>
+                                  GST
+                                  <br />
+                                  <strong>
+                                    {money(
+                                      activeBooking.gst_amount
+                                    )}
+                                  </strong>
                                 </div>
 
-                                <div
-                                  style={
-                                    styles.messageTime
-                                  }
-                                >
-                                  {formatDateTime(
-                                    item.created_at
-                                  )}
+                                <div>
+                                  Final Payable
+                                  <br />
+                                  <strong>
+                                    {money(
+                                      activeBooking.final_payable_amount
+                                    )}
+                                  </strong>
                                 </div>
                               </div>
+
+                              {offerPending && (
+                                <button
+                                  type="button"
+                                  onClick={
+                                    acceptSpecialOffer
+                                  }
+                                  disabled={
+                                    acceptingOffer
+                                  }
+                                  style={
+                                    styles.acceptOfferButton
+                                  }
+                                >
+                                  {acceptingOffer
+                                    ? 'Accepting...'
+                                    : 'Accept Offer'}
+                                </button>
+                              )}
+
+                              {offerAccepted &&
+                                !bookingPaid && (
+                                  <button
+                                    type="button"
+                                    onClick={
+                                      payNow
+                                    }
+                                    disabled={
+                                      paymentLoading
+                                    }
+                                    style={
+                                      styles.payButton
+                                    }
+                                  >
+                                    {paymentLoading
+                                      ? 'Opening Payment...'
+                                      : `Pay Now ${money(
+                                          finalPayable
+                                        )}`}
+                                  </button>
+                                )}
+
+                              {bookingPaid && (
+                                <div
+                                  style={
+                                    styles.paidBox
+                                  }
+                                >
+                                  Paid and confirmed
+                                </div>
+                              )}
                             </div>
                           );
                         }
-                      )
+
+                        return (
+                          <div
+                            key={
+                              item.id
+                            }
+                            style={{
+                              display:
+                                'flex',
+
+                              justifyContent:
+                                isGuest
+                                  ? 'flex-end'
+                                  : 'flex-start',
+                            }}
+                          >
+                            <div
+                              style={
+                                isGuest
+                                  ? styles.guestBubble
+                                  : styles.hostBubble
+                              }
+                            >
+                              <strong>
+                                {discountRequest
+                                  ? 'Better Rate Request'
+                                  : item.sender_name}
+                              </strong>
+
+                              <div>
+                                {discountRequest
+                                  ? String(
+                                      item.message
+                                    ).replace(
+                                      /^DISCOUNT REQUEST:\s*/,
+                                      ''
+                                    )
+                                  : item.message}
+                              </div>
+
+                              <small>
+                                {formatDateTime(
+                                  item.created_at
+                                )}
+                              </small>
+                            </div>
+                          </div>
+                        );
+                      }
                     )}
                   </div>
 
@@ -2171,9 +1719,7 @@ export default function GuestMessagesPage() {
                         styles.noticeBox
                       }
                     >
-                      {
-                        notice
-                      }
+                      {notice}
                     </div>
                   )}
 
@@ -2183,172 +1729,118 @@ export default function GuestMessagesPage() {
                         styles.errorBox
                       }
                     >
-                      {
-                        error
-                      }
+                      {error}
                     </div>
                   )}
 
-                  {!bookingPaid && (
-                    <div
+                  <form
+                    onSubmit={
+                      sendMessage
+                    }
+                    style={
+                      styles.messageComposer
+                    }
+                  >
+                    <textarea
+                      value={
+                        messageText
+                      }
+                      onChange={(e) =>
+                        setMessageText(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Write a message to the host..."
                       style={
-                        styles.composerSection
+                        styles.messageInput
+                      }
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={
+                        sending ||
+                        !messageText.trim()
+                      }
+                      style={
+                        styles.sendButton
                       }
                     >
-                      <form
-                        onSubmit={
-                          sendMessage
-                        }
+                      {sending
+                        ? 'Sending...'
+                        : 'Send'}
+                    </button>
+                  </form>
+
+                  {!bookingPaid &&
+                    !offerAccepted && (
+                      <div
                         style={
-                          styles.messageComposer
+                          styles.discountArea
                         }
                       >
-                        <textarea
-                          value={
-                            messageText
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            setMessageText(
-                              event.target.value
-                            )
-                          }
-                          placeholder="Write a message to the host..."
-                          style={
-                            styles.messageInput
-                          }
-                        />
+                        {!showDiscountRequest ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowDiscountRequest(
+                                true
+                              )
+                            }
+                            style={
+                              styles.discountLink
+                            }
+                          >
+                            Want a better rate? Ask host
+                          </button>
+                        ) : (
+                          <div
+                            style={
+                              styles.discountInline
+                            }
+                          >
+                            <input
+                              value={
+                                discountText
+                              }
+                              onChange={(e) =>
+                                setDiscountText(
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Ask host for a better rate..."
+                              style={
+                                styles.discountInput
+                              }
+                            />
 
-                        <button
-                          type="submit"
-                          disabled={
-                            sending ||
-                            !messageText.trim()
-                          }
-                          style={{
-                            ...styles.sendButton,
+                            <button
+                              type="button"
+                              onClick={
+                                requestDiscount
+                              }
+                            >
+                              Ask
+                            </button>
 
-                            ...(sending ||
-                            !messageText.trim()
-                              ? styles.disabledButton
-                              : {}),
-                          }}
-                        >
-                          {sending
-                            ? 'Sending...'
-                            : 'Send'}
-                        </button>
-                      </form>
-
-                      {!offerAccepted && (
-                        <div
-                          style={
-                            styles.smallDiscountArea
-                          }
-                        >
-                          {!showDiscountRequest ? (
                             <button
                               type="button"
                               onClick={() => {
                                 setShowDiscountRequest(
-                                  true
+                                  false
                                 );
 
-                                setError(
-                                  ''
-                                );
-
-                                setNotice(
+                                setDiscountText(
                                   ''
                                 );
                               }}
-                              style={
-                                styles.smallDiscountLink
-                              }
                             >
-                              Want a better rate? Ask host
+                              Cancel
                             </button>
-                          ) : (
-                            <div
-                              style={
-                                styles.discountInlineBox
-                              }
-                            >
-                              <input
-                                type="text"
-                                value={
-                                  discountText
-                                }
-                                onChange={(
-                                  event
-                                ) =>
-                                  setDiscountText(
-                                    event.target.value
-                                  )
-                                }
-                                placeholder="Ask host for a better rate..."
-                                style={
-                                  styles.discountInlineInput
-                                }
-                              />
-
-                              <button
-                                type="button"
-                                onClick={
-                                  requestDiscount
-                                }
-                                disabled={
-                                  discountSending ||
-                                  !discountText.trim()
-                                }
-                                style={{
-                                  ...styles.discountAskButton,
-
-                                  ...(discountSending ||
-                                  !discountText.trim()
-                                    ? styles.disabledButton
-                                    : {}),
-                                }}
-                              >
-                                {discountSending
-                                  ? 'Sending...'
-                                  : 'Ask'}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowDiscountRequest(
-                                    false
-                                  );
-
-                                  setDiscountText(
-                                    ''
-                                  );
-                                }}
-                                style={
-                                  styles.discountCancelButton
-                                }
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {bookingPaid && (
-                    <div
-                      style={
-                        styles.confirmedFooter
-                      }
-                    >
-                      Booking confirmed. These dates are now blocked for this property.
-                    </div>
-                  )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </>
               )}
             </section>
@@ -2369,7 +1861,7 @@ const styles = {
   },
 
   header: {
-    minHeight: 74,
+    minHeight: 72,
     padding: '10px 5%',
     background: '#ffffff',
     borderBottom:
@@ -2378,10 +1870,6 @@ const styles = {
     alignItems: 'center',
     justifyContent:
       'space-between',
-    gap: 20,
-    position: 'sticky',
-    top: 0,
-    zIndex: 50,
   },
 
   logo: {
@@ -2394,66 +1882,51 @@ const styles = {
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent:
-      'flex-end',
-    gap: 22,
-    flexWrap: 'wrap',
+    gap: 20,
   },
 
   nav: {
     display: 'flex',
-    gap: 16,
-    alignItems: 'center',
+    gap: 15,
   },
 
   navLink: {
     color: '#174f91',
     textDecoration: 'none',
     fontWeight: 700,
-    fontSize: 14,
   },
 
   activeNavLink: {
     color: '#ffffff',
     background: '#174f91',
+    padding: '8px 13px',
+    borderRadius: 20,
     textDecoration: 'none',
     fontWeight: 700,
-    fontSize: 14,
-    padding: '9px 14px',
-    borderRadius: 20,
   },
 
   loginStatus: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    paddingLeft: 18,
-    borderLeft:
-      '1px solid #e5e7eb',
+    gap: 10,
   },
 
   loggedInLabel: {
     fontSize: 9,
-    textTransform: 'uppercase',
     color: '#667085',
-    fontWeight: 700,
-    marginBottom: 2,
   },
 
   loggedInEmail: {
     fontSize: 10,
     color: '#667085',
-    marginTop: 2,
   },
 
   logoutButton: {
     border:
       '1px solid #d0d5dd',
     background: '#ffffff',
-    color: '#0b2447',
-    padding: '8px 13px',
     borderRadius: 20,
-    fontWeight: 700,
+    padding: '8px 12px',
     cursor: 'pointer',
   },
 
@@ -2461,8 +1934,7 @@ const styles = {
     width: '92%',
     maxWidth: 1220,
     margin: '0 auto',
-    padding:
-      '30px 0 60px',
+    padding: '30px 0',
   },
 
   pageHeader: {
@@ -2470,18 +1942,14 @@ const styles = {
     justifyContent:
       'space-between',
     alignItems: 'center',
-    gap: 20,
-    marginBottom: 22,
+    marginBottom: 20,
   },
 
   title: {
     margin: 0,
-    fontSize: 34,
   },
 
   subtitle: {
-    marginTop: 8,
-    marginBottom: 0,
     color: '#667085',
   },
 
@@ -2489,383 +1957,195 @@ const styles = {
     border: 0,
     background: '#174f91',
     color: '#ffffff',
-    borderRadius: 9,
-    padding: '10px 16px',
-    fontWeight: 700,
-    cursor: 'pointer',
+    padding: '9px 14px',
+    borderRadius: 8,
   },
 
   chatLayout: {
     display: 'grid',
     gridTemplateColumns:
-      '310px minmax(0, 1fr)',
-    minHeight: 650,
+      '310px 1fr',
     background: '#ffffff',
     border:
       '1px solid #dfe3e8',
-    borderRadius: 16,
+    borderRadius: 15,
     overflow: 'hidden',
   },
 
   conversationList: {
     borderRight:
-      '1px solid #dfe3e8',
-    maxHeight: 760,
-    overflowY: 'auto',
-    background: '#ffffff',
+      '1px solid #e5e7eb',
   },
 
   listHeading: {
-    padding: 16,
+    padding: 15,
     fontWeight: 800,
-    borderBottom:
-      '1px solid #e5e7eb',
   },
 
   conversationButton: {
     width: '100%',
+    padding: 14,
     border: 0,
-    borderBottom:
+    borderTop:
       '1px solid #edf0f4',
     background: '#ffffff',
-    padding: 15,
     textAlign: 'left',
     display: 'grid',
-    gap: 5,
-    cursor: 'pointer',
+    gap: 4,
   },
 
   activeConversation: {
     background: '#edf4ff',
-    borderLeft:
-      '4px solid #174f91',
   },
 
   bookingCode: {
     color: '#174f91',
-    fontSize: 13,
+    fontWeight: 800,
   },
 
   propertyName: {
     fontWeight: 700,
-    fontSize: 13,
   },
 
   bookingDates: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#667085',
   },
 
   bookingStatus: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#667085',
-    textTransform: 'capitalize',
   },
 
   chatPanel: {
     minWidth: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#f9fafc',
   },
 
   chatHeader: {
-    padding: 18,
-    background: '#ffffff',
+    padding: 16,
     borderBottom:
       '1px solid #e5e7eb',
-    display: 'flex',
-    justifyContent:
-      'space-between',
-    alignItems: 'center',
-    gap: 16,
   },
 
   chatTitle: {
     margin: 0,
-    fontSize: 22,
   },
 
   chatMeta: {
     marginTop: 5,
+    fontSize: 11,
     color: '#667085',
-    fontSize: 12,
-  },
-
-  statusGroup: {
-    display: 'flex',
-    gap: 7,
-    flexWrap: 'wrap',
-  },
-
-  statusPill: {
-    padding: '5px 8px',
-    borderRadius: 20,
-    background: '#eef2f6',
-    color: '#475467',
-    fontSize: 10,
-    fontWeight: 800,
-    textTransform: 'capitalize',
   },
 
   priceStrip: {
     display: 'grid',
     gridTemplateColumns:
-      'repeat(auto-fit, minmax(130px, 1fr))',
+      'repeat(3, 1fr)',
     gap: 10,
     padding: 14,
-    background: '#ffffff',
     borderBottom:
       '1px solid #e5e7eb',
   },
 
   priceLabel: {
     display: 'block',
-    marginBottom: 5,
+    fontSize: 9,
     color: '#667085',
-    fontSize: 10,
-    textTransform: 'uppercase',
-    fontWeight: 700,
-  },
-
-  discountAmount: {
-    color: '#23833c',
+    marginBottom: 4,
   },
 
   messagesArea: {
-    flex: 1,
     minHeight: 350,
-    maxHeight: 510,
+    maxHeight: 500,
     overflowY: 'auto',
-    padding: 18,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-
-  noMessages: {
-    margin: 'auto',
-    color: '#98a2b3',
-    textAlign: 'center',
-    fontSize: 13,
-  },
-
-  messageRow: {
-    display: 'flex',
-    width: '100%',
-  },
-
-  messageBubble: {
-    maxWidth: '72%',
-    padding: '11px 13px',
-    borderRadius: 13,
-    boxShadow:
-      '0 1px 2px rgba(0,0,0,0.04)',
+    padding: 15,
+    display: 'grid',
+    gap: 10,
   },
 
   guestBubble: {
+    maxWidth: 450,
     background: '#e8f1ff',
-    border:
-      '1px solid #c6dbff',
+    padding: 10,
+    borderRadius: 12,
   },
 
   hostBubble: {
+    maxWidth: 450,
     background: '#ffffff',
     border:
       '1px solid #e1e5ea',
-  },
-
-  discountRequestBubble: {
-    background: '#fffdf8',
-    border:
-      '1px solid #e7dfc7',
-  },
-
-  discountBadge: {
-    display: 'inline-block',
-    marginBottom: 5,
-    padding: '3px 6px',
-    borderRadius: 20,
-    background: '#f5f1e5',
-    color: '#776735',
-    fontSize: 9,
-    fontWeight: 800,
-  },
-
-  messageSender: {
-    fontWeight: 800,
-    fontSize: 11,
-    marginBottom: 5,
-  },
-
-  messageText: {
-    fontSize: 13,
-    lineHeight: 1.5,
-    whiteSpace: 'pre-wrap',
-  },
-
-  messageTime: {
-    marginTop: 6,
-    color: '#98a2b3',
-    fontSize: 10,
-  },
-
-  systemMessage: {
-    maxWidth: '82%',
-    alignSelf: 'center',
     padding: 10,
-    borderRadius: 10,
-    background: '#fff7df',
-    border: '1px solid #ead79a',
-    color: '#6b561d',
-    textAlign: 'center',
-    fontSize: 12,
-  },
-
-  specialOfferMessageRow: {
-    display: 'flex',
-    justifyContent: 'flex-start',
-    width: '100%',
+    borderRadius: 12,
   },
 
   specialOfferCard: {
-    width: '100%',
     maxWidth: 520,
-    background: '#f1fbf4',
+    background: '#effaf2',
     border:
-      '1px solid #b8ddc4',
-    borderRadius: 14,
-    padding: 15,
+      '1px solid #aad4b8',
+    padding: 14,
+    borderRadius: 13,
   },
 
-  specialOfferBadge: {
-    display: 'inline-block',
-    padding: '4px 7px',
-    borderRadius: 20,
-    background: '#dff3e5',
-    color: '#27643a',
-    fontSize: 9,
-    fontWeight: 900,
-    marginBottom: 7,
-  },
-
-  specialOfferTitle: {
-    fontSize: 15,
-    fontWeight: 900,
-    marginBottom: 8,
-  },
-
-  specialOfferText: {
-    fontSize: 12,
-    lineHeight: 1.45,
+  messageText: {
     whiteSpace: 'pre-wrap',
-    color: '#385044',
+    marginTop: 7,
+    lineHeight: 1.45,
   },
 
-  offerPriceBox: {
-    marginTop: 12,
-    padding: 11,
-    background: '#ffffff',
-    border:
-      '1px solid #d8eadf',
-    borderRadius: 10,
+  offerAmounts: {
     display: 'grid',
     gridTemplateColumns:
       'repeat(3, 1fr)',
     gap: 10,
-  },
-
-  offerPriceLabel: {
-    display: 'block',
-    fontSize: 9,
-    textTransform: 'uppercase',
-    color: '#667085',
-    marginBottom: 4,
-    fontWeight: 700,
-  },
-
-  finalOfferAmount: {
-    color: '#174f91',
-    fontSize: 17,
-  },
-
-  offerActions: {
     marginTop: 12,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
+    background: '#ffffff',
+    padding: 10,
+    borderRadius: 8,
   },
 
   acceptOfferButton: {
-    border: 0,
-    background: '#ffffff',
-    color: '#27643a',
+    marginTop: 12,
     border:
-      '1px solid #97cba8',
-    borderRadius: 8,
-    padding: '10px 14px',
-    fontWeight: 900,
-    cursor: 'pointer',
+      '1px solid #79b78d',
+    background: '#ffffff',
+    color: '#23743c',
+    padding: '9px 13px',
+    borderRadius: 7,
+    fontWeight: 800,
   },
 
   payButton: {
+    marginTop: 12,
     border: 0,
     background: '#174f91',
     color: '#ffffff',
-    borderRadius: 8,
-    padding: '11px 16px',
-    fontWeight: 900,
-    cursor: 'pointer',
+    padding: '10px 15px',
+    borderRadius: 7,
+    fontWeight: 800,
   },
 
-  acceptedText: {
-    color: '#24723a',
-    fontSize: 12,
-    fontWeight: 900,
-  },
-
-  paidOfferBox: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 8,
-    background: '#dff3e5',
-    color: '#27643a',
-    fontSize: 12,
-    fontWeight: 900,
-  },
-
-  specialOfferNote: {
+  paidBox: {
     marginTop: 10,
-    color: '#687080',
-    fontSize: 10,
+    color: '#23743c',
+    fontWeight: 800,
   },
 
   noticeBox: {
-    margin: '0 18px 10px',
-    padding: 11,
-    borderRadius: 9,
+    margin: 12,
+    padding: 10,
     background: '#eaf7ee',
     color: '#24723a',
-    fontSize: 12,
-    fontWeight: 700,
+    borderRadius: 8,
   },
 
   errorBox: {
-    margin: '0 18px 10px',
-    padding: 11,
-    borderRadius: 9,
+    margin: 12,
+    padding: 10,
     background: '#fdeaea',
     color: '#a12828',
-    fontSize: 12,
-    fontWeight: 700,
-  },
-
-  composerSection: {
-    background: '#ffffff',
-    borderTop:
-      '1px solid #e5e7eb',
-    paddingBottom: 8,
+    borderRadius: 8,
   },
 
   messageComposer: {
@@ -2873,129 +2153,71 @@ const styles = {
     gridTemplateColumns:
       '1fr auto',
     gap: 10,
-    padding: '14px 18px 7px',
+    padding: 14,
+    borderTop:
+      '1px solid #e5e7eb',
   },
 
   messageInput: {
-    width: '100%',
-    boxSizing: 'border-box',
-    minHeight: 58,
-    resize: 'vertical',
+    minHeight: 55,
+    padding: 10,
     border:
       '1px solid #cfd6df',
-    borderRadius: 9,
-    padding: 11,
-    fontSize: 13,
+    borderRadius: 8,
   },
 
   sendButton: {
-    minWidth: 95,
     border: 0,
     background: '#174f91',
     color: '#ffffff',
-    borderRadius: 9,
     padding: '0 18px',
+    borderRadius: 8,
     fontWeight: 800,
-    cursor: 'pointer',
   },
 
-  smallDiscountArea: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    padding: '0 18px 5px',
+  discountArea: {
+    textAlign: 'right',
+    padding: '0 14px 12px',
   },
 
-  smallDiscountLink: {
+  discountLink: {
     border: 0,
     background: 'transparent',
     color: '#7b8490',
-    padding: '2px 0',
     fontSize: 10,
     textDecoration: 'underline',
     cursor: 'pointer',
   },
 
-  discountInlineBox: {
+  discountInline: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 6,
-    width: '100%',
+    justifyContent: 'flex-end',
   },
 
-  discountInlineInput: {
-    width: 270,
-    maxWidth: '60%',
+  discountInput: {
+    width: 260,
+    padding: 7,
     border:
       '1px solid #d6dbe1',
     borderRadius: 7,
-    padding: '7px 9px',
-    fontSize: 11,
   },
 
-  discountAskButton: {
-    border: 0,
-    background: '#687080',
-    color: '#ffffff',
-    borderRadius: 7,
-    padding: '7px 10px',
-    fontSize: 10,
-    fontWeight: 800,
-    cursor: 'pointer',
-  },
-
-  discountCancelButton: {
-    border: 0,
-    background: 'transparent',
-    color: '#8b929b',
-    padding: '6px 3px',
-    fontSize: 10,
-    cursor: 'pointer',
-  },
-
-  confirmedFooter: {
-    padding: 15,
-    background: '#eaf7ee',
-    borderTop:
-      '1px solid #cfe8d5',
-    color: '#24723a',
+  centerBox: {
+    maxWidth: 600,
+    margin: '100px auto',
+    background: '#ffffff',
+    padding: 30,
     textAlign: 'center',
-    fontSize: 12,
-    fontWeight: 800,
-  },
-
-  disabledButton: {
-    opacity: 0.55,
-    cursor: 'not-allowed',
   },
 
   emptyCard: {
     background: '#ffffff',
-    border:
-      '1px solid #e5e7eb',
-    borderRadius: 14,
-    padding: 28,
-    textAlign: 'center',
+    padding: 25,
+    borderRadius: 12,
   },
 
   primaryLink: {
-    display: 'inline-block',
-    marginTop: 10,
-    color: '#ffffff',
-    background: '#174f91',
-    padding: '10px 14px',
-    borderRadius: 8,
-    textDecoration: 'none',
-    fontWeight: 700,
-  },
-
-  centerBox: {
-    width: '90%',
-    maxWidth: 600,
-    margin: '100px auto',
-    background: '#ffffff',
-    borderRadius: 14,
-    padding: 30,
-    textAlign: 'center',
+    color: '#174f91',
   },
 };
