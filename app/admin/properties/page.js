@@ -137,106 +137,95 @@ function normalizeProperty(property) {
     ...property,
 
     check_in_time:
-      property?.check_in_time?.slice(
-        0,
-        5
-      ) || '14:00',
+      property?.check_in_time?.slice(0, 5) ||
+      '14:00',
 
     check_out_time:
-      property?.check_out_time?.slice(
-        0,
-        5
-      ) || '11:00',
+      property?.check_out_time?.slice(0, 5) ||
+      '11:00',
 
     quiet_hours_start:
-      property?.quiet_hours_start?.slice(
-        0,
-        5
-      ) || '22:00',
+      property?.quiet_hours_start?.slice(0, 5) ||
+      '22:00',
 
     quiet_hours_end:
-      property?.quiet_hours_end?.slice(
-        0,
-        5
-      ) || '07:00',
+      property?.quiet_hours_end?.slice(0, 5) ||
+      '07:00',
 
     amenities:
-      Array.isArray(
-        property?.amenities
-      )
+      Array.isArray(property?.amenities)
         ? property.amenities
         : [],
 
     kitchen_features:
-      Array.isArray(
-        property?.kitchen_features
-      )
+      Array.isArray(property?.kitchen_features)
         ? property.kitchen_features
         : [],
 
     features:
-      Array.isArray(
-        property?.features
-      )
+      Array.isArray(property?.features)
         ? property.features
         : [],
 
     house_rules_text:
-      Array.isArray(
-        property?.house_rules
-      )
-        ? property.house_rules.join(
-            '\n'
-          )
+      Array.isArray(property?.house_rules)
+        ? property.house_rules.join('\n')
         : '',
   };
 }
 
 export default function AdminPropertiesPage() {
-  const [
-    checkingSession,
-    setCheckingSession,
-  ] = useState(true);
+  const [checkingSession, setCheckingSession] =
+    useState(true);
 
-  const [
-    session,
-    setSession,
-  ] = useState(null);
+  const [session, setSession] =
+    useState(null);
 
-  const [
-    adminProfile,
-    setAdminProfile,
-  ] = useState(null);
+  const [adminProfile, setAdminProfile] =
+    useState(null);
 
-  const [
-    properties,
-    setProperties,
-  ] = useState([]);
+  const [properties, setProperties] =
+    useState([]);
 
-  const [
-    form,
-    setForm,
-  ] = useState(emptyForm);
+  const [form, setForm] =
+    useState({
+      ...emptyForm,
+    });
 
-  const [
-    loadingProperties,
-    setLoadingProperties,
-  ] = useState(false);
+  /*
+    Main page modes:
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
+    list
+    Shows all existing properties first.
 
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState('');
+    add
+    Shows the Add New Property form.
 
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] = useState('');
+    manage
+    Opens one existing property with:
+    Details
+    Photos
+    Pricing & Offers
+    Calendar
+  */
+
+  const [screen, setScreen] =
+    useState('list');
+
+  const [manageTab, setManageTab] =
+    useState('details');
+
+  const [loadingProperties, setLoadingProperties] =
+    useState(false);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState('');
+
+  const [successMessage, setSuccessMessage] =
+    useState('');
 
   useEffect(() => {
     startPage();
@@ -245,9 +234,7 @@ export default function AdminPropertiesPage() {
   async function startPage() {
     try {
       const {
-        data: {
-          session,
-        },
+        data: { session },
         error,
       } =
         await supabase.auth.getSession();
@@ -264,13 +251,10 @@ export default function AdminPropertiesPage() {
 
       const {
         data: profile,
-        error:
-          profileError,
+        error: profileError,
       } =
         await supabase
-          .from(
-            'admin_profiles'
-          )
+          .from('admin_profiles')
           .select(
             'user_id, full_name, role, is_active'
           )
@@ -293,31 +277,23 @@ export default function AdminPropertiesPage() {
         );
       }
 
-      setAdminProfile(
-        profile
-      );
+      setAdminProfile(profile);
 
       await loadProperties();
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
         error.message ||
           'Unable to open property management.'
       );
     } finally {
-      setCheckingSession(
-        false
-      );
+      setCheckingSession(false);
     }
   }
 
   async function loadProperties() {
-    setLoadingProperties(
-      true
-    );
+    setLoadingProperties(true);
 
     try {
       const {
@@ -325,15 +301,12 @@ export default function AdminPropertiesPage() {
         error,
       } =
         await supabase
-          .from(
-            'properties'
-          )
+          .from('properties')
           .select('*')
           .order(
             'created_at',
             {
-              ascending:
-                false,
+              ascending: false,
             }
           );
 
@@ -345,15 +318,15 @@ export default function AdminPropertiesPage() {
         data || []
       );
     } catch (error) {
+      console.error(error);
+
       setErrorMessage(
         `Unable to load properties: ${
           error.message
         }`
       );
     } finally {
-      setLoadingProperties(
-        false
-      );
+      setLoadingProperties(false);
     }
   }
 
@@ -380,26 +353,19 @@ export default function AdminPropertiesPage() {
       (previous) => {
         const existing =
           Array.isArray(
-            previous[
-              field
-            ]
+            previous[field]
           )
-            ? previous[
-                field
-              ]
+            ? previous[field]
             : [];
 
         return {
           ...previous,
 
           [field]:
-            existing.includes(
-              value
-            )
+            existing.includes(value)
               ? existing.filter(
                   (item) =>
-                    item !==
-                    value
+                    item !== value
                 )
               : [
                   ...existing,
@@ -408,6 +374,21 @@ export default function AdminPropertiesPage() {
         };
       }
     );
+
+    setErrorMessage('');
+    setSuccessMessage('');
+  }
+
+  function showPropertyList() {
+    setScreen('list');
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
   }
 
   function startNewProperty() {
@@ -415,18 +396,21 @@ export default function AdminPropertiesPage() {
       ...emptyForm,
     });
 
+    setScreen('add');
+    setManageTab('details');
+
     setErrorMessage('');
     setSuccessMessage('');
 
     window.scrollTo({
       top: 0,
-      behavior:
-        'smooth',
+      behavior: 'smooth',
     });
   }
 
-  function editProperty(
-    property
+  function manageProperty(
+    property,
+    tab = 'details'
   ) {
     setForm(
       normalizeProperty(
@@ -434,19 +418,19 @@ export default function AdminPropertiesPage() {
       )
     );
 
+    setScreen('manage');
+    setManageTab(tab);
+
     setErrorMessage('');
     setSuccessMessage('');
 
     window.scrollTo({
       top: 0,
-      behavior:
-        'smooth',
+      behavior: 'smooth',
     });
   }
 
-  async function saveProperty(
-    event
-  ) {
+  async function saveProperty(event) {
     event.preventDefault();
 
     setErrorMessage('');
@@ -824,12 +808,11 @@ export default function AdminPropertiesPage() {
         form.amenities ||
         [],
 
-      features:
-        [
-          ...new Set(
-            featureList
-          ),
-        ],
+      features: [
+        ...new Set(
+          featureList
+        ),
+      ],
 
       house_rules:
         houseRules,
@@ -877,18 +860,16 @@ export default function AdminPropertiesPage() {
     try {
       let savedProperty;
 
-      if (form.id) {
+      if (
+        form.id
+      ) {
         const {
           data,
           error,
         } =
           await supabase
-            .from(
-              'properties'
-            )
-            .update(
-              payload
-            )
+            .from('properties')
+            .update(payload)
             .eq(
               'id',
               form.id
@@ -912,12 +893,8 @@ export default function AdminPropertiesPage() {
           error,
         } =
           await supabase
-            .from(
-              'properties'
-            )
-            .insert(
-              payload
-            )
+            .from('properties')
+            .insert(payload)
             .select('*')
             .single();
 
@@ -929,7 +906,7 @@ export default function AdminPropertiesPage() {
           data;
 
         setSuccessMessage(
-          'Property created successfully. You can now manage photos, discounts and calendar rates.'
+          'Property created successfully.'
         );
       }
 
@@ -939,11 +916,27 @@ export default function AdminPropertiesPage() {
         )
       );
 
+      /*
+        A newly created property
+        immediately opens in Manage mode.
+
+        Photos is opened first so the host
+        can complete the listing quickly.
+      */
+
+      setScreen(
+        'manage'
+      );
+
+      setManageTab(
+        form.id
+          ? manageTab
+          : 'photos'
+      );
+
       await loadProperties();
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
         `Unable to save property: ${
@@ -955,20 +948,14 @@ export default function AdminPropertiesPage() {
       setSaving(false);
     }
   }
-
-  async function toggleProperty(
-    property
-  ) {
+  async function toggleProperty(property) {
     setErrorMessage('');
+    setSuccessMessage('');
 
     try {
-      const {
-        error,
-      } =
+      const { error } =
         await supabase
-          .from(
-            'properties'
-          )
+          .from('properties')
           .update({
             is_active:
               !property.is_active,
@@ -1001,6 +988,8 @@ export default function AdminPropertiesPage() {
         );
       }
     } catch (error) {
+      console.error(error);
+
       setErrorMessage(
         `Unable to update property status: ${
           error.message
@@ -1016,14 +1005,14 @@ export default function AdminPropertiesPage() {
       '/admin/bookings';
   }
 
-  if (
-    checkingSession
-  ) {
+  if (checkingSession) {
     return (
-      <main style={styles.page}>
-        <div style={styles.loading}>
+      <main className="nosPropPage">
+        <div className="nosPropLoadingBox">
           Loading property management...
         </div>
+
+        <PageStyles />
       </main>
     );
   }
@@ -1033,1019 +1022,1457 @@ export default function AdminPropertiesPage() {
     !adminProfile
   ) {
     return (
-      <main style={styles.page}>
-        <div style={styles.notice}>
+      <main className="nosPropPage">
+        <div className="nosPropLoginNotice">
           <h2>
             Admin login required
           </h2>
 
           <p>
-            Please log in before managing properties.
+            Please log in before
+            managing properties.
           </p>
 
           <a
             href="/admin/bookings"
-            style={
-              styles.primaryLink
-            }
+            className="nosPropPrimaryLink"
           >
-            Go to Admin
+            Go to Admin Login
           </a>
         </div>
+
+        <PageStyles />
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <div style={styles.brand}>
+    <main className="nosPropPage">
+      <header className="nosPropHeader">
+        <div className="nosPropBrandArea">
+          <div className="nosPropBrand">
             NightOutStays
           </div>
 
-          <div style={styles.muted}>
+          <div className="nosPropMuted">
             Host Property Management
           </div>
         </div>
 
-        <div style={styles.headerRight}>
-          <div>
+        <div className="nosPropHeaderRight">
+          <div className="nosPropProfile">
             <strong>
               {adminProfile.full_name ||
                 'Admin'}
             </strong>
 
-            <div style={styles.roleText}>
+            <span>
               {adminProfile.role ||
-                'admin'}
-            </div>
+                'Admin'}
+            </span>
           </div>
 
           <button
             type="button"
             onClick={logout}
-            style={styles.logout}
+            className="nosPropLogoutButton"
           >
             Logout
           </button>
         </div>
       </header>
 
-      <section style={styles.content}>
-        <div style={styles.topRow}>
+      <section className="nosPropContent">
+        <div className="nosPropPageHeading">
           <div>
-            <h1 style={styles.pageTitle}>
-              {form.id
-                ? 'Edit Property'
-                : 'Add New Property'}
+            <h1>
+              Properties
             </h1>
 
-            <p style={styles.muted}>
-              Manage property details, pricing, photos,
-              discounts, availability and calendar rates.
+            <p>
+              Manage listings,
+              photos, pricing,
+              offers and property
+              calendars.
             </p>
           </div>
-
-          {form.id && (
-            <button
-              type="button"
-              onClick={
-                startNewProperty
-              }
-              style={
-                styles.secondaryButton
-              }
-            >
-              + Add New Property
-            </button>
-          )}
         </div>
 
-        <form
-          onSubmit={
-            saveProperty
-          }
-        >
-          <Section title="Basic Property Information">
-            <TextField
-              label="PROPERTY NAME"
-              value={form.name}
-              onChange={(value) =>
-                updateField(
-                  'name',
-                  value
-                )
-              }
-            />
-
-            <TextField
-              label="LOCATION"
-              value={
-                form.location_name
-              }
-              onChange={(value) =>
-                updateField(
-                  'location_name',
-                  value
-                )
-              }
-            />
-
-            <TextField
-              label="PROPERTY URL SLUG"
-              value={form.slug}
-              placeholder="Leave blank to generate automatically"
-              onChange={(value) =>
-                updateField(
-                  'slug',
-                  value
-                )
-              }
-            />
-
-            <TextField
-              label="GOOGLE MAPS LINK"
-              value={
-                form.google_maps_url
-              }
-              onChange={(value) =>
-                updateField(
-                  'google_maps_url',
-                  value
-                )
-              }
-            />
-
-            <TextArea
-              label="FULL ADDRESS"
-              value={form.address}
-              onChange={(value) =>
-                updateField(
-                  'address',
-                  value
-                )
-              }
-            />
-
-            <TextArea
-              label="SHORT DESCRIPTION"
-              value={
-                form.short_description
-              }
-              onChange={(value) =>
-                updateField(
-                  'short_description',
-                  value
-                )
-              }
-            />
-
-            <TextArea
-              label="FULL DESCRIPTION"
-              value={
-                form.description
-              }
-              onChange={(value) =>
-                updateField(
-                  'description',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Rooms, Beds & Capacity">
-            <NumberField
-              label="BEDROOMS"
-              value={form.bedrooms}
-              onChange={(value) =>
-                updateField(
-                  'bedrooms',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="BATHROOMS"
-              value={
-                form.bathrooms
-              }
-              onChange={(value) =>
-                updateField(
-                  'bathrooms',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="QUEEN SIZE BEDS"
-              value={
-                form.queen_bed_count
-              }
-              onChange={(value) =>
-                updateField(
-                  'queen_bed_count',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="SINGLE BEDS"
-              value={
-                form.single_bed_count
-              }
-              onChange={(value) =>
-                updateField(
-                  'single_bed_count',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="SOFA-CUM-BEDS"
-              value={
-                form.sofa_cum_bed_count
-              }
-              onChange={(value) =>
-                updateField(
-                  'sofa_cum_bed_count',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="MINIMUM GUESTS"
-              value={
-                form.min_guests
-              }
-              onChange={(value) =>
-                updateField(
-                  'min_guests',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="GUESTS INCLUDED IN BASE PRICE"
-              value={
-                form.included_guests
-              }
-              onChange={(value) =>
-                updateField(
-                  'included_guests',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="MAXIMUM GUESTS"
-              value={
-                form.max_guests
-              }
-              onChange={(value) =>
-                updateField(
-                  'max_guests',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Pricing">
-            <NumberField
-              label="BASE NIGHTLY PRICE ₹"
-              value={
-                form.base_price
-              }
-              onChange={(value) =>
-                updateField(
-                  'base_price',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="EXTRA GUEST ₹ / PERSON / NIGHT"
-              value={
-                form.extra_guest_fee
-              }
-              onChange={(value) =>
-                updateField(
-                  'extra_guest_fee',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="CLEANING FEE ₹"
-              value={
-                form.cleaning_fee
-              }
-              onChange={(value) =>
-                updateField(
-                  'cleaning_fee',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="SECURITY DEPOSIT ₹"
-              value={
-                form.security_deposit
-              }
-              onChange={(value) =>
-                updateField(
-                  'security_deposit',
-                  value
-                )
-              }
-            />
-
-            <div style={styles.infoBox}>
-              Base rate ₹
-              {numberValue(
-                form.base_price
-              ).toLocaleString(
-                'en-IN'
-              )}{' '}
-              includes{' '}
-              <strong>
-                {form.included_guests}
-              </strong>{' '}
-              guest(s). Extra guest charge ₹
-              {numberValue(
-                form.extra_guest_fee
-              ).toLocaleString(
-                'en-IN'
-              )}{' '}
-              per person per night.
-            </div>
-          </Section>
-
-          <Section title="Stay Duration & Timing">
-            <NumberField
-              label="MINIMUM STAY NIGHTS"
-              value={
-                form.min_stay_nights
-              }
-              onChange={(value) =>
-                updateField(
-                  'min_stay_nights',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="MAXIMUM STAY NIGHTS"
-              value={
-                form.max_stay_nights
-              }
-              onChange={(value) =>
-                updateField(
-                  'max_stay_nights',
-                  value
-                )
-              }
-            />
-
-            <TimeField
-              label="CHECK-IN TIME"
-              value={
-                form.check_in_time
-              }
-              onChange={(value) =>
-                updateField(
-                  'check_in_time',
-                  value
-                )
-              }
-            />
-
-            <TimeField
-              label="CHECK-OUT TIME"
-              value={
-                form.check_out_time
-              }
-              onChange={(value) =>
-                updateField(
-                  'check_out_time',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="LATE CHECK-OUT ₹ / HOUR"
-              value={
-                form.late_checkout_hourly_fee
-              }
-              onChange={(value) =>
-                updateField(
-                  'late_checkout_hourly_fee',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Facilities">
-            <Toggle
-              label="Wi-Fi"
-              checked={
-                form.wifi_available
-              }
-              onChange={(value) =>
-                updateField(
-                  'wifi_available',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="TV"
-              checked={
-                form.tv_available
-              }
-              onChange={(value) =>
-                updateField(
-                  'tv_available',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Fridge"
-              checked={
-                form.fridge_available
-              }
-              onChange={(value) =>
-                updateField(
-                  'fridge_available',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Washing Machine"
-              checked={
-                form.washing_machine_available
-              }
-              onChange={(value) =>
-                updateField(
-                  'washing_machine_available',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Air Conditioning"
-              checked={
-                form.ac_available
-              }
-              onChange={(value) =>
-                updateField(
-                  'ac_available',
-                  value
-                )
-              }
-            />
-
-            {form.ac_available && (
-              <NumberField
-                label="NUMBER OF ACs"
-                value={
-                  form.ac_count
-                }
-                onChange={(value) =>
-                  updateField(
-                    'ac_count',
-                    value
-                  )
-                }
-              />
-            )}
-
-            <NumberField
-              label="WATER HEATERS / GEYSERS"
-              value={
-                form.water_heater_count
-              }
-              onChange={(value) =>
-                updateField(
-                  'water_heater_count',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Kitchen Features">
-            <CheckboxGrid
-              items={
-                kitchenOptions
-              }
-              selected={
-                form.kitchen_features
-              }
-              onToggle={(value) =>
-                toggleArrayItem(
-                  'kitchen_features',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Amenities">
-            <CheckboxGrid
-              items={
-                amenityOptions
-              }
-              selected={
-                form.amenities
-              }
-              onToggle={(value) =>
-                toggleArrayItem(
-                  'amenities',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Rules & Permissions">
-            <Toggle
-              label="Pets Allowed"
-              checked={
-                form.pets_allowed
-              }
-              onChange={(value) =>
-                updateField(
-                  'pets_allowed',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Parties Allowed"
-              checked={
-                form.parties_allowed
-              }
-              onChange={(value) =>
-                updateField(
-                  'parties_allowed',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Couples Allowed"
-              checked={
-                form.couples_allowed
-              }
-              onChange={(value) =>
-                updateField(
-                  'couples_allowed',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Alcohol Allowed"
-              checked={
-                form.alcohol_allowed
-              }
-              onChange={(value) =>
-                updateField(
-                  'alcohol_allowed',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Smoking Allowed"
-              checked={
-                form.smoking_allowed
-              }
-              onChange={(value) =>
-                updateField(
-                  'smoking_allowed',
-                  value
-                )
-              }
-            />
-
-            <Toggle
-              label="Enable Quiet Hours"
-              checked={
-                form.quiet_hours_enabled
-              }
-              onChange={(value) =>
-                updateField(
-                  'quiet_hours_enabled',
-                  value
-                )
-              }
-            />
-
-            {form.quiet_hours_enabled && (
-              <>
-                <TimeField
-                  label="QUIET HOURS FROM"
-                  value={
-                    form.quiet_hours_start
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'quiet_hours_start',
-                      value
-                    )
-                  }
-                />
-
-                <TimeField
-                  label="QUIET HOURS UNTIL"
-                  value={
-                    form.quiet_hours_end
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'quiet_hours_end',
-                      value
-                    )
-                  }
-                />
-              </>
-            )}
-
-            <TextArea
-              label="OTHER HOUSE RULES — ONE PER LINE"
-              value={
-                form.house_rules_text
-              }
-              onChange={(value) =>
-                updateField(
-                  'house_rules_text',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Directions / Arrival Instructions">
-            <TextArea
-              label="DIRECTION INSTRUCTIONS"
-              value={
-                form.direction_instructions
-              }
-              onChange={(value) =>
-                updateField(
-                  'direction_instructions',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          <Section title="Automatic Dynamic Pricing">
-            <Toggle
-              label="Enable Dynamic Pricing"
-              checked={
-                form.dynamic_pricing_enabled
-              }
-              onChange={(value) =>
-                updateField(
-                  'dynamic_pricing_enabled',
-                  value
-                )
-              }
-            />
-
-            {form.dynamic_pricing_enabled && (
-              <>
-                <NumberField
-                  label="WEEKEND MARKUP %"
-                  value={
-                    form.weekend_markup_percent
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'weekend_markup_percent',
-                      value
-                    )
-                  }
-                />
-
-                <NumberField
-                  label="LONG WEEKEND MARKUP %"
-                  value={
-                    form.long_weekend_markup_percent
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'long_weekend_markup_percent',
-                      value
-                    )
-                  }
-                />
-
-                <NumberField
-                  label="FESTIVAL MARKUP %"
-                  value={
-                    form.festival_markup_percent
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'festival_markup_percent',
-                      value
-                    )
-                  }
-                />
-
-                <NumberField
-                  label="SEASON MARKUP %"
-                  value={
-                    form.season_markup_percent
-                  }
-                  onChange={(value) =>
-                    updateField(
-                      'season_markup_percent',
-                      value
-                    )
-                  }
-                />
-              </>
-            )}
-          </Section>
-
-          <Section title="Publishing">
-            <Toggle
-              label="Property Active / Visible to Guests"
-              checked={
-                form.is_active
-              }
-              onChange={(value) =>
-                updateField(
-                  'is_active',
-                  value
-                )
-              }
-            />
-          </Section>
-
-          {errorMessage && (
-            <div style={styles.error}>
-              {errorMessage}
-            </div>
-          )}
-
-          {successMessage && (
-            <div style={styles.success}>
-              {successMessage}
-            </div>
-          )}
-
+        <div className="nosPropMainTabs">
           <button
-            type="submit"
-            disabled={saving}
-            style={styles.saveButton}
+            type="button"
+            onClick={
+              showPropertyList
+            }
+            className={
+              screen === 'list'
+                ? 'nosPropMainTab nosPropMainTabActive'
+                : 'nosPropMainTab'
+            }
           >
-            {saving
-              ? 'Saving Property...'
-              : form.id
-              ? 'Update Property'
-              : 'Create Property'}
+            My Properties
           </button>
-        </form>
-
-        {form.id && (
-          <PropertyPhotoManager
-            propertyId={
-              form.id
-            }
-            propertyName={
-              form.name
-            }
-          />
-        )}
-
-        {form.id && (
-          <PropertyDiscountManager
-            propertyId={
-              form.id
-            }
-            propertyName={
-              form.name
-            }
-          />
-        )}
-
-        {form.id && (
-          <PropertyCalendarManager
-            propertyId={
-              form.id
-            }
-            propertyName={
-              form.name
-            }
-          />
-        )}
-
-        <hr style={styles.separator} />
-
-        <div style={styles.topRow}>
-          <div>
-            <h2 style={styles.pageTitle}>
-              Existing Properties
-            </h2>
-
-            <p style={styles.muted}>
-              Select a property to manage its details,
-              photos, discounts, availability and rates.
-            </p>
-          </div>
 
           <button
             type="button"
             onClick={
               startNewProperty
             }
-            style={
-              styles.secondaryButton
+            className={
+              screen === 'add'
+                ? 'nosPropMainTab nosPropMainTabActive'
+                : 'nosPropMainTab'
             }
           >
-            + Add Property
+            + Add New Property
           </button>
         </div>
 
-        {loadingProperties ? (
-          <div style={styles.loading}>
-            Loading properties...
-          </div>
-        ) : properties.length ===
-          0 ? (
-          <div style={styles.empty}>
-            No properties found.
-          </div>
-        ) : (
-          <div style={styles.propertyGrid}>
-            {properties.map(
-              (property) => (
-                <article
-                  key={
-                    property.id
-                  }
-                  style={
-                    styles.propertyCard
-                  }
-                >
-                  <div style={styles.cardTop}>
-                    <div>
-                      <h3 style={styles.cardTitle}>
-                        {property.name}
-                      </h3>
+        {screen === 'list' && (
+          <>
+            {errorMessage && (
+              <div className="nosPropError">
+                {errorMessage}
+              </div>
+            )}
 
-                      <div style={styles.muted}>
-                        {
-                          property.location_name
-                        }
+            <MyProperties
+              properties={
+                properties
+              }
+              loading={
+                loadingProperties
+              }
+              onManage={
+                manageProperty
+              }
+              onToggle={
+                toggleProperty
+              }
+              onAdd={
+                startNewProperty
+              }
+            />
+          </>
+        )}
+
+        {screen === 'add' && (
+          <div className="nosPropEditor">
+            <button
+              type="button"
+              onClick={
+                showPropertyList
+              }
+              className="nosPropBackButton"
+            >
+              ← My Properties
+            </button>
+
+            <div className="nosPropEditorTitle">
+              <h2>
+                Add New Property
+              </h2>
+
+              <p>
+                Add the basic
+                property information,
+                pricing, facilities,
+                rules and booking
+                settings.
+              </p>
+            </div>
+
+            <PropertyDetailsForm
+              form={form}
+              updateField={
+                updateField
+              }
+              toggleArrayItem={
+                toggleArrayItem
+              }
+              saving={
+                saving
+              }
+              errorMessage={
+                errorMessage
+              }
+              successMessage={
+                successMessage
+              }
+              onSubmit={
+                saveProperty
+              }
+              isEditing={
+                false
+              }
+            />
+          </div>
+        )}
+
+        {screen === 'manage' &&
+          form.id && (
+            <div className="nosPropEditor">
+              <div className="nosPropManageHeader">
+                <div className="nosPropManageLeft">
+                  <button
+                    type="button"
+                    onClick={
+                      showPropertyList
+                    }
+                    className="nosPropBackButton"
+                  >
+                    ← My Properties
+                  </button>
+
+                  <div className="nosPropManageTitleRow">
+                    <div>
+                      <div className="nosPropSmallTitle">
+                        MANAGE PROPERTY
                       </div>
+
+                      <h2>
+                        {form.name}
+                      </h2>
+
+                      <p>
+                        {form.location_name ||
+                          'Location not added'}
+                      </p>
                     </div>
 
                     <span
-                      style={{
-                        ...styles.status,
-
-                        background:
-                          property.is_active
-                            ? '#e7f7ec'
-                            : '#eeeeee',
-
-                        color:
-                          property.is_active
-                            ? '#24663a'
-                            : '#666666',
-                      }}
+                      className={
+                        form.is_active
+                          ? 'nosPropStatus nosPropStatusActive'
+                          : 'nosPropStatus nosPropStatusInactive'
+                      }
                     >
-                      {property.is_active
+                      {form.is_active
                         ? 'Active'
                         : 'Inactive'}
                     </span>
                   </div>
+                </div>
 
-                  <div style={styles.cardPrice}>
-                    ₹
-                    {numberValue(
-                      property.base_price
-                    ).toLocaleString(
-                      'en-IN'
-                    )}
-                    {' / night'}
+                {form.slug && (
+                  <a
+                    href={`/property/${form.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="nosPropPreviewTop"
+                  >
+                    View Property
+                  </a>
+                )}
+              </div>
+
+              <div className="nosPropManageTabsWrap">
+                <div className="nosPropManageTabs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setManageTab(
+                        'details'
+                      )
+                    }
+                    className={
+                      manageTab ===
+                      'details'
+                        ? 'nosPropManageTab nosPropManageTabActive'
+                        : 'nosPropManageTab'
+                    }
+                  >
+                    Details
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setManageTab(
+                        'photos'
+                      )
+                    }
+                    className={
+                      manageTab ===
+                      'photos'
+                        ? 'nosPropManageTab nosPropManageTabActive'
+                        : 'nosPropManageTab'
+                    }
+                  >
+                    Photos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setManageTab(
+                        'offers'
+                      )
+                    }
+                    className={
+                      manageTab ===
+                      'offers'
+                        ? 'nosPropManageTab nosPropManageTabActive'
+                        : 'nosPropManageTab'
+                    }
+                  >
+                    Pricing & Offers
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setManageTab(
+                        'calendar'
+                      )
+                    }
+                    className={
+                      manageTab ===
+                      'calendar'
+                        ? 'nosPropManageTab nosPropManageTabActive'
+                        : 'nosPropManageTab'
+                    }
+                  >
+                    Calendar
+                  </button>
+                </div>
+              </div>
+
+              {manageTab ===
+                'details' && (
+                <PropertyDetailsForm
+                  form={form}
+                  updateField={
+                    updateField
+                  }
+                  toggleArrayItem={
+                    toggleArrayItem
+                  }
+                  saving={
+                    saving
+                  }
+                  errorMessage={
+                    errorMessage
+                  }
+                  successMessage={
+                    successMessage
+                  }
+                  onSubmit={
+                    saveProperty
+                  }
+                  isEditing={
+                    true
+                  }
+                />
+              )}
+
+              {manageTab ===
+                'photos' && (
+                <div className="nosPropManagerPanel">
+                  <div className="nosPropManagerHeading">
+                    <h3>
+                      Property Photos
+                    </h3>
+
+                    <p>
+                      Upload and manage
+                      photos for{' '}
+                      <strong>
+                        {form.name}
+                      </strong>
+                      .
+                    </p>
                   </div>
 
-                  <div style={styles.small}>
-                    Base price includes{' '}
-                    {property.included_guests}{' '}
-                    guest(s)
+                  <PropertyPhotoManager
+                    propertyId={
+                      form.id
+                    }
+                    propertyName={
+                      form.name
+                    }
+                  />
+                </div>
+              )}
+
+              {manageTab ===
+                'offers' && (
+                <div className="nosPropManagerPanel">
+                  <div className="nosPropManagerHeading">
+                    <h3>
+                      Pricing & Offers
+                    </h3>
+
+                    <p>
+                      Manage discounts
+                      and property
+                      offers for{' '}
+                      <strong>
+                        {form.name}
+                      </strong>
+                      .
+                    </p>
                   </div>
 
-                  <div style={styles.small}>
-                    Maximum{' '}
-                    {property.max_guests}{' '}
-                    guests
+                  <PropertyDiscountManager
+                    propertyId={
+                      form.id
+                    }
+                    propertyName={
+                      form.name
+                    }
+                  />
+                </div>
+              )}
+
+              {manageTab ===
+                'calendar' && (
+                <div className="nosPropManagerPanel">
+                  <div className="nosPropManagerHeading">
+                    <h3>
+                      Property Calendar
+                    </h3>
+
+                    <p>
+                      Manage date-wise
+                      pricing and
+                      availability for{' '}
+                      <strong>
+                        {form.name}
+                      </strong>
+                      .
+                    </p>
                   </div>
 
-                  {property.dynamic_pricing_enabled && (
-                    <div style={styles.dynamicBadge}>
-                      Dynamic Pricing Active
-                    </div>
-                  )}
-
-                  <div style={styles.cardButtons}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        editProperty(
-                          property
-                        )
-                      }
-                      style={
-                        styles.editButton
-                      }
-                    >
-                      Edit Property
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toggleProperty(
-                          property
-                        )
-                      }
-                      style={
-                        styles.statusButton
-                      }
-                    >
-                      {property.is_active
-                        ? 'Deactivate'
-                        : 'Activate'}
-                    </button>
-
-                    {property.slug && (
-                      <a
-                        href={`/property/${property.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={
-                          styles.viewButton
-                        }
-                      >
-                        View
-                      </a>
-                    )}
-                  </div>
-                </article>
-              )
-            )}
-          </div>
-        )}
+                  <PropertyCalendarManager
+                    propertyId={
+                      form.id
+                    }
+                    propertyName={
+                      form.name
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
       </section>
+
+      <PageStyles />
     </main>
   );
 }
 
-function Section({
+/* =====================================================
+   MY PROPERTIES LIST
+===================================================== */
+
+function MyProperties({
+  properties,
+  loading,
+  onManage,
+  onToggle,
+  onAdd,
+}) {
+  if (loading) {
+    return (
+      <div className="nosPropLoadingBox">
+        Loading properties...
+      </div>
+    );
+  }
+
+  if (!properties.length) {
+    return (
+      <div className="nosPropEmptyState">
+        <div className="nosPropEmptyIcon">
+          🏠
+        </div>
+
+        <h2>
+          No properties added yet
+        </h2>
+
+        <p>
+          Add your first property
+          and start preparing it
+          for direct bookings.
+        </p>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="nosPropPrimaryButton"
+        >
+          + Add New Property
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section className="nosPropListSection">
+      <div className="nosPropListHeading">
+        <div>
+          <h2>
+            My Properties
+          </h2>
+
+          <p>
+            {properties.length}{' '}
+            {properties.length === 1
+              ? 'property'
+              : 'properties'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="nosPropAddButton"
+        >
+          + Add Property
+        </button>
+      </div>
+
+      <div className="nosPropPropertyGrid">
+        {properties.map(
+          (property) => (
+            <article
+              key={
+                property.id
+              }
+              className="nosPropPropertyCard"
+            >
+              <div className="nosPropCardTop">
+                <div className="nosPropCardTitle">
+                  <h3>
+                    {property.name}
+                  </h3>
+
+                  <p>
+                    {property.location_name ||
+                      'Location not added'}
+                  </p>
+                </div>
+
+                <span
+                  className={
+                    property.is_active
+                      ? 'nosPropStatus nosPropStatusActive'
+                      : 'nosPropStatus nosPropStatusInactive'
+                  }
+                >
+                  {property.is_active
+                    ? 'Active'
+                    : 'Inactive'}
+                </span>
+              </div>
+
+              <div className="nosPropPrice">
+                ₹
+                {numberValue(
+                  property.base_price
+                ).toLocaleString(
+                  'en-IN'
+                )}
+
+                <span>
+                  / night
+                </span>
+              </div>
+
+              <div className="nosPropCardInfo">
+                <div>
+                  <strong>
+                    {property.bedrooms ||
+                      0}
+                  </strong>
+
+                  <span>
+                    Bedrooms
+                  </span>
+                </div>
+
+                <div>
+                  <strong>
+                    {property.bathrooms ||
+                      0}
+                  </strong>
+
+                  <span>
+                    Bathrooms
+                  </span>
+                </div>
+
+                <div>
+                  <strong>
+                    {property.max_guests ||
+                      0}
+                  </strong>
+
+                  <span>
+                    Max Guests
+                  </span>
+                </div>
+              </div>
+
+              <div className="nosPropBaseGuestInfo">
+                Base price includes{' '}
+                <strong>
+                  {property.included_guests ||
+                    1}
+                </strong>{' '}
+                guest(s)
+              </div>
+
+              {property.dynamic_pricing_enabled && (
+                <div className="nosPropDynamicBadge">
+                  Dynamic Pricing Active
+                </div>
+              )}
+
+              <div className="nosPropCardActions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onManage(
+                      property,
+                      'details'
+                    )
+                  }
+                  className="nosPropCardPrimary"
+                >
+                  Manage
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onManage(
+                      property,
+                      'photos'
+                    )
+                  }
+                  className="nosPropCardSecondary"
+                >
+                  Photos
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onManage(
+                      property,
+                      'offers'
+                    )
+                  }
+                  className="nosPropCardSecondary"
+                >
+                  Offers
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onManage(
+                      property,
+                      'calendar'
+                    )
+                  }
+                  className="nosPropCardSecondary"
+                >
+                  Calendar
+                </button>
+
+                {property.slug && (
+                  <a
+                    href={`/property/${property.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="nosPropCardSecondary nosPropCardLink"
+                  >
+                    Preview
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onToggle(
+                      property
+                    )
+                  }
+                  className={
+                    property.is_active
+                      ? 'nosPropCardDanger'
+                      : 'nosPropCardActivate'
+                  }
+                >
+                  {property.is_active
+                    ? 'Deactivate'
+                    : 'Activate'}
+                </button>
+              </div>
+            </article>
+          )
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* =====================================================
+   PROPERTY DETAILS FORM
+===================================================== */
+
+function PropertyDetailsForm({
+  form,
+  updateField,
+  toggleArrayItem,
+  saving,
+  errorMessage,
+  successMessage,
+  onSubmit,
+  isEditing,
+}) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="nosPropForm"
+    >
+      <FormSection title="Basic Property Information">
+        <TextField
+          label="PROPERTY NAME"
+          value={form.name}
+          onChange={(value) =>
+            updateField(
+              'name',
+              value
+            )
+          }
+        />
+
+        <TextField
+          label="LOCATION"
+          value={
+            form.location_name
+          }
+          onChange={(value) =>
+            updateField(
+              'location_name',
+              value
+            )
+          }
+        />
+
+        <TextField
+          label="PROPERTY URL SLUG"
+          value={form.slug}
+          placeholder="Leave blank to generate automatically"
+          onChange={(value) =>
+            updateField(
+              'slug',
+              value
+            )
+          }
+        />
+
+        <TextField
+          label="GOOGLE MAPS LINK"
+          value={
+            form.google_maps_url
+          }
+          onChange={(value) =>
+            updateField(
+              'google_maps_url',
+              value
+            )
+          }
+        />
+
+        <TextArea
+          label="FULL ADDRESS"
+          value={form.address}
+          onChange={(value) =>
+            updateField(
+              'address',
+              value
+            )
+          }
+        />
+
+        <TextArea
+          label="SHORT DESCRIPTION"
+          value={
+            form.short_description
+          }
+          onChange={(value) =>
+            updateField(
+              'short_description',
+              value
+            )
+          }
+        />
+
+        <TextArea
+          label="FULL DESCRIPTION"
+          value={
+            form.description
+          }
+          onChange={(value) =>
+            updateField(
+              'description',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Rooms, Beds & Capacity">
+        <NumberField
+          label="BEDROOMS"
+          value={
+            form.bedrooms
+          }
+          onChange={(value) =>
+            updateField(
+              'bedrooms',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="BATHROOMS"
+          value={
+            form.bathrooms
+          }
+          onChange={(value) =>
+            updateField(
+              'bathrooms',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="QUEEN SIZE BEDS"
+          value={
+            form.queen_bed_count
+          }
+          onChange={(value) =>
+            updateField(
+              'queen_bed_count',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="SINGLE BEDS"
+          value={
+            form.single_bed_count
+          }
+          onChange={(value) =>
+            updateField(
+              'single_bed_count',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="SOFA-CUM-BEDS"
+          value={
+            form.sofa_cum_bed_count
+          }
+          onChange={(value) =>
+            updateField(
+              'sofa_cum_bed_count',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="MINIMUM GUESTS"
+          value={
+            form.min_guests
+          }
+          onChange={(value) =>
+            updateField(
+              'min_guests',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="GUESTS INCLUDED IN BASE PRICE"
+          value={
+            form.included_guests
+          }
+          onChange={(value) =>
+            updateField(
+              'included_guests',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="MAXIMUM GUESTS"
+          value={
+            form.max_guests
+          }
+          onChange={(value) =>
+            updateField(
+              'max_guests',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Pricing">
+        <NumberField
+          label="BASE NIGHTLY PRICE ₹"
+          value={
+            form.base_price
+          }
+          onChange={(value) =>
+            updateField(
+              'base_price',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="EXTRA GUEST ₹ / PERSON / NIGHT"
+          value={
+            form.extra_guest_fee
+          }
+          onChange={(value) =>
+            updateField(
+              'extra_guest_fee',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="CLEANING FEE ₹"
+          value={
+            form.cleaning_fee
+          }
+          onChange={(value) =>
+            updateField(
+              'cleaning_fee',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="SECURITY DEPOSIT ₹"
+          value={
+            form.security_deposit
+          }
+          onChange={(value) =>
+            updateField(
+              'security_deposit',
+              value
+            )
+          }
+        />
+
+        <div className="nosPropInfoBox">
+          Base price ₹
+          {numberValue(
+            form.base_price
+          ).toLocaleString(
+            'en-IN'
+          )}{' '}
+          includes{' '}
+          <strong>
+            {form.included_guests}
+          </strong>{' '}
+          guest(s). Extra guests
+          are charged ₹
+          {numberValue(
+            form.extra_guest_fee
+          ).toLocaleString(
+            'en-IN'
+          )}{' '}
+          per person per night.
+        </div>
+      </FormSection>
+
+      <FormSection title="Stay Duration & Timing">
+        <NumberField
+          label="MINIMUM STAY NIGHTS"
+          value={
+            form.min_stay_nights
+          }
+          onChange={(value) =>
+            updateField(
+              'min_stay_nights',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="MAXIMUM STAY NIGHTS"
+          value={
+            form.max_stay_nights
+          }
+          onChange={(value) =>
+            updateField(
+              'max_stay_nights',
+              value
+            )
+          }
+        />
+
+        <TimeField
+          label="CHECK-IN TIME"
+          value={
+            form.check_in_time
+          }
+          onChange={(value) =>
+            updateField(
+              'check_in_time',
+              value
+            )
+          }
+        />
+
+        <TimeField
+          label="CHECK-OUT TIME"
+          value={
+            form.check_out_time
+          }
+          onChange={(value) =>
+            updateField(
+              'check_out_time',
+              value
+            )
+          }
+        />
+
+        <NumberField
+          label="LATE CHECK-OUT ₹ / HOUR"
+          value={
+            form.late_checkout_hourly_fee
+          }
+          onChange={(value) =>
+            updateField(
+              'late_checkout_hourly_fee',
+              value
+            )
+          }
+        />
+      </FormSection>
+      <FormSection title="Facilities">
+        <Toggle
+          label="Wi-Fi"
+          checked={
+            form.wifi_available
+          }
+          onChange={(value) =>
+            updateField(
+              'wifi_available',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="TV"
+          checked={
+            form.tv_available
+          }
+          onChange={(value) =>
+            updateField(
+              'tv_available',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Fridge"
+          checked={
+            form.fridge_available
+          }
+          onChange={(value) =>
+            updateField(
+              'fridge_available',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Washing Machine"
+          checked={
+            form.washing_machine_available
+          }
+          onChange={(value) =>
+            updateField(
+              'washing_machine_available',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Air Conditioning"
+          checked={
+            form.ac_available
+          }
+          onChange={(value) =>
+            updateField(
+              'ac_available',
+              value
+            )
+          }
+        />
+
+        {form.ac_available && (
+          <NumberField
+            label="NUMBER OF ACs"
+            value={
+              form.ac_count
+            }
+            onChange={(value) =>
+              updateField(
+                'ac_count',
+                value
+              )
+            }
+          />
+        )}
+
+        <NumberField
+          label="WATER HEATERS / GEYSERS"
+          value={
+            form.water_heater_count
+          }
+          onChange={(value) =>
+            updateField(
+              'water_heater_count',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Kitchen Features">
+        <CheckboxGrid
+          items={
+            kitchenOptions
+          }
+          selected={
+            form.kitchen_features
+          }
+          onToggle={(value) =>
+            toggleArrayItem(
+              'kitchen_features',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Amenities">
+        <CheckboxGrid
+          items={
+            amenityOptions
+          }
+          selected={
+            form.amenities
+          }
+          onToggle={(value) =>
+            toggleArrayItem(
+              'amenities',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Rules & Permissions">
+        <Toggle
+          label="Pets Allowed"
+          checked={
+            form.pets_allowed
+          }
+          onChange={(value) =>
+            updateField(
+              'pets_allowed',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Parties Allowed"
+          checked={
+            form.parties_allowed
+          }
+          onChange={(value) =>
+            updateField(
+              'parties_allowed',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Couples Allowed"
+          checked={
+            form.couples_allowed
+          }
+          onChange={(value) =>
+            updateField(
+              'couples_allowed',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Alcohol Allowed"
+          checked={
+            form.alcohol_allowed
+          }
+          onChange={(value) =>
+            updateField(
+              'alcohol_allowed',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Smoking Allowed"
+          checked={
+            form.smoking_allowed
+          }
+          onChange={(value) =>
+            updateField(
+              'smoking_allowed',
+              value
+            )
+          }
+        />
+
+        <Toggle
+          label="Enable Quiet Hours"
+          checked={
+            form.quiet_hours_enabled
+          }
+          onChange={(value) =>
+            updateField(
+              'quiet_hours_enabled',
+              value
+            )
+          }
+        />
+
+        {form.quiet_hours_enabled && (
+          <>
+            <TimeField
+              label="QUIET HOURS FROM"
+              value={
+                form.quiet_hours_start
+              }
+              onChange={(value) =>
+                updateField(
+                  'quiet_hours_start',
+                  value
+                )
+              }
+            />
+
+            <TimeField
+              label="QUIET HOURS UNTIL"
+              value={
+                form.quiet_hours_end
+              }
+              onChange={(value) =>
+                updateField(
+                  'quiet_hours_end',
+                  value
+                )
+              }
+            />
+          </>
+        )}
+
+        <TextArea
+          label="OTHER HOUSE RULES — ONE PER LINE"
+          value={
+            form.house_rules_text
+          }
+          onChange={(value) =>
+            updateField(
+              'house_rules_text',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Directions / Arrival Instructions">
+        <TextArea
+          label="DIRECTION INSTRUCTIONS"
+          value={
+            form.direction_instructions
+          }
+          onChange={(value) =>
+            updateField(
+              'direction_instructions',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      <FormSection title="Automatic Dynamic Pricing">
+        <Toggle
+          label="Enable Dynamic Pricing"
+          checked={
+            form.dynamic_pricing_enabled
+          }
+          onChange={(value) =>
+            updateField(
+              'dynamic_pricing_enabled',
+              value
+            )
+          }
+        />
+
+        {form.dynamic_pricing_enabled && (
+          <>
+            <NumberField
+              label="WEEKEND MARKUP %"
+              value={
+                form.weekend_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'weekend_markup_percent',
+                  value
+                )
+              }
+            />
+
+            <NumberField
+              label="LONG WEEKEND MARKUP %"
+              value={
+                form.long_weekend_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'long_weekend_markup_percent',
+                  value
+                )
+              }
+            />
+
+            <NumberField
+              label="FESTIVAL MARKUP %"
+              value={
+                form.festival_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'festival_markup_percent',
+                  value
+                )
+              }
+            />
+
+            <NumberField
+              label="SEASON MARKUP %"
+              value={
+                form.season_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'season_markup_percent',
+                  value
+                )
+              }
+            />
+          </>
+        )}
+      </FormSection>
+
+      <FormSection title="Publishing">
+        <Toggle
+          label="Property Active / Visible to Guests"
+          checked={
+            form.is_active
+          }
+          onChange={(value) =>
+            updateField(
+              'is_active',
+              value
+            )
+          }
+        />
+      </FormSection>
+
+      {errorMessage && (
+        <div className="nosPropError">
+          {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="nosPropSuccess">
+          {successMessage}
+        </div>
+      )}
+
+      <div className="nosPropSaveArea">
+        <button
+          type="submit"
+          disabled={saving}
+          className="nosPropSaveButton"
+        >
+          {saving
+            ? 'Saving Property...'
+            : isEditing
+            ? 'Update Property'
+            : 'Create Property'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* =====================================================
+   FORM HELPERS
+===================================================== */
+
+function FormSection({
   title,
   children,
 }) {
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>
+    <section className="nosPropFormSection">
+      <h3>
         {title}
-      </h2>
+      </h3>
 
-      <div style={styles.formGrid}>
+      <div className="nosPropFormGrid">
         {children}
       </div>
     </section>
@@ -2059,21 +2486,22 @@ function TextField({
   placeholder = '',
 }) {
   return (
-    <label>
-      <span style={styles.label}>
+    <label className="nosPropField">
+      <span>
         {label}
       </span>
 
       <input
         type="text"
         value={value ?? ''}
-        placeholder={placeholder}
+        placeholder={
+          placeholder
+        }
         onChange={(event) =>
           onChange(
             event.target.value
           )
         }
-        style={styles.input}
       />
     </label>
   );
@@ -2085,8 +2513,8 @@ function NumberField({
   onChange,
 }) {
   return (
-    <label>
-      <span style={styles.label}>
+    <label className="nosPropField">
+      <span>
         {label}
       </span>
 
@@ -2100,7 +2528,6 @@ function NumberField({
             event.target.value
           )
         }
-        style={styles.input}
       />
     </label>
   );
@@ -2112,8 +2539,8 @@ function TimeField({
   onChange,
 }) {
   return (
-    <label>
-      <span style={styles.label}>
+    <label className="nosPropField">
+      <span>
         {label}
       </span>
 
@@ -2125,7 +2552,6 @@ function TimeField({
             event.target.value
           )
         }
-        style={styles.input}
       />
     </label>
   );
@@ -2137,8 +2563,8 @@ function TextArea({
   onChange,
 }) {
   return (
-    <label style={styles.fullWidth}>
-      <span style={styles.label}>
+    <label className="nosPropField nosPropFullWidth">
+      <span>
         {label}
       </span>
 
@@ -2149,7 +2575,7 @@ function TextArea({
             event.target.value
           )
         }
-        style={styles.textarea}
+        rows="5"
       />
     </label>
   );
@@ -2161,7 +2587,7 @@ function Toggle({
   onChange,
 }) {
   return (
-    <label style={styles.toggleRow}>
+    <label className="nosPropToggle">
       <input
         type="checkbox"
         checked={
@@ -2174,9 +2600,11 @@ function Toggle({
         }
       />
 
-      <span>
+      <span className="nosPropToggleSwitch" />
+
+      <strong>
         {label}
-      </span>
+      </strong>
     </label>
   );
 }
@@ -2187,609 +2615,882 @@ function CheckboxGrid({
   onToggle,
 }) {
   return (
-    <div style={styles.fullWidth}>
-      <div style={styles.checkboxGrid}>
-        {items.map(
-          (item) => (
-            <label
-              key={item}
-              style={
-                styles.checkboxItem
+    <div className="nosPropCheckboxGrid nosPropFullWidth">
+      {items.map(
+        (item) => (
+          <label
+            key={item}
+            className="nosPropCheckboxItem"
+          >
+            <input
+              type="checkbox"
+              checked={
+                selected?.includes(
+                  item
+                ) || false
               }
-            >
-              <input
-                type="checkbox"
-                checked={
-                  selected?.includes(
-                    item
-                  ) || false
-                }
-                onChange={() =>
-                  onToggle(
-                    item
-                  )
-                }
-              />
+              onChange={() =>
+                onToggle(item)
+              }
+            />
 
-              <span>
-                {item}
-              </span>
-            </label>
-          )
-        )}
-      </div>
+            <span>
+              {item}
+            </span>
+          </label>
+        )
+      )}
     </div>
   );
 }
 
-const styles = {
-  page: {
-    minHeight:
-      '100vh',
-
-    background:
-      '#f6f7f9',
-
-    color:
-      '#172033',
-
-    fontFamily:
-      'Arial, sans-serif',
-  },
-
-  header: {
-    background:
-      '#ffffff',
-
-    padding:
-      '18px 5vw',
-
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    alignItems:
-      'center',
-
-    gap: 15,
-
-    borderBottom:
-      '1px solid #e4e6e9',
-  },
-
-  headerRight: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap: 16,
-  },
-
-  brand: {
-    fontSize: 24,
-    fontWeight: 900,
-    color: '#163c74',
-  },
-
-  roleText: {
-    fontSize: 11,
-    color: '#687080',
-    textTransform:
-      'capitalize',
-  },
-
-  logout: {
-    border:
-      '1px solid #dddddd',
-
-    background:
-      '#ffffff',
-
-    borderRadius: 20,
-
-    padding:
-      '9px 15px',
-
-    cursor:
-      'pointer',
-  },
-
-  content: {
-    maxWidth: 1400,
-
-    margin:
-      '0 auto',
-
-    padding:
-      '35px 5vw 80px',
-  },
-
-  pageTitle: {
-    marginTop: 0,
-  },
-
-  topRow: {
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    alignItems:
-      'center',
-
-    flexWrap:
-      'wrap',
-
-    gap: 20,
-  },
-
-  muted: {
-    color:
-      '#687080',
-
-    lineHeight:
-      1.5,
-  },
-
-  section: {
-    marginTop: 22,
-
-    background:
-      '#ffffff',
-
-    padding: 24,
-
-    border:
-      '1px solid #e2e5e8',
-
-    borderRadius: 16,
-  },
-
-  sectionTitle: {
-    marginTop: 0,
-    marginBottom: 20,
-  },
-
-  formGrid: {
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(230px, 1fr))',
-
-    gap: 18,
-  },
-
-  fullWidth: {
-    gridColumn:
-      '1 / -1',
-  },
-
-  label: {
-    display:
-      'block',
-
-    fontSize: 10,
-
-    fontWeight: 800,
-
-    letterSpacing: 1,
-
-    marginBottom: 6,
-  },
-
-  input: {
-    width:
-      '100%',
-
-    boxSizing:
-      'border-box',
-
-    padding: 12,
-
-    border:
-      '1px solid #ccd1d7',
-
-    borderRadius: 10,
-
-    background:
-      '#ffffff',
-  },
-
-  textarea: {
-    width:
-      '100%',
-
-    boxSizing:
-      'border-box',
-
-    minHeight: 100,
-
-    padding: 12,
-
-    border:
-      '1px solid #ccd1d7',
-
-    borderRadius: 10,
-
-    resize:
-      'vertical',
-  },
-
-  toggleRow: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap: 10,
-
-    padding: 13,
-
-    border:
-      '1px solid #e0e3e7',
-
-    borderRadius: 10,
-
-    background:
-      '#fafafa',
-
-    cursor:
-      'pointer',
-  },
-
-  checkboxGrid: {
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(180px, 1fr))',
-
-    gap: 10,
-  },
-
-  checkboxItem: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap: 9,
-
-    padding: 11,
-
-    border:
-      '1px solid #e0e3e7',
-
-    borderRadius: 10,
-
-    background:
-      '#fafafa',
-
-    cursor:
-      'pointer',
-  },
-
-  infoBox: {
-    gridColumn:
-      '1 / -1',
-
-    padding: 14,
-
-    background:
-      '#fff7e5',
-
-    borderRadius: 10,
-
-    fontWeight: 700,
-  },
-
-  error: {
-    marginTop: 20,
-
-    padding: 14,
-
-    borderRadius: 10,
-
-    background:
-      '#ffeaea',
-
-    color:
-      '#8c2020',
-
-    fontWeight: 700,
-  },
-
-  success: {
-    marginTop: 20,
-
-    padding: 14,
-
-    borderRadius: 10,
-
-    background:
-      '#eaf8ee',
-
-    color:
-      '#236339',
-
-    fontWeight: 700,
-  },
-
-  saveButton: {
-    width:
-      '100%',
-
-    marginTop: 25,
-
-    padding: 16,
-
-    border: 0,
-
-    borderRadius: 12,
-
-    background:
-      '#163c74',
-
-    color:
-      '#ffffff',
-
-    fontSize: 16,
-
-    fontWeight: 800,
-
-    cursor:
-      'pointer',
-  },
-
-  secondaryButton: {
-    padding:
-      '11px 17px',
-
-    borderRadius: 10,
-
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #163c74',
-
-    color:
-      '#163c74',
-
-    fontWeight: 700,
-
-    cursor:
-      'pointer',
-  },
-
-  separator: {
-    margin:
-      '55px 0 30px',
-
-    border: 0,
-
-    borderTop:
-      '1px solid #dddddd',
-  },
-
-  propertyGrid: {
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      'repeat(auto-fit, minmax(280px, 1fr))',
-
-    gap: 20,
-
-    marginTop: 20,
-  },
-
-  propertyCard: {
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #e2e4e8',
-
-    borderRadius: 16,
-
-    padding: 20,
-  },
-
-  cardTop: {
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    gap: 15,
-  },
-
-  cardTitle: {
-    margin: 0,
-  },
-
-  status: {
-    height:
-      'fit-content',
-
-    padding:
-      '6px 10px',
-
-    borderRadius: 20,
-
-    fontSize: 11,
-
-    fontWeight: 800,
-  },
-
-  cardPrice: {
-    marginTop: 20,
-
-    color:
-      '#163c74',
-
-    fontSize: 21,
-
-    fontWeight: 800,
-  },
-
-  small: {
-    marginTop: 5,
-
-    fontSize: 13,
-
-    color:
-      '#666666',
-  },
-
-  dynamicBadge: {
-    width:
-      'fit-content',
-
-    marginTop: 10,
-
-    padding:
-      '6px 9px',
-
-    borderRadius: 8,
-
-    background:
-      '#fff3d5',
-
-    color:
-      '#7c5900',
-
-    fontSize: 10,
-
-    fontWeight: 800,
-  },
-
-  cardButtons: {
-    display:
-      'flex',
-
-    gap: 10,
-
-    flexWrap:
-      'wrap',
-
-    marginTop: 20,
-  },
-
-  editButton: {
-    padding: 10,
-
-    border: 0,
-
-    borderRadius: 10,
-
-    background:
-      '#163c74',
-
-    color:
-      '#ffffff',
-
-    fontWeight: 700,
-
-    cursor:
-      'pointer',
-  },
-
-  statusButton: {
-    padding: 10,
-
-    border:
-      '1px solid #cccccc',
-
-    borderRadius: 10,
-
-    background:
-      '#ffffff',
-
-    cursor:
-      'pointer',
-  },
-
-  viewButton: {
-    padding:
-      '9px 12px',
-
-    border:
-      '1px solid #163c74',
-
-    borderRadius: 10,
-
-    background:
-      '#ffffff',
-
-    color:
-      '#163c74',
-
-    textDecoration:
-      'none',
-
-    fontWeight: 700,
-
-    fontSize: 12,
-  },
-
-  empty: {
-    padding: 30,
-
-    marginTop: 20,
-
-    background:
-      '#ffffff',
-
-    borderRadius: 15,
-  },
-
-  loading: {
-    padding: 40,
-  },
-
-  notice: {
-    maxWidth: 450,
-
-    margin:
-      '80px auto',
-
-    background:
-      '#ffffff',
-
-    padding: 30,
-
-    borderRadius: 16,
-  },
-
-  primaryLink: {
-    display:
-      'inline-block',
-
-    marginTop: 15,
-
-    padding:
-      '11px 16px',
-
-    borderRadius: 10,
-
-    background:
-      '#163c74',
-
-    color:
-      '#ffffff',
-
-    textDecoration:
-      'none',
-  },
-};
+/* =====================================================
+   RESPONSIVE STYLES
+===================================================== */
+
+function PageStyles() {
+  return (
+    <style jsx global>{`
+      .nosPropPage {
+        min-height: 100vh;
+        background: #f5f7fa;
+        color: #172033;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .nosPropPage *,
+      .nosPropPage *::before,
+      .nosPropPage *::after {
+        box-sizing: border-box;
+      }
+
+      .nosPropHeader {
+        min-height: 76px;
+        padding: 14px 28px;
+        background: #ffffff;
+        border-bottom: 1px solid #e3e7ee;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .nosPropBrand {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.4px;
+      }
+
+      .nosPropMuted,
+      .nosPropHeaderRight span,
+      .nosPropPageHeading p,
+      .nosPropEditorTitle p,
+      .nosPropManageTitleRow p,
+      .nosPropManagerHeading p,
+      .nosPropListHeading p,
+      .nosPropCardTitle p {
+        color: #697386;
+      }
+
+      .nosPropBrandArea .nosPropMuted {
+        margin-top: 4px;
+        font-size: 13px;
+      }
+
+      .nosPropHeaderRight {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .nosPropProfile {
+        display: flex;
+        flex-direction: column;
+        text-align: right;
+        gap: 3px;
+        font-size: 13px;
+      }
+
+      .nosPropProfile strong {
+        font-size: 14px;
+      }
+
+      .nosPropLogoutButton,
+      .nosPropBackButton,
+      .nosPropMainTab,
+      .nosPropAddButton,
+      .nosPropPrimaryButton,
+      .nosPropSaveButton,
+      .nosPropManageTab,
+      .nosPropCardActions button,
+      .nosPropCardActions a,
+      .nosPropPreviewTop {
+        min-height: 44px;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .nosPropLogoutButton {
+        border: 1px solid #d8dee8;
+        background: #ffffff;
+        padding: 9px 16px;
+        border-radius: 9px;
+        font-weight: 700;
+      }
+
+      .nosPropContent {
+        width: min(1400px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 32px 0 60px;
+      }
+
+      .nosPropPageHeading h1 {
+        margin: 0;
+        font-size: 30px;
+      }
+
+      .nosPropPageHeading p {
+        margin: 8px 0 0;
+        line-height: 1.5;
+      }
+
+      .nosPropMainTabs {
+        margin-top: 24px;
+        display: inline-flex;
+        padding: 5px;
+        background: #e9edf3;
+        border-radius: 12px;
+        gap: 5px;
+      }
+
+      .nosPropMainTab {
+        border: 0;
+        background: transparent;
+        padding: 10px 18px;
+        border-radius: 9px;
+        font-weight: 700;
+        color: #536071;
+      }
+
+      .nosPropMainTabActive {
+        background: #ffffff;
+        color: #172033;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      }
+
+      .nosPropListSection {
+        margin-top: 28px;
+      }
+
+      .nosPropListHeading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropListHeading h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .nosPropListHeading p {
+        margin: 5px 0 0;
+        font-size: 14px;
+      }
+
+      .nosPropAddButton,
+      .nosPropPrimaryButton,
+      .nosPropSaveButton {
+        border: 0;
+        background: #172033;
+        color: #ffffff;
+        border-radius: 9px;
+        padding: 10px 18px;
+        font-weight: 800;
+      }
+
+      .nosPropPropertyGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .nosPropPropertyCard {
+        background: #ffffff;
+        border: 1px solid #e1e6ed;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 14px rgba(21, 32, 51, 0.04);
+        min-width: 0;
+      }
+
+      .nosPropCardTop {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .nosPropCardTitle {
+        min-width: 0;
+      }
+
+      .nosPropCardTitle h3 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .nosPropCardTitle p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .nosPropStatus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .nosPropStatusActive {
+        background: #e8f7ee;
+        color: #16733d;
+      }
+
+      .nosPropStatusInactive {
+        background: #f1f2f4;
+        color: #697386;
+      }
+
+      .nosPropPrice {
+        margin-top: 20px;
+        font-size: 24px;
+        font-weight: 800;
+      }
+
+      .nosPropPrice span {
+        font-size: 13px;
+        font-weight: 500;
+        color: #697386;
+      }
+
+      .nosPropCardInfo {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 18px;
+        border: 1px solid #e8ebf0;
+        border-radius: 11px;
+        overflow: hidden;
+      }
+
+      .nosPropCardInfo > div {
+        min-width: 0;
+        padding: 11px 7px;
+        text-align: center;
+        border-right: 1px solid #e8ebf0;
+      }
+
+      .nosPropCardInfo > div:last-child {
+        border-right: 0;
+      }
+
+      .nosPropCardInfo strong,
+      .nosPropCardInfo span {
+        display: block;
+      }
+
+      .nosPropCardInfo strong {
+        font-size: 16px;
+      }
+
+      .nosPropCardInfo span {
+        margin-top: 4px;
+        color: #697386;
+        font-size: 11px;
+      }
+
+      .nosPropBaseGuestInfo {
+        margin-top: 13px;
+        color: #697386;
+        font-size: 12px;
+      }
+
+      .nosPropDynamicBadge {
+        margin-top: 12px;
+        display: inline-block;
+        padding: 6px 9px;
+        border-radius: 7px;
+        background: #fff4d6;
+        color: #795800;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .nosPropCardActions {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .nosPropCardActions button,
+      .nosPropCardActions a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-weight: 700;
+        font-size: 12px;
+        text-decoration: none;
+        text-align: center;
+      }
+
+      .nosPropCardPrimary {
+        border: 1px solid #172033;
+        background: #172033;
+        color: #ffffff;
+      }
+
+      .nosPropCardSecondary {
+        border: 1px solid #dbe1e9;
+        background: #ffffff;
+        color: #27364a;
+      }
+
+      .nosPropCardDanger {
+        border: 1px solid #f1cccc;
+        background: #fff5f5;
+        color: #a12b2b;
+      }
+
+      .nosPropCardActivate {
+        border: 1px solid #bfe3cd;
+        background: #f1fbf5;
+        color: #16733d;
+      }
+
+      .nosPropEditor {
+        margin-top: 28px;
+      }
+
+      .nosPropBackButton {
+        border: 0;
+        background: transparent;
+        padding: 0 4px;
+        color: #41546d;
+        font-weight: 800;
+      }
+
+      .nosPropEditorTitle {
+        margin: 10px 0 20px;
+      }
+
+      .nosPropEditorTitle h2,
+      .nosPropManageTitleRow h2 {
+        margin: 0;
+        font-size: 25px;
+      }
+
+      .nosPropEditorTitle p,
+      .nosPropManageTitleRow p {
+        margin: 7px 0 0;
+        line-height: 1.5;
+      }
+
+      .nosPropManageHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 20px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropManageLeft {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .nosPropManageTitleRow {
+        margin-top: 10px;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+
+      .nosPropSmallTitle {
+        margin-bottom: 5px;
+        color: #8791a0;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 1px;
+      }
+
+      .nosPropPreviewTop {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d8dee8;
+        background: #ffffff;
+        color: #27364a;
+        border-radius: 9px;
+        padding: 9px 16px;
+        text-decoration: none;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .nosPropManageTabsWrap {
+        overflow-x: auto;
+        scrollbar-width: thin;
+        margin-bottom: 20px;
+      }
+
+      .nosPropManageTabs {
+        min-width: max-content;
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        background: #e9edf3;
+        border-radius: 11px;
+      }
+
+      .nosPropManageTab {
+        border: 0;
+        background: transparent;
+        color: #536071;
+        padding: 9px 16px;
+        border-radius: 8px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .nosPropManageTabActive {
+        background: #ffffff;
+        color: #172033;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      }
+
+      .nosPropManagerPanel,
+      .nosPropFormSection {
+        background: #ffffff;
+        border: 1px solid #e1e6ed;
+        border-radius: 14px;
+        padding: 22px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropManagerHeading {
+        padding-bottom: 16px;
+        margin-bottom: 18px;
+        border-bottom: 1px solid #e8ebf0;
+      }
+
+      .nosPropManagerHeading h3,
+      .nosPropFormSection h3 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .nosPropManagerHeading p {
+        margin: 6px 0 0;
+        line-height: 1.45;
+      }
+
+      .nosPropForm {
+        width: 100%;
+      }
+
+      .nosPropFormGrid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 16px;
+        align-items: start;
+      }
+
+      .nosPropField {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .nosPropField > span {
+        color: #59677a;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.25px;
+      }
+
+      .nosPropField input,
+      .nosPropField textarea {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid #d8dee8;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #172033;
+        padding: 10px 12px;
+        font: inherit;
+        outline: none;
+      }
+
+      .nosPropField textarea {
+        min-height: 110px;
+        resize: vertical;
+        line-height: 1.5;
+      }
+
+      .nosPropField input:focus,
+      .nosPropField textarea:focus {
+        border-color: #7e8ca0;
+        box-shadow: 0 0 0 3px rgba(90, 110, 140, 0.09);
+      }
+
+      .nosPropFullWidth {
+        grid-column: 1 / -1;
+      }
+
+      .nosPropInfoBox {
+        grid-column: 1 / -1;
+        padding: 12px 14px;
+        background: #f6f8fb;
+        border: 1px solid #e2e7ee;
+        border-radius: 8px;
+        color: #536071;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .nosPropToggle {
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid #e1e6ed;
+        border-radius: 9px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .nosPropToggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .nosPropToggleSwitch {
+        position: relative;
+        width: 40px;
+        height: 23px;
+        flex: 0 0 40px;
+        border-radius: 999px;
+        background: #c9d0da;
+        transition: 0.2s ease;
+      }
+
+      .nosPropToggleSwitch::after {
+        content: '';
+        position: absolute;
+        width: 17px;
+        height: 17px;
+        left: 3px;
+        top: 3px;
+        border-radius: 50%;
+        background: #ffffff;
+        transition: 0.2s ease;
+      }
+
+      .nosPropToggle input:checked + .nosPropToggleSwitch {
+        background: #172033;
+      }
+
+      .nosPropToggle input:checked + .nosPropToggleSwitch::after {
+        transform: translateX(17px);
+      }
+
+      .nosPropToggle strong {
+        font-size: 13px;
+      }
+
+      .nosPropCheckboxGrid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .nosPropCheckboxItem {
+        min-height: 46px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 11px;
+        border: 1px solid #e1e6ed;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .nosPropCheckboxItem input {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 17px;
+      }
+
+      .nosPropSaveArea {
+        display: flex;
+        justify-content: flex-end;
+        padding: 4px 0 24px;
+      }
+
+      .nosPropSaveButton {
+        min-width: 190px;
+      }
+
+      .nosPropSaveButton:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .nosPropError,
+      .nosPropSuccess {
+        margin: 14px 0;
+        padding: 12px 14px;
+        border-radius: 9px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .nosPropError {
+        background: #fff3f3;
+        border: 1px solid #f0cccc;
+        color: #9d2929;
+      }
+
+      .nosPropSuccess {
+        background: #effaf3;
+        border: 1px solid #c9e8d4;
+        color: #17663a;
+      }
+
+      .nosPropLoadingBox,
+      .nosPropLoginNotice,
+      .nosPropEmptyState {
+        margin-top: 28px;
+        background: #ffffff;
+        border: 1px solid #e1e6ed;
+        border-radius: 14px;
+        padding: 32px;
+        text-align: center;
+      }
+
+      .nosPropLoginNotice {
+        width: min(520px, calc(100% - 32px));
+        margin: 60px auto;
+      }
+
+      .nosPropLoginNotice h2,
+      .nosPropEmptyState h2 {
+        margin: 8px 0;
+      }
+
+      .nosPropLoginNotice p,
+      .nosPropEmptyState p {
+        color: #697386;
+        line-height: 1.5;
+      }
+
+      .nosPropPrimaryLink {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        margin-top: 8px;
+        padding: 10px 18px;
+        border-radius: 9px;
+        background: #172033;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 800;
+      }
+
+      .nosPropEmptyIcon {
+        font-size: 36px;
+      }
+
+      @media (max-width: 1100px) {
+        .nosPropPropertyGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropCheckboxGrid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 768px) {
+        .nosPropHeader {
+          padding: 13px 18px;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .nosPropHeaderRight {
+          width: 100%;
+          justify-content: space-between;
+          border-top: 1px solid #edf0f4;
+          padding-top: 11px;
+        }
+
+        .nosPropProfile {
+          text-align: left;
+        }
+
+        .nosPropContent {
+          width: calc(100% - 28px);
+          padding-top: 22px;
+        }
+
+        .nosPropPageHeading h1 {
+          font-size: 26px;
+        }
+
+        .nosPropMainTabs {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .nosPropMainTab {
+          padding-left: 8px;
+          padding-right: 8px;
+          font-size: 13px;
+        }
+
+        .nosPropPropertyGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropListHeading {
+          align-items: flex-end;
+        }
+
+        .nosPropManageHeader {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .nosPropPreviewTop {
+          width: 100%;
+        }
+
+        .nosPropManageTitleRow {
+          justify-content: space-between;
+        }
+
+        .nosPropManagerPanel,
+        .nosPropFormSection {
+          padding: 17px;
+          border-radius: 12px;
+        }
+
+        .nosPropFormGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropCheckboxGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropSaveButton {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .nosPropBrand {
+          font-size: 20px;
+        }
+
+        .nosPropContent {
+          width: calc(100% - 20px);
+        }
+
+        .nosPropListHeading {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .nosPropAddButton {
+          width: 100%;
+        }
+
+        .nosPropPropertyCard {
+          padding: 16px;
+        }
+
+        .nosPropCardTop {
+          gap: 8px;
+        }
+
+        .nosPropCardInfo {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .nosPropCardActions {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropFormGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropCheckboxGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropFullWidth,
+        .nosPropInfoBox {
+          grid-column: 1;
+        }
+
+        .nosPropManageTitleRow {
+          flex-direction: column;
+        }
+
+        .nosPropManageTabsWrap {
+          margin-left: -10px;
+          margin-right: -10px;
+          padding: 0 10px;
+        }
+
+        .nosPropEditorTitle h2,
+        .nosPropManageTitleRow h2 {
+          font-size: 22px;
+        }
+      }
+
+      @media (max-width: 360px) {
+        .nosPropCardActions {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropMainTabs {
+          grid-template-columns: 1fr;
+        }
+      }
+    `}</style>
+  );
+}
