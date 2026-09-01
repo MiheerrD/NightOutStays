@@ -9,35 +9,19 @@ const supabase = createClient(
 );
 
 export default function GuestLoginPage() {
-  const [redirectTo, setRedirectTo] =
-    useState('/account/bookings');
+  const [mode, setMode] = useState('login');
+  const [redirectTo, setRedirectTo] = useState('/account/bookings');
 
-  const [mode, setMode] =
-    useState('login');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [fullName, setFullName] =
-    useState('');
+  const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  const [email, setEmail] =
-    useState('');
-
-  const [password, setPassword] =
-    useState('');
-
-  const [confirmPassword, setConfirmPassword] =
-    useState('');
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [checkingSession, setCheckingSession] =
-    useState(true);
-
-  const [errorMessage, setErrorMessage] =
-    useState('');
-
-  const [successMessage, setSuccessMessage] =
-    useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     initialisePage();
@@ -45,604 +29,415 @@ export default function GuestLoginPage() {
 
   async function initialisePage() {
     try {
-      let resolvedRedirect =
-        '/account/bookings';
+      let destination = '/account/bookings';
 
-      if (
-        typeof window !==
-        'undefined'
-      ) {
-        const params =
-          new URLSearchParams(
-            window.location.search
-          );
-
-        const requestedRedirect =
-          params.get(
-            'redirect'
-          );
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const requestedRedirect = params.get('redirect');
 
         if (
           requestedRedirect &&
-          requestedRedirect.startsWith(
-            '/'
-          ) &&
-          !requestedRedirect.startsWith(
-            '//'
-          )
+          requestedRedirect.startsWith('/') &&
+          !requestedRedirect.startsWith('//')
         ) {
-          resolvedRedirect =
-            requestedRedirect;
+          destination = requestedRedirect;
         }
       }
 
-      setRedirectTo(
-        resolvedRedirect
-      );
+      setRedirectTo(destination);
 
       const {
-        data: {
-          session,
-        },
+        data: { session },
         error,
-      } =
-        await supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (
-        session
-      ) {
-        window.location.replace(
-          resolvedRedirect
-        );
-
+      if (session) {
+        window.location.replace(destination);
         return;
       }
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
-        error?.message ||
-          'Unable to check login status.'
+        error?.message || 'Unable to check login status.'
       );
     } finally {
-      setCheckingSession(
-        false
-      );
+      setCheckingSession(false);
     }
   }
 
-  async function createGuestProfile(
-    user,
-    name
-  ) {
-    if (
-      !user?.id
-    ) {
-      throw new Error(
-        'Guest account information is missing.'
-      );
-    }
-
-    const {
-      data:
-        existingGuest,
-      error:
-        existingError,
-    } =
-      await supabase
-        .from('guests')
-        .select(
-          'id, user_id, full_name, email, phone'
-        )
-        .eq(
-          'user_id',
-          user.id
-        )
-        .maybeSingle();
-
-    if (
-      existingError
-    ) {
-      throw existingError;
-    }
-
-    if (
-      existingGuest
-    ) {
-      const updates = {};
-
-      if (
-        !existingGuest.full_name &&
-        name
-      ) {
-        updates.full_name =
-          name.trim();
-      }
-
-      if (
-        !existingGuest.email &&
-        user.email
-      ) {
-        updates.email =
-          user.email;
-      }
-
-      if (
-        Object.keys(
-          updates
-        ).length >
-        0
-      ) {
-        const {
-          data:
-            updatedGuest,
-          error:
-            updateError,
-        } =
-          await supabase
-            .from('guests')
-            .update(
-              updates
-            )
-            .eq(
-              'id',
-              existingGuest.id
-            )
-            .select(
-              'id, user_id, full_name, email, phone'
-            )
-            .single();
-
-        if (
-          updateError
-        ) {
-          throw updateError;
-        }
-
-        return updatedGuest;
-      }
-
-      return existingGuest;
-    }
-
-    const {
-      data:
-        profile,
-      error:
-        profileError,
-    } =
-      await supabase
-        .from('guests')
-        .insert({
-          user_id:
-            user.id,
-
-          full_name:
-            name?.trim() ||
-            user.user_metadata
-              ?.full_name ||
-            user.email?.split(
-              '@'
-            )[0] ||
-            'Guest',
-
-          email:
-            user.email ||
-            null,
-
-          phone:
-            null,
-        })
-        .select(
-          'id, user_id, full_name, email, phone'
-        )
-        .single();
-
-    if (
-      profileError
-    ) {
-      throw profileError;
-    }
-
-    return profile;
-  }
-
-  function resetMessages() {
+  function clearMessages() {
     setErrorMessage('');
     setSuccessMessage('');
   }
 
-  function switchMode(
-    nextMode
-  ) {
-    setMode(
-      nextMode
-    );
+  function switchMode(nextMode) {
+    setMode(nextMode);
 
-    resetMessages();
+    clearMessages();
 
     setPassword('');
     setConfirmPassword('');
   }
 
-  async function handleSignup(
-    event
-  ) {
-    event.preventDefault();
-
-    resetMessages();
+  async function ensureGuestProfile(user, suppliedName = '') {
+    if (!user?.id) {
+      throw new Error('Guest account information is missing.');
+    }
 
     const normalizedEmail =
-      email
-        .trim()
-        .toLowerCase();
+      user.email?.trim().toLowerCase() || null;
 
-    if (
-      !fullName.trim()
-    ) {
-      setErrorMessage(
-        'Please enter your full name.'
-      );
+    const {
+      data: existingByUser,
+      error: userLookupError,
+    } = await supabase
+      .from('guests')
+      .select('id, user_id, full_name, email, phone')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
+    if (userLookupError) {
+      throw userLookupError;
+    }
+
+    if (existingByUser) {
+      const updates = {};
+
+      if (!existingByUser.full_name && suppliedName.trim()) {
+        updates.full_name = suppliedName.trim();
+      }
+
+      if (!existingByUser.email && normalizedEmail) {
+        updates.email = normalizedEmail;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const {
+          data: updatedGuest,
+          error: updateError,
+        } = await supabase
+          .from('guests')
+          .update(updates)
+          .eq('id', existingByUser.id)
+          .select('id, user_id, full_name, email, phone')
+          .single();
+
+        if (updateError) throw updateError;
+
+        return updatedGuest;
+      }
+
+      return existingByUser;
+    }
+
+    /*
+      Older NightOutStays guest records may already exist
+      with the same email but without user_id.
+
+      Link that existing guest to the authenticated account
+      instead of creating a duplicate guest.
+    */
+
+    if (normalizedEmail) {
+      const {
+        data: existingByEmail,
+        error: emailLookupError,
+      } = await supabase
+        .from('guests')
+        .select('id, user_id, full_name, email, phone')
+        .eq('email', normalizedEmail)
+        .is('user_id', null)
+        .maybeSingle();
+
+      if (emailLookupError) {
+        throw emailLookupError;
+      }
+
+      if (existingByEmail) {
+        const {
+          data: linkedGuest,
+          error: linkError,
+        } = await supabase
+          .from('guests')
+          .update({
+            user_id: user.id,
+
+            full_name:
+              existingByEmail.full_name ||
+              suppliedName.trim() ||
+              user.user_metadata?.full_name ||
+              normalizedEmail.split('@')[0],
+          })
+          .eq('id', existingByEmail.id)
+          .select('id, user_id, full_name, email, phone')
+          .single();
+
+        if (linkError) throw linkError;
+
+        return linkedGuest;
+      }
+    }
+
+    const guestName =
+      suppliedName.trim() ||
+      user.user_metadata?.full_name ||
+      normalizedEmail?.split('@')[0] ||
+      'Guest';
+
+    const {
+      data: newGuest,
+      error: insertError,
+    } = await supabase
+      .from('guests')
+      .insert({
+        user_id: user.id,
+        full_name: guestName,
+        email: normalizedEmail,
+        phone: null,
+      })
+      .select('id, user_id, full_name, email, phone')
+      .single();
+
+    if (insertError) throw insertError;
+
+    return newGuest;
+  }
+
+  async function handleSignup(event) {
+    event.preventDefault();
+
+    clearMessages();
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!fullName.trim()) {
+      setErrorMessage('Please enter your full name.');
       return;
     }
 
-    if (
-      !normalizedEmail
-    ) {
-      setErrorMessage(
-        'Please enter your email address.'
-      );
-
+    if (!normalizedEmail) {
+      setErrorMessage('Please enter your email address.');
       return;
     }
 
-    if (
-      password.length <
-      6
-    ) {
+    if (password.length < 8) {
       setErrorMessage(
-        'Password must be at least 6 characters.'
+        'Password must be at least 8 characters.'
       );
-
       return;
     }
 
-    if (
-      password !==
-      confirmPassword
-    ) {
-      setErrorMessage(
-        'Passwords do not match.'
-      );
-
+    if (password !== confirmPassword) {
+      setErrorMessage('Passwords do not match.');
       return;
     }
 
-    setLoading(
-      true
-    );
+    setLoading(true);
 
     try {
-      const {
-        data,
-        error,
-      } =
-        await supabase.auth.signUp({
-          email:
-            normalizedEmail,
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
 
-          password,
-
-          options: {
-            data: {
-              full_name:
-                fullName.trim(),
-            },
+        options: {
+          data: {
+            full_name: fullName.trim(),
           },
-        });
+        },
+      });
 
-      if (
-        error
-      ) {
-        throw error;
+      if (error) throw error;
+
+      if (!data.user) {
+        throw new Error('Unable to create your account.');
       }
 
-      if (
-        data.user &&
-        data.session
-      ) {
-        await createGuestProfile(
-          data.user,
-          fullName
-        );
+      /*
+        Email confirmation is disabled in Supabase,
+        so a successful signup should return a session.
+      */
 
-        window.location.replace(
-          redirectTo
+      if (!data.session) {
+        throw new Error(
+          'Account was created but automatic login was not completed. Please try logging in.'
         );
-
-        return;
       }
 
-      setSuccessMessage(
-        'Account created successfully. Please check your email to confirm your account, then log in.'
+      await ensureGuestProfile(
+        data.user,
+        fullName
       );
 
-      setMode(
-        'login'
-      );
-
-      setPassword('');
-      setConfirmPassword('');
+      window.location.replace(redirectTo);
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
-        error?.message ||
+        friendlyAuthError(
+          error,
           'Unable to create account.'
+        )
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
-  async function handleLogin(
-    event
-  ) {
+  async function handleLogin(event) {
     event.preventDefault();
 
-    resetMessages();
+    clearMessages();
 
-    const normalizedEmail =
-      email
-        .trim()
-        .toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (
-      !normalizedEmail ||
-      !password
-    ) {
+    if (!normalizedEmail || !password) {
       setErrorMessage(
-        'Enter your email and password.'
+        'Please enter your email and password.'
       );
-
       return;
     }
 
-    setLoading(
-      true
-    );
+    setLoading(true);
 
     try {
-      const {
-        data,
-        error,
-      } =
+      const { data, error } =
         await supabase.auth.signInWithPassword({
-          email:
-            normalizedEmail,
-
+          email: normalizedEmail,
           password,
         });
 
-      if (
-        error
-      ) {
-        throw error;
+      if (error) throw error;
+
+      if (!data.user || !data.session) {
+        throw new Error('Unable to login.');
       }
 
-      if (
-        !data.user ||
-        !data.session
-      ) {
-        throw new Error(
-          'Unable to login.'
-        );
-      }
-
-      const name =
-        data.user
-          .user_metadata
-          ?.full_name ||
-        data.user.email?.split(
-          '@'
-        )[0] ||
+      const guestName =
+        data.user.user_metadata?.full_name ||
+        data.user.email?.split('@')[0] ||
         'Guest';
 
-      await createGuestProfile(
+      await ensureGuestProfile(
         data.user,
-        name
+        guestName
       );
 
-      window.location.replace(
-        redirectTo
-      );
+      window.location.replace(redirectTo);
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
-        error?.message ||
+        friendlyAuthError(
+          error,
           'Unable to login.'
+        )
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
   async function forgotPassword() {
-    resetMessages();
+    clearMessages();
 
-    const normalizedEmail =
-      email
-        .trim()
-        .toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (
-      !normalizedEmail
-    ) {
+    if (!normalizedEmail) {
       setErrorMessage(
-        'Enter your email address first.'
+        'Enter your registered email address first.'
       );
-
       return;
     }
 
-    setLoading(
-      true
-    );
+    setLoading(true);
 
     try {
       const origin =
-        typeof window !==
-        'undefined'
+        typeof window !== 'undefined'
           ? window.location.origin
-          : '';
+          : 'https://nightoutstay.com';
 
-      const {
-        error,
-      } =
+      const { error } =
         await supabase.auth.resetPasswordForEmail(
           normalizedEmail,
           {
-            redirectTo:
-              `${origin}/login`,
+            redirectTo: `${origin}/reset-password`,
           }
         );
 
-      if (
-        error
-      ) {
-        throw error;
-      }
+      if (error) throw error;
 
       setSuccessMessage(
-        'Password reset instructions have been sent to your email.'
+        'Password recovery email sent. Please check your inbox and open the reset link.'
       );
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
         error?.message ||
-          'Unable to send password reset email.'
+          'Unable to send password recovery email.'
       );
     } finally {
-      setLoading(
-        false
-      );
+      setLoading(false);
     }
   }
 
-  if (
-    checkingSession
-  ) {
+  if (checkingSession) {
     return (
-      <main
-        style={
-          styles.loadingPage
-        }
-      >
+      <main className="loading-page">
         Checking login...
+        <PageStyles />
       </main>
     );
   }
 
   return (
-    <main
-      style={
-        styles.page
-      }
-    >
-      <section
-        style={
-          styles.card
-        }
-      >
-        <div
-          style={
-            styles.brand
-          }
-        >
+    <main className="page">
+      <section className="card">
+        <div className="brand">
           NightOutStays
         </div>
 
-        <h1
-          style={
-            styles.heading
-          }
-        >
-          {mode ===
-          'login'
+        <h1>
+          {mode === 'login'
             ? 'Guest Login'
             : 'Create Guest Account'}
         </h1>
 
-        <p
-          style={
-            styles.subtitle
-          }
-        >
-          Sign in to request
-          bookings, message
-          hosts, make payments,
-          view receipts and
-          manage your stays.
+        <p className="subtitle">
+          {mode === 'login'
+            ? 'Login to manage your bookings, messages, payments and stays.'
+            : 'Create your account to request bookings and manage your stays.'}
         </p>
 
-        <div
-          style={
-            styles.tabs
-          }
-        >
+        <div className="tabs">
           <button
             type="button"
-            onClick={() =>
-              switchMode(
-                'login'
-              )
+            className={
+              mode === 'login'
+                ? 'tab active'
+                : 'tab'
             }
-            style={{
-              ...styles.tab,
-
-              ...(mode ===
-              'login'
-                ? styles.activeTab
-                : {}),
-            }}
+            onClick={() =>
+              switchMode('login')
+            }
           >
             Login
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              switchMode(
-                'signup'
-              )
+            className={
+              mode === 'signup'
+                ? 'tab active'
+                : 'tab'
             }
-            style={{
-              ...styles.tab,
-
-              ...(mode ===
-              'signup'
-                ? styles.activeTab
-                : {}),
-            }}
+            onClick={() =>
+              switchMode('signup')
+            }
           >
             Sign Up
           </button>
@@ -650,23 +445,17 @@ export default function GuestLoginPage() {
 
         <form
           onSubmit={
-            mode ===
-            'login'
+            mode === 'login'
               ? handleLogin
               : handleSignup
           }
         >
-          {mode ===
-            'signup' && (
+          {mode === 'signup' && (
             <Field
               label="FULL NAME"
               type="text"
-              value={
-                fullName
-              }
-              onChange={
-                setFullName
-              }
+              value={fullName}
+              onChange={setFullName}
               placeholder="Your full name"
               autoComplete="name"
             />
@@ -675,12 +464,8 @@ export default function GuestLoginPage() {
           <Field
             label="EMAIL"
             type="email"
-            value={
-              email
-            }
-            onChange={
-              setEmail
-            }
+            value={email}
+            onChange={setEmail}
             placeholder="you@example.com"
             autoComplete="email"
           />
@@ -688,55 +473,38 @@ export default function GuestLoginPage() {
           <Field
             label="PASSWORD"
             type="password"
-            value={
-              password
+            value={password}
+            onChange={setPassword}
+            placeholder={
+              mode === 'signup'
+                ? 'Minimum 8 characters'
+                : 'Your password'
             }
-            onChange={
-              setPassword
-            }
-            placeholder="Password"
             autoComplete={
-              mode ===
-              'login'
+              mode === 'login'
                 ? 'current-password'
                 : 'new-password'
             }
           />
 
-          {mode ===
-            'signup' && (
+          {mode === 'signup' && (
             <Field
               label="CONFIRM PASSWORD"
               type="password"
-              value={
-                confirmPassword
-              }
-              onChange={
-                setConfirmPassword
-              }
+              value={confirmPassword}
+              onChange={setConfirmPassword}
               placeholder="Re-enter password"
               autoComplete="new-password"
             />
           )}
 
-          {mode ===
-            'login' && (
-            <div
-              style={
-                styles.forgotRow
-              }
-            >
+          {mode === 'login' && (
+            <div className="forgot-row">
               <button
                 type="button"
-                onClick={
-                  forgotPassword
-                }
-                disabled={
-                  loading
-                }
-                style={
-                  styles.forgotButton
-                }
+                className="forgot-button"
+                disabled={loading}
+                onClick={forgotPassword}
               >
                 Forgot Password?
               </button>
@@ -744,64 +512,78 @@ export default function GuestLoginPage() {
           )}
 
           {errorMessage && (
-            <div
-              style={
-                styles.error
-              }
-            >
+            <div className="message error">
               {errorMessage}
             </div>
           )}
 
           {successMessage && (
-            <div
-              style={
-                styles.success
-              }
-            >
+            <div className="message success">
               {successMessage}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={
-              loading
-            }
-            style={{
-              ...styles.submitButton,
-
-              ...(loading
-                ? styles.disabledButton
-                : {}),
-            }}
+            disabled={loading}
+            className="submit-button"
           >
             {loading
               ? 'Please wait...'
-              : mode ===
-                'login'
+              : mode === 'login'
               ? 'Login'
               : 'Create Account'}
           </button>
         </form>
 
-        <div
-          style={
-            styles.note
-          }
-        >
-          You can browse
-          NightOutStays without
-          logging in. Login is
-          required only when you
-          request a booking,
-          message a host, make a
-          payment or access your
-          account.
+        <div className="note">
+          You can browse NightOutStays without
+          logging in. Login is required when you
+          request a booking, message a host, make
+          a payment or access your account.
         </div>
       </section>
+
+      <PageStyles />
     </main>
   );
+}
+
+function friendlyAuthError(
+  error,
+  fallback
+) {
+  const message =
+    error?.message || '';
+
+  const lower =
+    message.toLowerCase();
+
+  if (
+    lower.includes(
+      'invalid login credentials'
+    )
+  ) {
+    return 'Incorrect email or password.';
+  }
+
+  if (
+    lower.includes(
+      'user already registered'
+    )
+  ) {
+    return 'An account already exists with this email. Please login instead.';
+  }
+
+  if (
+    lower.includes(
+      'email not confirmed'
+    )
+  ) {
+    return 'This older account is still awaiting email confirmation. Please contact support or reset the account.';
+  }
+
+  return message || fallback;
 }
 
 function Field({
@@ -813,397 +595,217 @@ function Field({
   autoComplete,
 }) {
   return (
-    <div
-      style={
-        styles.field
-      }
-    >
-      <label
-        style={
-          styles.label
-        }
-      >
-        {label}
-      </label>
+    <div className="field">
+      <label>{label}</label>
 
       <input
         type={type}
-        value={
-          value
-        }
+        value={value}
         onChange={(event) =>
-          onChange(
-            event.target.value
-          )
+          onChange(event.target.value)
         }
-        placeholder={
-          placeholder
-        }
-        autoComplete={
-          autoComplete
-        }
-        style={
-          styles.input
-        }
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        required
       />
     </div>
   );
 }
 
-const styles = {
-  page: {
-    minHeight:
-      '100vh',
-
-    display:
-      'flex',
-
-    justifyContent:
-      'center',
-
-    alignItems:
-      'center',
-
-    padding:
-      '30px 15px',
-
-    background:
-      '#f5f7fa',
-
-    fontFamily:
-      'Arial, sans-serif',
-
-    color:
-      '#11213c',
-  },
-
-  loadingPage: {
-    minHeight:
-      '100vh',
-
-    display:
-      'flex',
-
-    justifyContent:
-      'center',
-
-    alignItems:
-      'center',
-
-    background:
-      '#f5f7fa',
-
-    fontFamily:
-      'Arial, sans-serif',
-
-    color:
-      '#11213c',
-  },
-
-  card: {
-    width:
-      '100%',
-
-    maxWidth:
-      460,
-
-    boxSizing:
-      'border-box',
-
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #dfe3e8',
-
-    borderRadius:
-      18,
-
-    padding:
-      28,
-
-    boxShadow:
-      '0 10px 35px rgba(16,24,40,0.08)',
-  },
-
-  brand: {
-    color:
-      '#17457f',
-
-    fontWeight:
-      900,
-
-    fontSize:
-      24,
-
-    marginBottom:
-      18,
-  },
-
-  heading: {
-    marginTop:
-      0,
-
-    marginBottom:
-      8,
-
-    fontSize:
-      28,
-  },
-
-  subtitle: {
-    color:
-      '#687080',
-
-    lineHeight:
-      1.5,
-
-    marginTop:
-      0,
-
-    marginBottom:
-      22,
-  },
-
-  tabs: {
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      '1fr 1fr',
-
-    gap:
-      8,
-
-    marginBottom:
-      22,
-
-    background:
-      '#f1f3f6',
-
-    padding:
-      5,
-
-    borderRadius:
-      10,
-  },
-
-  tab: {
-    border:
-      0,
-
-    background:
-      'transparent',
-
-    padding:
-      10,
-
-    borderRadius:
-      8,
-
-    fontWeight:
-      800,
-
-    cursor:
-      'pointer',
-
-    color:
-      '#687080',
-  },
-
-  activeTab: {
-    background:
-      '#17457f',
-
-    color:
-      '#ffffff',
-  },
-
-  field: {
-    marginBottom:
-      15,
-  },
-
-  label: {
-    display:
-      'block',
-
-    fontSize:
-      10,
-
-    fontWeight:
-      900,
-
-    letterSpacing:
-      1,
-
-    marginBottom:
-      6,
-  },
-
-  input: {
-    width:
-      '100%',
-
-    boxSizing:
-      'border-box',
-
-    border:
-      '1px solid #ccd1d8',
-
-    borderRadius:
-      10,
-
-    padding:
-      12,
-
-    fontSize:
-      14,
-
-    outline:
-      'none',
-  },
-
-  forgotRow: {
-    display:
-      'flex',
-
-    justifyContent:
-      'flex-end',
-
-    marginTop:
-      -5,
-
-    marginBottom:
-      14,
-  },
-
-  forgotButton: {
-    border:
-      0,
-
-    background:
-      'transparent',
-
-    color:
-      '#17457f',
-
-    padding:
-      0,
-
-    cursor:
-      'pointer',
-
-    fontWeight:
-      700,
-
-    fontSize:
-      12,
-  },
-
-  error: {
-    padding:
-      12,
-
-    background:
-      '#ffeaea',
-
-    color:
-      '#8b2020',
-
-    borderRadius:
-      9,
-
-    marginBottom:
-      14,
-
-    fontWeight:
-      700,
-
-    lineHeight:
-      1.4,
-  },
-
-  success: {
-    padding:
-      12,
-
-    background:
-      '#eaf8ee',
-
-    color:
-      '#25663a',
-
-    borderRadius:
-      9,
-
-    marginBottom:
-      14,
-
-    fontWeight:
-      700,
-
-    lineHeight:
-      1.4,
-  },
-
-  submitButton: {
-    width:
-      '100%',
-
-    border:
-      0,
-
-    background:
-      '#17457f',
-
-    color:
-      '#ffffff',
-
-    padding:
-      14,
-
-    borderRadius:
-      10,
-
-    fontWeight:
-      900,
-
-    fontSize:
-      15,
-
-    cursor:
-      'pointer',
-  },
-
-  disabledButton: {
-    opacity:
-      0.65,
-
-    cursor:
-      'not-allowed',
-  },
-
-  note: {
-    marginTop:
-      18,
-
-    padding:
-      12,
-
-    background:
-      '#f7f8fa',
-
-    borderRadius:
-      9,
-
-    color:
-      '#687080',
-
-    fontSize:
-      12,
-
-    lineHeight:
-      1.5,
-  },
-};
+function PageStyles() {
+  return (
+    <style jsx global>{`
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      .page,
+      .loading-page {
+        min-height: 100vh;
+        font-family: Arial, sans-serif;
+        color: #11213c;
+        background: #f5f7fa;
+      }
+
+      .page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 15px;
+      }
+
+      .loading-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 460px;
+        background: white;
+        border: 1px solid #dfe3e8;
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow:
+          0 10px 35px
+          rgba(16, 24, 40, 0.08);
+      }
+
+      .brand {
+        color: #17457f;
+        font-size: 24px;
+        font-weight: 900;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+
+      .subtitle {
+        color: #687080;
+        line-height: 1.5;
+        margin: 0 0 22px;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        background: #f1f3f6;
+        padding: 5px;
+        border-radius: 10px;
+        margin-bottom: 22px;
+      }
+
+      .tab {
+        min-height: 44px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #687080;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .tab.active {
+        background: #17457f;
+        color: white;
+      }
+
+      .field {
+        margin-bottom: 15px;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 1px;
+      }
+
+      .field input {
+        width: 100%;
+        min-height: 46px;
+        padding: 12px;
+        border: 1px solid #ccd1d8;
+        border-radius: 10px;
+        font-size: 16px;
+        outline: none;
+      }
+
+      .field input:focus {
+        border-color: #17457f;
+      }
+
+      .forgot-row {
+        display: flex;
+        justify-content: flex-end;
+        margin: -4px 0 15px;
+      }
+
+      .forgot-button {
+        min-height: 40px;
+        border: 0;
+        background: transparent;
+        color: #17457f;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .message {
+        padding: 12px;
+        margin-bottom: 14px;
+        border-radius: 9px;
+        font-weight: 700;
+        line-height: 1.4;
+        font-size: 14px;
+      }
+
+      .message.error {
+        background: #ffeaea;
+        color: #8b2020;
+      }
+
+      .message.success {
+        background: #eaf8ee;
+        color: #25663a;
+      }
+
+      .submit-button {
+        width: 100%;
+        min-height: 48px;
+        border: 0;
+        border-radius: 10px;
+        background: #17457f;
+        color: white;
+        font-size: 15px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .submit-button:disabled,
+      .forgot-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .note {
+        margin-top: 18px;
+        padding: 12px;
+        border-radius: 9px;
+        background: #f7f8fa;
+        color: #687080;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 520px) {
+        .page {
+          align-items: flex-start;
+          padding: 18px 12px;
+        }
+
+        .card {
+          padding: 22px 18px;
+          border-radius: 14px;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        .brand {
+          font-size: 22px;
+        }
+      }
+    `}</style>
+  );
+}
