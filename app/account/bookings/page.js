@@ -110,9 +110,8 @@ export default function GuestBookingsPage() {
             id,
             name,
             slug,
-            location,
-            city,
-            main_image_url
+            location_name,
+            address
           )
         `)
         .eq('guest_id', guestId)
@@ -235,8 +234,7 @@ export default function GuestBookingsPage() {
             <h2>Loading your bookings</h2>
 
             <p>
-              Please wait while we prepare your NightOutStays
-              account.
+              Please wait while we prepare your NightOutStays account.
             </p>
           </div>
         </main>
@@ -510,9 +508,7 @@ function BookingCard({
     !isApprovalExpired(booking);
 
   const propertyImage =
-    property.main_image_url ||
-    booking.property_image ||
-    '';
+    booking.property_image || '';
 
   return (
     <article className="booking-card">
@@ -545,10 +541,13 @@ function BookingCard({
                 'NightOutStays Property'}
             </h2>
 
-            {(property.location ||
-              property.city) && (
+            {(property.location_name ||
+              property.address) && (
               <p className="property-location">
-                {[property.location, property.city]
+                {[
+                  property.location_name,
+                  property.address,
+                ]
                   .filter(Boolean)
                   .join(', ')}
               </p>
@@ -640,9 +639,8 @@ function BookingCard({
               </strong>
 
               <span>
-                Your host has sent you a special
-                price. Open Messages to review
-                the offer.
+                Your host has sent you a special price.
+                Open Messages to review the offer.
               </span>
             </div>
           )}
@@ -656,9 +654,8 @@ function BookingCard({
               </strong>
 
               <span>
-                Payment received. Complete your
-                ID verification to finish the
-                booking confirmation process.
+                Payment received. Complete your ID verification
+                to finish the booking confirmation process.
               </span>
             </div>
           )}
@@ -825,6 +822,7 @@ function PaymentBadge({
     </span>
   );
 }
+
 function ApprovalNotice({
   booking,
 }) {
