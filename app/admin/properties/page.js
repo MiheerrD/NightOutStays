@@ -1032,14 +1032,12 @@ export default function AdminPropertiesPage() {
             Please log in before
             managing properties.
           </p>
-
-          <a
-            href="/admin/bookings"
-            className="nosPropPrimaryLink"
-          >
-            Go to Admin Login
-          </a>
-        </div>
+<a
+  href="/login"
+  className="nosPropPrimaryLink"
+>
+  Go to Admin Login
+</a>        </div>
 
         <PageStyles />
       </main>
