@@ -85,7 +85,6 @@ export default function GuestBookingsPage() {
       }
 
       setGuest(guestRow);
-
       await loadBookings(guestRow.id);
     } catch (err) {
       console.error('Guest bookings initialization error:', err);
@@ -101,6 +100,8 @@ export default function GuestBookingsPage() {
 
   async function loadBookings(guestId) {
     try {
+      setError('');
+
       const { data, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -139,9 +140,9 @@ export default function GuestBookingsPage() {
   }
 
   const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
   }, []);
 
   const groupedBookings = useMemo(() => {
@@ -178,23 +179,33 @@ export default function GuestBookingsPage() {
     });
 
     upcoming.sort((a, b) => {
+      const aDate = parseDateOnly(a.check_in);
+      const bDate = parseDateOnly(b.check_in);
+
       return (
-        parseDateOnly(a.check_in)?.getTime() -
-        parseDateOnly(b.check_in)?.getTime()
+        (aDate?.getTime() || 0) -
+        (bDate?.getTime() || 0)
       );
     });
 
     past.sort((a, b) => {
+      const aDate = parseDateOnly(a.check_out);
+      const bDate = parseDateOnly(b.check_out);
+
       return (
-        parseDateOnly(b.check_out)?.getTime() -
-        parseDateOnly(a.check_out)?.getTime()
+        (bDate?.getTime() || 0) -
+        (aDate?.getTime() || 0)
       );
     });
 
     cancelled.sort((a, b) => {
       return (
-        new Date(b.updated_at || b.created_at).getTime() -
-        new Date(a.updated_at || a.created_at).getTime()
+        new Date(
+          b.updated_at || b.created_at
+        ).getTime() -
+        new Date(
+          a.updated_at || a.created_at
+        ).getTime()
       );
     });
 
@@ -283,6 +294,7 @@ export default function GuestBookingsPage() {
           {error ? (
             <div className="error-box">
               <strong>Unable to load account</strong>
+
               <span>{error}</span>
 
               <button
@@ -317,7 +329,9 @@ export default function GuestBookingsPage() {
               <nav className="booking-tabs">
                 <TabButton
                   active={activeTab === 'upcoming'}
-                  onClick={() => setActiveTab('upcoming')}
+                  onClick={() =>
+                    setActiveTab('upcoming')
+                  }
                 >
                   Upcoming
                   <span>
@@ -327,7 +341,9 @@ export default function GuestBookingsPage() {
 
                 <TabButton
                   active={activeTab === 'past'}
-                  onClick={() => setActiveTab('past')}
+                  onClick={() =>
+                    setActiveTab('past')
+                  }
                 >
                   Past Stays
                   <span>
@@ -337,7 +353,9 @@ export default function GuestBookingsPage() {
 
                 <TabButton
                   active={activeTab === 'cancelled'}
-                  onClick={() => setActiveTab('cancelled')}
+                  onClick={() =>
+                    setActiveTab('cancelled')
+                  }
                 >
                   Cancelled / Expired
                   <span>
@@ -470,18 +488,16 @@ function BookingCard({
   const displayStatus =
     getBookingDisplayStatus(booking);
 
-  const paymentStatus =
-    String(
-      booking.payment_status || 'unpaid'
-    ).toLowerCase();
+  const paymentStatus = String(
+    booking.payment_status || 'unpaid'
+  ).toLowerCase();
 
-  const amount =
-    Number(
-      booking.final_payable_amount ||
-        booking.amount_including_gst ||
-        booking.total_amount ||
-        0
-    );
+  const amount = Number(
+    booking.final_payable_amount ||
+      booking.amount_including_gst ||
+      booking.total_amount ||
+      0
+  );
 
   const canPay =
     paymentStatus !== 'paid' &&
@@ -545,7 +561,6 @@ function BookingCard({
         </div>
 
         <div className="stay-details">
-
           <DetailItem
             label="Check-in"
             value={formatDate(
@@ -579,18 +594,16 @@ function BookingCard({
             label="Nights"
             value={
               booking.nights
-                ? `${booking.nights}`
+                ? String(booking.nights)
                 : calculateNights(
                     booking.check_in,
                     booking.check_out
                   )
             }
           />
-
         </div>
 
         <div className="booking-finance">
-
           <div>
             <span className="finance-label">
               Total Amount
@@ -610,29 +623,29 @@ function BookingCard({
               paymentStatus={paymentStatus}
             />
           </div>
-
         </div>
 
         {displayStatus ===
           'Host Approved – Payment Pending' && (
-          <ApprovalNotice
-            booking={booking}
+            <ApprovalNotice
+              booking={booking}
+            />
           )}
 
         {booking.offer_status ===
           'host_offered' && (
-          <div className="offer-notice">
-            <strong>
-              Special Offer Received
-            </strong>
+            <div className="offer-notice">
+              <strong>
+                Special Offer Received
+              </strong>
 
-            <span>
-              Your host has sent you a special
-              price. Open Messages to review
-              the offer.
-            </span>
-          </div>
-        )}
+              <span>
+                Your host has sent you a special
+                price. Open Messages to review
+                the offer.
+              </span>
+            </div>
+          )}
 
         {paymentStatus === 'paid' &&
           booking.verification_status ===
@@ -651,7 +664,6 @@ function BookingCard({
           )}
 
         <div className="booking-actions">
-
           <button
             type="button"
             className="secondary-button"
@@ -687,7 +699,10 @@ function BookingCard({
               className="primary-button"
               onClick={() =>
                 router.push(
-                  `/booking/${booking.booking_code || booking.id}/pay`
+                  `/booking/${
+                    booking.booking_code ||
+                    booking.id
+                  }/pay`
                 )
               }
             >
@@ -731,12 +746,12 @@ function BookingCard({
                 Write Review
               </button>
             )}
-
         </div>
       </div>
     </article>
   );
 }
+
 function DetailItem({
   label,
   value,
@@ -750,8 +765,9 @@ function DetailItem({
 }
 
 function StatusBadge({ status }) {
-  const normalized =
-    String(status || '').toLowerCase();
+  const normalized = String(
+    status || ''
+  ).toLowerCase();
 
   let className = 'status-badge';
 
@@ -809,7 +825,6 @@ function PaymentBadge({
     </span>
   );
 }
-
 function ApprovalNotice({
   booking,
 }) {
@@ -910,21 +925,15 @@ function getBookingDisplayStatus(
     return 'Property Booked';
   }
 
-  if (
-    offerStatus === 'host_offered'
-  ) {
+  if (offerStatus === 'host_offered') {
     return 'Special Offer Sent';
   }
 
-  if (
-    offerStatus === 'accepted'
-  ) {
+  if (offerStatus === 'accepted') {
     return 'Special Offer Accepted – Payment Pending';
   }
 
-  if (
-    booking.guest_discount_requested
-  ) {
+  if (booking.guest_discount_requested) {
     return 'Asking for Extra Discount';
   }
 
@@ -1010,7 +1019,9 @@ function isApprovalExpired(
 }
 
 function parseDateOnly(value) {
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
 
   const parts =
     String(value).split('-');
@@ -1030,7 +1041,9 @@ function parseDateOnly(value) {
   const date = new Date(value);
 
   if (
-    Number.isNaN(date.getTime())
+    Number.isNaN(
+      date.getTime()
+    )
   ) {
     return null;
   }
@@ -1042,7 +1055,9 @@ function formatDate(value) {
   const date =
     parseDateOnly(value);
 
-  if (!date) return '—';
+  if (!date) {
+    return '—';
+  }
 
   return new Intl.DateTimeFormat(
     'en-IN',
@@ -1061,7 +1076,9 @@ function formatDateTime(value) {
       : new Date(value);
 
   if (
-    Number.isNaN(date.getTime())
+    Number.isNaN(
+      date.getTime()
+    )
   ) {
     return '—';
   }
@@ -1110,10 +1127,11 @@ function calculateNights(
     end.getTime() -
     start.getTime();
 
-  const nights = Math.round(
-    difference /
-      (1000 * 60 * 60 * 24)
-  );
+  const nights =
+    Math.round(
+      difference /
+        (1000 * 60 * 60 * 24)
+    );
 
   return nights > 0
     ? String(nights)
@@ -1131,10 +1149,7 @@ function PageStyles() {
         margin: 0;
         background: #f5f7fb;
         color: #172033;
-        font-family:
-          Arial,
-          Helvetica,
-          sans-serif;
+        font-family: Arial, Helvetica, sans-serif;
       }
 
       button {
@@ -1197,7 +1212,6 @@ function PageStyles() {
         padding: 10px 16px;
         font-weight: 700;
         cursor: pointer;
-        transition: 0.15s ease;
       }
 
       .primary-button {
@@ -1206,18 +1220,10 @@ function PageStyles() {
         color: white;
       }
 
-      .primary-button:hover {
-        opacity: 0.92;
-      }
-
       .secondary-button {
         border: 1px solid #d0d5dd;
         background: white;
         color: #344054;
-      }
-
-      .secondary-button:hover {
-        background: #f9fafb;
       }
 
       .logout-button {
@@ -1308,8 +1314,7 @@ function PageStyles() {
       }
 
       .tab-button.active span {
-        background:
-          rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.18);
         color: white;
       }
 
@@ -1627,8 +1632,7 @@ function PageStyles() {
 
       @media (max-width: 700px) {
         .guest-page {
-          padding:
-            18px 12px 40px;
+          padding: 18px 12px 40px;
         }
 
         .guest-header {
