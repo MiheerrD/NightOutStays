@@ -29,27 +29,22 @@ const supabase = createClient(
 function money(value) {
   return `₹${Number(
     value || 0
-  ).toLocaleString(
-    'en-IN',
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }
-  )}`;
+  ).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function roundMoney(value) {
   return (
     Math.round(
-      Number(value || 0) *
-        100
+      Number(value || 0) * 100
     ) / 100
   );
 }
 
 function todayString() {
-  const now =
-    new Date();
+  const now = new Date();
 
   return [
     now.getFullYear(),
@@ -70,10 +65,9 @@ function addDays(
     return '';
   }
 
-  const date =
-    new Date(
-      `${dateString}T12:00:00`
-    );
+  const date = new Date(
+    `${dateString}T12:00:00`
+  );
 
   date.setDate(
     date.getDate() +
@@ -116,41 +110,29 @@ function getStayDates(
 
   const dates = [];
 
-  let current =
-    new Date(
-      `${checkIn}T12:00:00`
-    );
+  let current = new Date(
+    `${checkIn}T12:00:00`
+  );
 
-  const end =
-    new Date(
-      `${checkOut}T12:00:00`
-    );
+  const end = new Date(
+    `${checkOut}T12:00:00`
+  );
 
-  while (
-    current < end
-  ) {
+  while (current < end) {
     dates.push(
       [
         current.getFullYear(),
         String(
-          current.getMonth() +
-            1
-        ).padStart(
-          2,
-          '0'
-        ),
+          current.getMonth() + 1
+        ).padStart(2, '0'),
         String(
           current.getDate()
-        ).padStart(
-          2,
-          '0'
-        ),
+        ).padStart(2, '0'),
       ].join('-')
     );
 
     current.setDate(
-      current.getDate() +
-        1
+      current.getDate() + 1
     );
   }
 
@@ -194,13 +176,11 @@ function formatTime(value) {
   const [
     hour,
     minute,
-  ] =
-    String(value)
-      .slice(0, 5)
-      .split(':');
+  ] = String(value)
+    .slice(0, 5)
+    .split(':');
 
-  const date =
-    new Date();
+  const date = new Date();
 
   date.setHours(
     Number(hour)
@@ -217,6 +197,62 @@ function formatTime(value) {
       minute: '2-digit',
     }
   );
+}
+
+/*
+  Host gets 24 hours from
+  booking request creation
+  to approve or decline.
+*/
+function getHostResponseDeadline(
+  booking
+) {
+  if (!booking?.created_at) {
+    return null;
+  }
+
+  const createdAt = new Date(
+    booking.created_at
+  );
+
+  if (
+    Number.isNaN(
+      createdAt.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return new Date(
+    createdAt.getTime() +
+      24 * 60 * 60 * 1000
+  );
+}
+
+function formatDateTime(value) {
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat(
+    'en-IN',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }
+  ).format(date);
 }
 
 /* =========================
@@ -239,8 +275,7 @@ function offerEligibleForBooking(
   }
 
   if (
-    offer.is_active ===
-    false
+    offer.is_active === false
   ) {
     return false;
   }
@@ -268,11 +303,8 @@ function offerEligibleForBooking(
     );
 
   if (
-    category ===
-      'monthly' ||
-    title.includes(
-      'monthly'
-    )
+    category === 'monthly' ||
+    title.includes('monthly')
   ) {
     requiredNights =
       Math.max(
@@ -280,11 +312,8 @@ function offerEligibleForBooking(
         20
       );
   } else if (
-    category ===
-      'fortnightly' ||
-    title.includes(
-      'fortnight'
-    )
+    category === 'fortnightly' ||
+    title.includes('fortnight')
   ) {
     requiredNights =
       Math.max(
@@ -292,11 +321,8 @@ function offerEligibleForBooking(
         12
       );
   } else if (
-    category ===
-      'weekly' ||
-    title.includes(
-      'weekly'
-    )
+    category === 'weekly' ||
+    title.includes('weekly')
   ) {
     requiredNights =
       Math.max(
@@ -370,30 +396,12 @@ function offerEligibleForBooking(
   }
 
   return (
-    eligibleDates.length >
-    0
+    eligibleDates.length > 0
   );
 }
 
 /* =========================
    DISCOUNT + NIGHTLY GST
-
-   GLOBAL RULE:
-
-   Effective nightly rate
-   below ₹7,000 = 5% GST
-
-   ₹7,000 and above = 18%
-
-   For multiple nights,
-   GST is calculated night
-   by night.
-
-   Cleaning / extra guest
-   charges are distributed
-   proportionately across
-   the nights so the night's
-   GST slab remains the basis.
 ========================= */
 
 function buildFinalPricing({
@@ -403,9 +411,7 @@ function buildFinalPricing({
   checkOut,
   property,
 }) {
-  if (
-    !basePricing?.valid
-  ) {
+  if (!basePricing?.valid) {
     return {
       valid: false,
     };
@@ -429,14 +435,11 @@ function buildFinalPricing({
           ) => ({
             date:
               item.date ||
-              stayDates[
-                index
-              ],
+              stayDates[index],
 
             rate:
               Number(
-                item.rate ||
-                  0
+                item.rate || 0
               ),
           })
         )
@@ -499,8 +502,7 @@ function buildFinalPricing({
       return true;
     };
 
-  let discountAmount =
-    0;
+  let discountAmount = 0;
 
   let discountedNights =
     rawBreakdown.map(
@@ -529,11 +531,8 @@ function buildFinalPricing({
               : null
         )
         .filter(
-          (
-            index
-          ) =>
-            index !==
-            null
+          (index) =>
+            index !== null
         );
 
     const eligibleAmount =
@@ -546,15 +545,13 @@ function buildFinalPricing({
           Number(
             discountedNights[
               index
-            ].rate ||
-              0
+            ].rate || 0
           ),
         0
       );
 
     if (
-      eligibleAmount >
-      0
+      eligibleAmount > 0
     ) {
       if (
         offer.discount_type ===
@@ -566,8 +563,7 @@ function buildFinalPricing({
               Number(
                 discountedNights[
                   index
-                ].rate ||
-                  0
+                ].rate || 0
               );
 
             const discount =
@@ -610,8 +606,7 @@ function buildFinalPricing({
             eligibleAmount
           );
 
-        let allocated =
-          0;
+        let allocated = 0;
 
         eligibleIndexes.forEach(
           (
@@ -622,8 +617,7 @@ function buildFinalPricing({
               Number(
                 discountedNights[
                   index
-                ].rate ||
-                  0
+                ].rate || 0
               );
 
             let share;
@@ -690,8 +684,7 @@ function buildFinalPricing({
         ) =>
           sum +
           Number(
-            item.rate ||
-              0
+            item.rate || 0
           ),
         0
       )
@@ -740,16 +733,12 @@ function buildFinalPricing({
     );
 
   const shareBasis =
-    discountedStaySubtotal >
-    0
+    discountedStaySubtotal > 0
       ? discountedStaySubtotal
       : discountedNights.length;
 
-  let allocatedShared =
-    0;
-
-  let totalGST =
-    0;
+  let allocatedShared = 0;
+  let totalGST = 0;
 
   const nightlyTaxBreakdown =
     discountedNights.map(
@@ -757,12 +746,10 @@ function buildFinalPricing({
         item,
         index
       ) => {
-        let sharedPart =
-          0;
+        let sharedPart = 0;
 
         if (
-          sharedCharges >
-          0
+          sharedCharges > 0
         ) {
           if (
             index ===
@@ -828,8 +815,7 @@ function buildFinalPricing({
               100
           );
 
-        totalGST +=
-          gst;
+        totalGST += gst;
 
         return {
           date:
@@ -879,15 +865,14 @@ function buildFinalPricing({
         securityDeposit
     );
 
-  const uniqueGstRates =
-    [
-      ...new Set(
-        nightlyTaxBreakdown.map(
-          (item) =>
-            item.gstRate
-        )
-      ),
-    ];
+  const uniqueGstRates = [
+    ...new Set(
+      nightlyTaxBreakdown.map(
+        (item) =>
+          item.gstRate
+      )
+    ),
+  ];
 
   return {
     ...basePricing,
@@ -1066,6 +1051,35 @@ export default function PropertyPage() {
     setBookingSuccess,
   ] = useState(null);
 
+  /*
+    Existing request for same
+    guest/property/overlapping
+    dates.
+
+    This is what prevents
+    duplicate booking rows and
+    duplicate chat threads.
+  */
+  const [
+    duplicateBooking,
+    setDuplicateBooking,
+  ] = useState(null);
+
+  const [
+    checkingDuplicate,
+    setCheckingDuplicate,
+  ] = useState(false);
+
+  const [
+    reminderLoading,
+    setReminderLoading,
+  ] = useState(false);
+
+  const [
+    reminderSuccess,
+    setReminderSuccess,
+  ] = useState('');
+
   useEffect(
     () => {
       checkGuestLogin();
@@ -1082,10 +1096,45 @@ export default function PropertyPage() {
     [slug]
   );
 
+  /*
+    Whenever guest/property/dates
+    change, check whether the guest
+    already has a request covering
+    these dates.
+  */
+  useEffect(
+    () => {
+      if (
+        !property?.id ||
+        !guestProfile?.id ||
+        !checkIn ||
+        !checkOut ||
+        checkOut <= checkIn
+      ) {
+        setDuplicateBooking(
+          null
+        );
+
+        return;
+      }
+
+      checkForExistingRequest(
+        guestProfile.id,
+        property.id,
+        checkIn,
+        checkOut
+      );
+    },
+    [
+      property?.id,
+      guestProfile?.id,
+      checkIn,
+      checkOut,
+    ]
+  );
+
   async function checkGuestLogin() {
-    setAuthChecking(
-      true
-    );
+    setAuthChecking(true);
 
     try {
       const {
@@ -1118,31 +1167,68 @@ export default function PropertyPage() {
         return;
       }
 
+      /*
+        Prefer user_id because
+        guest auth is now linked
+        directly to guests.
+      */
       const {
         data:
-          guestRows,
+          guestByUserId,
+        error:
+          guestByUserIdError,
       } =
         await supabase
-          .from(
-            'guests'
-          )
+          .from('guests')
           .select('*')
           .eq(
-            'email',
-            email
+            'user_id',
+            currentSession.user.id
           )
-          .order(
-            'created_at',
-            {
-              ascending:
-                true,
-            }
-          )
-          .limit(1);
+          .maybeSingle();
 
-      const guest =
-        guestRows?.[0] ||
+      if (
+        guestByUserIdError
+      ) {
+        console.warn(
+          guestByUserIdError
+        );
+      }
+
+      let guest =
+        guestByUserId ||
         null;
+
+      /*
+        Compatibility fallback for
+        any older guest record that
+        has not yet been linked.
+      */
+      if (!guest) {
+        const {
+          data:
+            guestRows,
+        } =
+          await supabase
+            .from('guests')
+            .select('*')
+            .eq(
+              'email',
+              email
+            )
+            .order(
+              'created_at',
+              {
+                ascending:
+                  true,
+              }
+            )
+            .limit(1);
+
+        guest =
+          guestRows?.[0] ||
+          null;
+      }
 
       if (guest) {
         setGuestProfile(
@@ -1201,9 +1287,7 @@ export default function PropertyPage() {
           propertyError,
       } =
         await supabase
-          .from(
-            'properties'
-          )
+          .from('properties')
           .select('*')
           .eq(
             'slug',
@@ -1325,20 +1409,18 @@ export default function PropertyPage() {
               propertyData.id
             ),
 
+          /*
+            Inventory is blocked only
+            by successful paid booking.
+          */
           supabase
-            .from(
-              'bookings'
-            )
+            .from('bookings')
             .select(
               'check_in, check_out, booking_status, payment_status'
             )
             .eq(
               'property_id',
               propertyData.id
-            )
-            .eq(
-              'booking_status',
-              'confirmed'
             )
             .eq(
               'payment_status',
@@ -1410,9 +1492,7 @@ export default function PropertyPage() {
           })
         )
       );
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
         error
       );
@@ -1527,8 +1607,7 @@ export default function PropertyPage() {
 
               rateOverrides,
 
-              gstRate:
-                0,
+              gstRate: 0,
             });
 
           return buildFinalPricing({
@@ -1539,15 +1618,14 @@ export default function PropertyPage() {
             checkOut,
             property,
           });
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
             error
           );
 
           return {
             valid: false,
+
             error:
               error.message ||
               'Unable to calculate booking price.',
@@ -1631,6 +1709,150 @@ export default function PropertyPage() {
       )}`;
   }
 
+  /*
+    ==================================================
+    DUPLICATE REQUEST PROTECTION
+    ==================================================
+
+    Same guest + same property +
+    overlapping stay dates cannot
+    create multiple active booking
+    requests.
+
+    We intentionally look at all
+    non-cancelled records for the
+    guest/property and perform the
+    overlap test here.
+  */
+  async function checkForExistingRequest(
+    guestId,
+    propertyId,
+    requestedCheckIn,
+    requestedCheckOut
+  ) {
+    if (
+      !guestId ||
+      !propertyId ||
+      !requestedCheckIn ||
+      !requestedCheckOut
+    ) {
+      setDuplicateBooking(
+        null
+      );
+
+      return null;
+    }
+
+    setCheckingDuplicate(
+      true
+    );
+
+    try {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from('bookings')
+          .select(`
+            id,
+            booking_code,
+            property_id,
+            guest_id,
+            check_in,
+            check_out,
+            booking_status,
+            payment_status,
+            host_decision,
+            host_decided_at,
+            created_at,
+            updated_at,
+            offer_status
+          `)
+          .eq(
+            'guest_id',
+            guestId
+          )
+          .eq(
+            'property_id',
+            propertyId
+          )
+          .order(
+            'created_at',
+            {
+              ascending:
+                false,
+            }
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      const matching =
+        (data || []).find(
+          (booking) => {
+            const status =
+              String(
+                booking.booking_status ||
+                  ''
+              ).toLowerCase();
+
+            /*
+              Cancelled or expired
+              requests may be replaced
+              with a new request.
+
+              Declined requests remain
+              closed and are not treated
+              as an active duplicate.
+            */
+            if (
+              status ===
+                'cancelled' ||
+              status ===
+                'declined' ||
+              status ===
+                'completed'
+            ) {
+              return false;
+            }
+
+            return rangesOverlap(
+              requestedCheckIn,
+              requestedCheckOut,
+              booking.check_in,
+              booking.check_out
+            );
+          }
+        ) || null;
+
+      setDuplicateBooking(
+        matching
+      );
+
+      return matching;
+    } catch (error) {
+      console.error(
+        'Duplicate booking check:',
+        error
+      );
+
+      /*
+        Do not silently create another
+        request when duplicate checking
+        itself fails.
+      */
+      throw new Error(
+        'Unable to verify your existing booking requests. Please try again.'
+      );
+    } finally {
+      setCheckingDuplicate(
+        false
+      );
+    }
+  }
+
   async function ensureGuestProfile() {
     if (
       !session?.user
@@ -1664,8 +1886,7 @@ export default function PropertyPage() {
     }
 
     if (
-      phone.length <
-      10
+      phone.length < 10
     ) {
       throw new Error(
         'Please enter a valid mobile number.'
@@ -1685,6 +1906,39 @@ export default function PropertyPage() {
     let guest =
       guestProfile;
 
+    /*
+      Always prefer auth user_id.
+    */
+    if (!guest?.id) {
+      const {
+        data:
+          userGuest,
+        error:
+          userGuestError,
+      } =
+        await supabase
+          .from('guests')
+          .select('*')
+          .eq(
+            'user_id',
+            session.user.id
+          )
+          .maybeSingle();
+
+      if (
+        userGuestError
+      ) {
+        throw userGuestError;
+      }
+
+      guest =
+        userGuest ||
+        null;
+    }
+
+    /*
+      Fallback for old profile.
+    */
     if (!guest?.id) {
       const {
         data:
@@ -1692,9 +1946,7 @@ export default function PropertyPage() {
         error,
       } =
         await supabase
-          .from(
-            'guests'
-          )
+          .from('guests')
           .select('*')
           .eq(
             'email',
@@ -1725,9 +1977,7 @@ export default function PropertyPage() {
         error,
       } =
         await supabase
-          .from(
-            'guests'
-          )
+          .from('guests')
           .update({
             full_name:
               name,
@@ -1735,6 +1985,14 @@ export default function PropertyPage() {
             phone,
 
             email,
+
+            /*
+              Make sure an older guest
+              profile is linked to the
+              logged-in auth account.
+            */
+            user_id:
+              session.user.id,
           })
           .eq(
             'id',
@@ -1760,10 +2018,11 @@ export default function PropertyPage() {
       error,
     } =
       await supabase
-        .from(
-          'guests'
-        )
+        .from('guests')
         .insert({
+          user_id:
+            session.user.id,
+
           full_name:
             name,
 
@@ -1785,6 +2044,197 @@ export default function PropertyPage() {
     return created;
   }
 
+  /*
+    ==================================================
+    REMIND HOST
+    ==================================================
+
+    This does NOT create another
+    booking.
+
+    It adds a normal message to the
+    SAME booking conversation.
+  */
+  async function remindHost() {
+    if (
+      !duplicateBooking?.id ||
+      !guestProfile?.id
+    ) {
+      return;
+    }
+
+    const hostDecision =
+      String(
+        duplicateBooking.host_decision ||
+          'pending'
+      ).toLowerCase();
+
+    const bookingStatus =
+      String(
+        duplicateBooking.booking_status ||
+          ''
+      ).toLowerCase();
+
+    if (
+      hostDecision !==
+        'pending' ||
+      bookingStatus !==
+        'pending'
+    ) {
+      setBookingError(
+        'The host has already responded to this booking request. Please continue from Messages.'
+      );
+
+      return;
+    }
+
+    const deadline =
+      getHostResponseDeadline(
+        duplicateBooking
+      );
+
+    if (
+      deadline &&
+      deadline.getTime() <=
+        Date.now()
+    ) {
+      setBookingError(
+        'The host response period has expired. This request must be closed before a new request can be submitted.'
+      );
+
+      return;
+    }
+
+    setReminderLoading(
+      true
+    );
+
+    setReminderSuccess('');
+    setBookingError('');
+
+    try {
+      /*
+        Avoid accidental rapid duplicate
+        reminders. Check the latest
+        messages first.
+      */
+      const {
+        data:
+          latestMessages,
+        error:
+          latestError,
+      } =
+        await supabase
+          .from(
+            'booking_messages'
+          )
+          .select(
+            'id, sender_type, message, created_at'
+          )
+          .eq(
+            'booking_id',
+            duplicateBooking.id
+          )
+          .order(
+            'created_at',
+            {
+              ascending:
+                false,
+            }
+          )
+          .limit(1);
+
+      if (latestError) {
+        throw latestError;
+      }
+
+      const latest =
+        latestMessages?.[0];
+
+      if (
+        latest &&
+        latest.sender_type ===
+          'guest' &&
+        String(
+          latest.message || ''
+        ).includes(
+          'Reminder: Please respond to my booking request.'
+        )
+      ) {
+        const lastTime =
+          new Date(
+            latest.created_at
+          ).getTime();
+
+        /*
+          Keep reminders sensible:
+          one reminder at most every
+          60 minutes.
+        */
+        if (
+          Date.now() -
+            lastTime <
+          60 * 60 * 1000
+        ) {
+          throw new Error(
+            'A reminder was already sent recently. Please allow the host some time to respond.'
+          );
+        }
+      }
+
+      const {
+        error:
+          reminderError,
+      } =
+        await supabase
+          .from(
+            'booking_messages'
+          )
+          .insert({
+            booking_id:
+              duplicateBooking.id,
+
+            sender_type:
+              'guest',
+
+            sender_name:
+              guestProfile.full_name ||
+              guestName ||
+              'Guest',
+
+            message:
+              'Reminder: Please respond to my booking request.',
+
+            message_type:
+              'message',
+
+            is_read:
+              false,
+          });
+
+      if (reminderError) {
+        throw reminderError;
+      }
+
+      setReminderSuccess(
+        'Reminder sent to host in the existing conversation.'
+      );
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setBookingError(
+        error.message ||
+          'Unable to send reminder.'
+      );
+    } finally {
+      setReminderLoading(
+        false
+      );
+    }
+  }
+
   async function submitBookingRequest(
     event
   ) {
@@ -1792,10 +2242,9 @@ export default function PropertyPage() {
 
     setBookingError('');
     setBookingSuccess(null);
+    setReminderSuccess('');
 
-    if (
-      authChecking
-    ) {
+    if (authChecking) {
       return;
     }
 
@@ -1812,18 +2261,19 @@ export default function PropertyPage() {
       setBookingError(
         'Full Name is required.'
       );
+
       return;
     }
 
     if (
       cleanPhone(
         guestPhone
-      ).length <
-      10
+      ).length < 10
     ) {
       setBookingError(
         'Valid mobile number is required.'
       );
+
       return;
     }
 
@@ -1835,6 +2285,7 @@ export default function PropertyPage() {
       setBookingError(
         'Valid email is required.'
       );
+
       return;
     }
 
@@ -1845,6 +2296,7 @@ export default function PropertyPage() {
       setBookingError(
         'Select check-in and check-out dates.'
       );
+
       return;
     }
 
@@ -1855,6 +2307,7 @@ export default function PropertyPage() {
       setBookingError(
         'Check-out must be after check-in.'
       );
+
       return;
     }
 
@@ -1864,6 +2317,7 @@ export default function PropertyPage() {
       setBookingError(
         'Selected dates are unavailable.'
       );
+
       return;
     }
 
@@ -1874,6 +2328,7 @@ export default function PropertyPage() {
         pricing?.error ||
           'Unable to calculate price.'
       );
+
       return;
     }
 
@@ -1884,6 +2339,52 @@ export default function PropertyPage() {
     try {
       const guest =
         await ensureGuestProfile();
+
+      /*
+        CRITICAL:
+
+        Re-check duplicates immediately
+        before INSERT.
+
+        We do not rely only on the UI
+        check because the guest could
+        click quickly or have another
+        browser tab open.
+      */
+      const existingRequest =
+        await checkForExistingRequest(
+          guest.id,
+          property.id,
+          checkIn,
+          checkOut
+        );
+
+      if (
+        existingRequest
+      ) {
+        setDuplicateBooking(
+          existingRequest
+        );
+
+        const hostDecision =
+          String(
+            existingRequest.host_decision ||
+              'pending'
+          ).toLowerCase();
+
+        if (
+          hostDecision ===
+          'pending'
+        ) {
+          throw new Error(
+            'You already have an active request for this property and these dates. Please use Remind Host instead of creating another request.'
+          );
+        }
+
+        throw new Error(
+          'You already have a booking request for this property and these dates. Please continue from the existing conversation.'
+        );
+      }
 
       const bookingNights =
         Math.max(
@@ -1984,19 +2485,6 @@ export default function PropertyPage() {
         offer_note:
           null,
 
-        /*
-          IMPORTANT FIX:
-
-          Normal property discount =
-          auto_applied
-
-          No normal discount =
-          none
-
-          "selected" is NOT allowed
-          by the database.
-        */
-
         offer_status:
           selectedOffer
             ? 'auto_applied'
@@ -2004,13 +2492,6 @@ export default function PropertyPage() {
 
         host_decision:
           'pending',
-
-        /*
-          Automatic Weekday /
-          Weekend / property offer
-          is NOT a guest request
-          for host discount.
-        */
 
         guest_discount_requested:
           false,
@@ -2048,12 +2529,10 @@ export default function PropertyPage() {
         data:
           createdBooking,
         error:
-          bookingError,
+          createdBookingError,
       } =
         await supabase
-          .from(
-            'bookings'
-          )
+          .from('bookings')
           .insert(
             bookingPayload
           )
@@ -2061,15 +2540,10 @@ export default function PropertyPage() {
           .single();
 
       if (
-        bookingError
+        createdBookingError
       ) {
-        throw bookingError;
+        throw createdBookingError;
       }
-
-      /*
-        Create initial booking
-        conversation message.
-      */
 
       const initialMessage =
         guestMessage.trim()
@@ -2105,24 +2579,72 @@ export default function PropertyPage() {
               false,
           });
 
-      if (
-        messageError
-      ) {
+      if (messageError) {
         console.warn(
           messageError
         );
+      }
+
+      /*
+        Add a system message so both
+        sides clearly understand the
+        host's response deadline.
+      */
+      const hostDeadline =
+        getHostResponseDeadline(
+          createdBooking
+        );
+
+      if (hostDeadline) {
+        const {
+          error:
+            deadlineMessageError,
+        } =
+          await supabase
+            .from(
+              'booking_messages'
+            )
+            .insert({
+              booking_id:
+                createdBooking.id,
+
+              sender_type:
+                'system',
+
+              sender_name:
+                'NightOutStays',
+
+              message:
+                `Host has 24 hours to approve or decline this booking request. Response deadline: ${formatDateTime(
+                  hostDeadline
+                )}.`,
+
+              message_type:
+                'system',
+
+              is_read:
+                false,
+            });
+
+        if (
+          deadlineMessageError
+        ) {
+          console.warn(
+            deadlineMessageError
+          );
+        }
       }
 
       setBookingSuccess(
         createdBooking
       );
 
-      setGuestMessage(
-        ''
+      setDuplicateBooking(
+        createdBooking
       );
-    } catch (
-      error
-    ) {
+
+      setGuestMessage('');
+    } catch (error) {
       console.error(
         error
       );
@@ -2190,6 +2712,39 @@ export default function PropertyPage() {
     photos[0] ||
     null;
 
+  const duplicateHostDecision =
+    String(
+      duplicateBooking?.host_decision ||
+        'pending'
+    ).toLowerCase();
+
+  const duplicateBookingStatus =
+    String(
+      duplicateBooking?.booking_status ||
+        ''
+    ).toLowerCase();
+
+  const duplicateDeadline =
+    duplicateBooking
+      ? getHostResponseDeadline(
+          duplicateBooking
+        )
+      : null;
+
+  const canRemindHost =
+    Boolean(
+      duplicateBooking &&
+      duplicateHostDecision ===
+        'pending' &&
+      duplicateBookingStatus ===
+        'pending' &&
+      (
+        !duplicateDeadline ||
+        duplicateDeadline.getTime() >
+          Date.now()
+      )
+    );
+
   return (
     <main
       style={
@@ -2217,6 +2772,15 @@ export default function PropertyPage() {
         >
           {session ? (
             <>
+              <a
+                href="/account/bookings"
+                style={
+                  styles.headerLink
+                }
+              >
+                My Bookings
+              </a>
+
               <a
                 href="/account/messages"
                 style={
@@ -2398,7 +2962,7 @@ export default function PropertyPage() {
                   styles.muted
                 }
               >
-                Paid and confirmed bookings are automatically blocked.
+                Dates are blocked after successful payment. Booking requests do not block inventory.
               </p>
 
               <GuestAvailabilityCalendar
@@ -2435,6 +2999,7 @@ export default function PropertyPage() {
               />
             </Section>
           </div>
+
           <aside
             style={
               styles.bookingColumn
@@ -2490,13 +3055,9 @@ export default function PropertyPage() {
                         event.target.value
                       );
 
-                      setBookingError(
-                        ''
-                      );
-
-                      setBookingSuccess(
-                        null
-                      );
+                      setBookingError('');
+                      setBookingSuccess(null);
+                      setReminderSuccess('');
                     }}
                     style={
                       styles.input
@@ -2531,13 +3092,9 @@ export default function PropertyPage() {
                         event.target.value
                       );
 
-                      setBookingError(
-                        ''
-                      );
-
-                      setBookingSuccess(
-                        null
-                      );
+                      setBookingError('');
+                      setBookingSuccess(null);
+                      setReminderSuccess('');
                     }}
                     style={
                       styles.input
@@ -2566,13 +3123,8 @@ export default function PropertyPage() {
                       )
                     );
 
-                    setBookingError(
-                      ''
-                    );
-
-                    setBookingSuccess(
-                      null
-                    );
+                    setBookingError('');
+                    setBookingSuccess(null);
                   }}
                   style={
                     styles.input
@@ -2655,6 +3207,122 @@ export default function PropertyPage() {
                   </div>
                 )}
 
+              {checkingDuplicate && (
+                <div
+                  style={
+                    styles.checkingBox
+                  }
+                >
+                  Checking your existing requests...
+                </div>
+              )}
+
+              {duplicateBooking && (
+                <div
+                  style={
+                    styles.existingRequestBox
+                  }
+                >
+                  <strong>
+                    You already have a request for these dates.
+                  </strong>
+
+                  {duplicateBooking.booking_code && (
+                    <div>
+                      Booking ID:{' '}
+                      <strong>
+                        {
+                          duplicateBooking.booking_code
+                        }
+                      </strong>
+                    </div>
+                  )}
+
+                  {duplicateHostDecision ===
+                    'pending' ? (
+                    <>
+                      <div>
+                        Waiting for host response.
+                      </div>
+
+                      {duplicateDeadline && (
+                        <div>
+                          Host response deadline:{' '}
+                          <strong>
+                            {formatDateTime(
+                              duplicateDeadline
+                            )}
+                          </strong>
+                        </div>
+                      )}
+
+                      <div
+                        style={
+                          styles.existingRequestActions
+                        }
+                      >
+                        {canRemindHost && (
+                          <button
+                            type="button"
+                            onClick={
+                              remindHost
+                            }
+                            disabled={
+                              reminderLoading
+                            }
+                            style={{
+                              ...styles.remindButton,
+
+                              ...(reminderLoading
+                                ? styles.disabledButton
+                                : {}),
+                            }}
+                          >
+                            {reminderLoading
+                              ? 'Sending Reminder...'
+                              : 'Remind Host'}
+                          </button>
+                        )}
+
+                        <a
+                          href="/account/messages"
+                          style={
+                            styles.openMessagesButton
+                          }
+                        >
+                          Open Messages
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        The host has already responded to this request.
+                      </div>
+
+                      <a
+                        href="/account/messages"
+                        style={
+                          styles.openMessagesButton
+                        }
+                      >
+                        Continue in Messages
+                      </a>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {reminderSuccess && (
+                <div
+                  style={
+                    styles.successBox
+                  }
+                >
+                  {reminderSuccess}
+                </div>
+              )}
+
               {checkIn &&
                 checkOut &&
                 availableOffers.length >
@@ -2682,13 +3350,8 @@ export default function PropertyPage() {
                             event.target.value
                           );
 
-                          setBookingError(
-                            ''
-                          );
-
-                          setBookingSuccess(
-                            null
-                          );
+                          setBookingError('');
+                          setBookingSuccess(null);
                         }}
                         style={
                           styles.input
@@ -2876,9 +3539,7 @@ export default function PropertyPage() {
                               }
                             >
                               <span>
-                                {
-                                  item.date
-                                }
+                                {item.date}
                               </span>
 
                               <span>
@@ -2886,10 +3547,7 @@ export default function PropertyPage() {
                                   item.effectiveRate
                                 )}
                                 {' @ '}
-                                {
-                                  item.gstRate
-                                }
-                                %
+                                {item.gstRate}%
                               </span>
 
                               <span>
@@ -2905,8 +3563,7 @@ export default function PropertyPage() {
 
                   <PriceRow
                     label={
-                      pricing.gstRate >
-                      0
+                      pricing.gstRate > 0
                         ? `GST (${pricing.gstRate}%)`
                         : 'GST'
                     }
@@ -2958,7 +3615,6 @@ export default function PropertyPage() {
                   </div>
                 </div>
               )}
-
               <label
                 style={
                   styles.label
@@ -2978,13 +3634,11 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError(
-                      ''
-                    );
+                    setBookingError('');
                   }}
                   required
                   autoComplete="name"
-                  placeholder="Your full name"
+                  placeholder="Full name"
                   style={
                     styles.input
                   }
@@ -3010,9 +3664,7 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError(
-                      ''
-                    );
+                    setBookingError('');
                   }}
                   required
                   autoComplete="tel"
@@ -3042,9 +3694,7 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError(
-                      ''
-                    );
+                    setBookingError('');
                   }}
                   required
                   autoComplete="email"
@@ -3124,6 +3774,10 @@ export default function PropertyPage() {
 
                   <br />
 
+                  The host has 24 hours to approve or decline your request.
+
+                  <br />
+
                   <a
                     href="/account/messages"
                     style={
@@ -3146,38 +3800,69 @@ export default function PropertyPage() {
                   </div>
                 )}
 
-              <button
-                type="submit"
-                disabled={
-                  bookingLoading ||
-                  selectedDatesUnavailable ||
-                  authChecking
-                }
-                style={{
-                  ...styles.bookButton,
+              {/*
+                IMPORTANT:
 
-                  ...(bookingLoading ||
-                  selectedDatesUnavailable ||
-                  authChecking
-                    ? styles.disabledButton
-                    : {}),
-                }}
-              >
-                {authChecking
-                  ? 'Checking account...'
-                  : bookingLoading
-                  ? 'Sending Request...'
-                  : session
-                  ? 'Request Booking'
-                  : 'Login to Request Booking'}
-              </button>
+                Once an existing active
+                request is detected we do
+                not allow another submit.
+
+                The guest gets Remind Host
+                / Messages instead.
+              */}
+
+              {!duplicateBooking && (
+                <button
+                  type="submit"
+                  disabled={
+                    bookingLoading ||
+                    checkingDuplicate ||
+                    selectedDatesUnavailable ||
+                    authChecking
+                  }
+                  style={{
+                    ...styles.bookButton,
+
+                    ...(bookingLoading ||
+                    checkingDuplicate ||
+                    selectedDatesUnavailable ||
+                    authChecking
+                      ? styles.disabledButton
+                      : {}),
+                  }}
+                >
+                  {authChecking
+                    ? 'Checking account...'
+                    : checkingDuplicate
+                    ? 'Checking Existing Request...'
+                    : bookingLoading
+                    ? 'Sending Request...'
+                    : session
+                    ? 'Request Booking'
+                    : 'Login to Request Booking'}
+                </button>
+              )}
+
+              {duplicateBooking && (
+                <div
+                  style={
+                    styles.duplicateSubmitNotice
+                  }
+                >
+                  Another booking request will not be created for these dates.
+
+                  {canRemindHost
+                    ? ' Use Remind Host above if you want to follow up.'
+                    : ' Continue from your existing booking conversation.'}
+                </div>
+              )}
 
               <div
                 style={
                   styles.bookingNote
                 }
               >
-                Sending a booking request does not immediately reserve the dates. Dates are blocked once payment is successfully completed and the booking is confirmed.
+                Sending a booking request does not reserve the dates. Dates are blocked only after successful payment.
               </div>
             </form>
           </aside>
@@ -3186,6 +3871,10 @@ export default function PropertyPage() {
     </main>
   );
 }
+
+/* =========================
+   SMALL COMPONENTS
+========================= */
 
 function Section({
   title,
@@ -3242,6 +3931,10 @@ function PriceRow({
   );
 }
 
+/* =========================
+   STYLES
+========================= */
+
 const styles = {
   page: {
     minHeight:
@@ -3258,7 +3951,7 @@ const styles = {
   },
 
   header: {
-    height:
+    minHeight:
       72,
 
     background:
@@ -3276,6 +3969,9 @@ const styles = {
     justifyContent:
       'space-between',
 
+    gap:
+      14,
+
     padding:
       '0 5%',
 
@@ -3287,6 +3983,9 @@ const styles = {
 
     zIndex:
       50,
+
+    flexWrap:
+      'wrap',
   },
 
   logo: {
@@ -3311,7 +4010,10 @@ const styles = {
       'center',
 
     gap:
-      16,
+      14,
+
+    flexWrap:
+      'wrap',
   },
 
   headerLink: {
@@ -3323,6 +4025,9 @@ const styles = {
 
     fontWeight:
       700,
+
+    fontSize:
+      14,
   },
 
   loginButton: {
@@ -3403,7 +4108,7 @@ const styles = {
       '100%',
 
     height:
-      500,
+      'clamp(260px, 42vw, 500px)',
 
     background:
       '#e9edf2',
@@ -3499,7 +4204,7 @@ const styles = {
       'grid',
 
     gridTemplateColumns:
-      'minmax(0, 1fr) 390px',
+      'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
 
     gap:
       26,
@@ -3542,11 +4247,17 @@ const styles = {
 
     color:
       '#344054',
+
+    minWidth:
+      0,
   },
 
   bookingColumn: {
     position:
       'relative',
+
+    minWidth:
+      0,
   },
 
   bookingCard: {
@@ -3576,6 +4287,9 @@ const styles = {
 
     gap:
       14,
+
+    minWidth:
+      0,
   },
 
   bookingPrice: {
@@ -3594,7 +4308,7 @@ const styles = {
       'grid',
 
     gridTemplateColumns:
-      '1fr 1fr',
+      'repeat(auto-fit, minmax(130px, 1fr))',
 
     gap:
       10,
@@ -3608,7 +4322,7 @@ const styles = {
       6,
 
     fontSize:
-      10,
+      11,
 
     fontWeight:
       800,
@@ -3618,6 +4332,9 @@ const styles = {
 
     color:
       '#0b2447',
+
+    minWidth:
+      0,
   },
 
   input: {
@@ -3628,13 +4345,13 @@ const styles = {
       'border-box',
 
     border:
-      '1px solid #cfd6df',
+      '1px solid #cfd5dd',
 
     borderRadius:
       9,
 
     padding:
-      '11px 11px',
+      '11px 12px',
 
     background:
       '#ffffff',
@@ -3643,7 +4360,7 @@ const styles = {
       '#101828',
 
     fontSize:
-      13,
+      14,
 
     outline:
       'none',
@@ -3654,7 +4371,7 @@ const styles = {
       '100%',
 
     minHeight:
-      95,
+      90,
 
     resize:
       'vertical',
@@ -3663,13 +4380,13 @@ const styles = {
       'border-box',
 
     border:
-      '1px solid #cfd6df',
+      '1px solid #cfd5dd',
 
     borderRadius:
       9,
 
     padding:
-      11,
+      '11px 12px',
 
     background:
       '#ffffff',
@@ -3678,87 +4395,248 @@ const styles = {
       '#101828',
 
     fontSize:
-      13,
+      14,
+
+    fontFamily:
+      'inherit',
 
     outline:
       'none',
   },
 
-  availableBox: {
-    padding:
-      10,
-
-    background:
-      '#eaf7ee',
+  requiredNote: {
+    fontSize:
+      11,
 
     color:
-      '#24723a',
+      '#667085',
+
+    lineHeight:
+      1.5,
+  },
+
+  availableBox: {
+    background:
+      '#ecfdf3',
+
+    color:
+      '#027a48',
+
+    border:
+      '1px solid #abefc6',
+
+    padding:
+      11,
 
     borderRadius:
       9,
 
+    fontSize:
+      13,
+
     fontWeight:
       700,
+  },
+
+  checkingBox: {
+    background:
+      '#f2f4f7',
+
+    color:
+      '#475467',
+
+    border:
+      '1px solid #d0d5dd',
+
+    padding:
+      11,
+
+    borderRadius:
+      9,
+
+    fontSize:
+      13,
+
+    fontWeight:
+      700,
+  },
+
+  existingRequestBox: {
+    display:
+      'grid',
+
+    gap:
+      9,
+
+    padding:
+      14,
+
+    borderRadius:
+      11,
+
+    background:
+      '#fff8e7',
+
+    border:
+      '1px solid #f3cf79',
+
+    color:
+      '#7a4b00',
+
+    fontSize:
+      13,
+
+    lineHeight:
+      1.5,
+  },
+
+  existingRequestActions: {
+    display:
+      'flex',
+
+    gap:
+      8,
+
+    alignItems:
+      'center',
+
+    flexWrap:
+      'wrap',
+
+    marginTop:
+      3,
+  },
+
+  remindButton: {
+    border:
+      0,
+
+    borderRadius:
+      8,
+
+    padding:
+      '10px 13px',
+
+    background:
+      '#174f91',
+
+    color:
+      '#ffffff',
+
+    fontWeight:
+      800,
+
+    cursor:
+      'pointer',
+
+    fontSize:
+      13,
+  },
+
+  openMessagesButton: {
+    display:
+      'inline-flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'center',
+
+    textDecoration:
+      'none',
+
+    border:
+      '1px solid #174f91',
+
+    borderRadius:
+      8,
+
+    padding:
+      '9px 12px',
+
+    background:
+      '#ffffff',
+
+    color:
+      '#174f91',
+
+    fontWeight:
+      800,
+
+    fontSize:
+      13,
+  },
+
+  duplicateSubmitNotice: {
+    background:
+      '#f2f4f7',
+
+    border:
+      '1px solid #d0d5dd',
+
+    borderRadius:
+      9,
+
+    padding:
+      11,
+
+    color:
+      '#475467',
 
     fontSize:
       12,
+
+    lineHeight:
+      1.5,
+
+    fontWeight:
+      600,
   },
 
   discountBox: {
     background:
-      '#fffaf0',
+      '#f8fafc',
 
     border:
-      '1px solid #ecd89b',
+      '1px solid #e4e7ec',
 
     borderRadius:
-      10,
+      11,
 
     padding:
-      10,
+      12,
 
     display:
       'grid',
 
     gap:
-      8,
+      10,
   },
 
   offerDescription: {
-    background:
-      '#fff4d5',
-
-    padding:
-      9,
-
-    borderRadius:
-      7,
+    color:
+      '#344054',
 
     fontSize:
-      11,
-
-    color:
-      '#765d1e',
+      12,
 
     lineHeight:
-      1.45,
+      1.5,
   },
 
   priceSummary: {
-    background:
-      '#f7f8fa',
-
-    borderRadius:
-      11,
-
-    padding:
-      13,
-
     display:
       'grid',
 
     gap:
       9,
+
+    borderTop:
+      '1px solid #eaecf0',
+
+    paddingTop:
+      14,
   },
 
   priceRow: {
@@ -3768,56 +4646,79 @@ const styles = {
     justifyContent:
       'space-between',
 
+    alignItems:
+      'flex-start',
+
     gap:
-      14,
+      12,
 
     color:
-      '#344054',
+      '#475467',
 
     fontSize:
-      12,
+      13,
   },
 
   discountRow: {
     color:
-      '#24723a',
+      '#027a48',
 
     fontWeight:
       700,
   },
 
+  totalRow: {
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    gap:
+      12,
+
+    paddingTop:
+      11,
+
+    borderTop:
+      '1px solid #d0d5dd',
+
+    fontSize:
+      18,
+
+    color:
+      '#101828',
+  },
+
   gstBreakdown: {
+    background:
+      '#f8fafc',
+
+    border:
+      '1px solid #eaecf0',
+
+    borderRadius:
+      8,
+
+    padding:
+      9,
+
     display:
       'grid',
 
     gap:
       5,
-
-    padding:
-      9,
-
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #e5e7eb',
-
-    borderRadius:
-      8,
   },
 
   gstTitle: {
     fontSize:
-      10,
+      11,
 
     fontWeight:
       800,
 
     color:
-      '#667085',
-
-    textTransform:
-      'uppercase',
+      '#344054',
   },
 
   gstNightRow: {
@@ -3833,133 +4734,91 @@ const styles = {
     alignItems:
       'center',
 
-    fontSize:
-      10,
-
-    color:
-      '#475467',
-  },
-
-  totalRow: {
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    gap:
-      14,
-
-    paddingTop:
-      11,
-
-    borderTop:
-      '1px solid #dfe3e8',
-
-    fontSize:
-      17,
-  },
-
-  taxRule: {
-    marginTop:
-      2,
-
-    fontSize:
-      9,
-
-    lineHeight:
-      1.4,
-
-    color:
-      '#7b8490',
-  },
-
-  requiredNote: {
-    fontSize:
-      10,
-
     color:
       '#667085',
 
-    lineHeight:
-      1.45,
+    fontSize:
+      10,
   },
 
-  errorBox: {
-    padding:
-      11,
-
-    background:
-      '#fdeaea',
-
+  taxRule: {
     color:
-      '#a12828',
-
-    borderRadius:
-      9,
+      '#667085',
 
     fontSize:
-      12,
-
-    fontWeight:
-      600,
-
-    lineHeight:
-      1.45,
-  },
-
-  successBox: {
-    padding:
-      11,
-
-    background:
-      '#eaf7ee',
-
-    color:
-      '#24723a',
-
-    borderRadius:
-      9,
-
-    fontSize:
-      12,
-
-    fontWeight:
-      700,
+      10,
 
     lineHeight:
       1.5,
   },
 
-  messageLink: {
-    display:
-      'inline-block',
+  errorBox: {
+    background:
+      '#fef3f2',
 
-    marginTop:
-      6,
+    border:
+      '1px solid #fecdca',
 
     color:
-      '#174f91',
+      '#b42318',
 
-    fontWeight:
-      800,
-  },
-
-  loginNotice: {
     padding:
       11,
 
+    borderRadius:
+      9,
+
+    fontSize:
+      13,
+
+    lineHeight:
+      1.5,
+  },
+
+  successBox: {
     background:
-      '#fff8e7',
+      '#ecfdf3',
+
+    border:
+      '1px solid #abefc6',
 
     color:
-      '#805b00',
+      '#027a48',
+
+    padding:
+      11,
+
+    borderRadius:
+      9,
+
+    fontSize:
+      13,
+
+    lineHeight:
+      1.6,
+  },
+
+  loginNotice: {
+    background:
+      '#eff8ff',
+
+    border:
+      '1px solid #b2ddff',
+
+    color:
+      '#175cd3',
+
+    padding:
+      11,
 
     borderRadius:
       9,
 
     fontSize:
       12,
+
+    lineHeight:
+      1.5,
   },
 
   bookButton: {
@@ -3970,10 +4829,7 @@ const styles = {
       0,
 
     borderRadius:
-      9,
-
-    padding:
-      '14px 15px',
+      10,
 
     background:
       '#174f91',
@@ -3981,8 +4837,11 @@ const styles = {
     color:
       '#ffffff',
 
+    padding:
+      '14px 16px',
+
     fontSize:
-      14,
+      15,
 
     fontWeight:
       800,
@@ -4000,9 +4859,6 @@ const styles = {
   },
 
   bookingNote: {
-    textAlign:
-      'center',
-
     color:
       '#667085',
 
@@ -4010,14 +4866,43 @@ const styles = {
       10,
 
     lineHeight:
-      1.45,
-  },
-
-  center: {
-    padding:
-      40,
+      1.5,
 
     textAlign:
       'center',
+  },
+
+  messageLink: {
+    color:
+      '#027a48',
+
+    fontWeight:
+      800,
+
+    textDecoration:
+      'underline',
+  },
+
+  center: {
+    minHeight:
+      220,
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'center',
+
+    flexDirection:
+      'column',
+
+    textAlign:
+      'center',
+
+    padding:
+      24,
   },
 };
