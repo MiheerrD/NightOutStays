@@ -9,154 +9,227 @@ const supabase = createClient(
 );
 
 export default function ResetPasswordPage() {
-  const [password, setPassword] =
-    useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [confirmPassword, setConfirmPassword] =
-    useState('');
+  const [checking, setChecking] = useState(true);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [checking, setChecking] =
-    useState(true);
-
-  const [recoveryReady, setRecoveryReady] =
-    useState(false);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState('');
-
-  const [successMessage, setSuccessMessage] =
-    useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    let mounted = true;
+    let active = true;
 
-    async function initialiseRecovery() {
+    async function prepareRecovery() {
       try {
-        /*
-          Supabase recovery links may establish the
-          session before this page finishes loading.
-        */
+        setChecking(true);
+        setErrorMessage('');
 
+        const url = new URL(window.location.href);
+
+        /*
+          NEW SUPABASE PKCE FLOW
+
+          Recovery link may return:
+
+          /reset-password?code=xxxxx
+
+          We must exchange that code for a real session.
+        */
+        const code = url.searchParams.get('code');
+
+        if (code) {
+          const {
+            data,
+            error,
+          } =
+            await supabase.auth.exchangeCodeForSession(
+              code
+            );
+
+          if (error) {
+            throw error;
+          }
+
+          if (data?.session) {
+            if (!active) return;
+
+            setRecoveryReady(true);
+            setChecking(false);
+
+            /*
+              Remove the one-time code from the browser URL
+              after it has successfully been exchanged.
+            */
+            window.history.replaceState(
+              {},
+              document.title,
+              '/reset-password'
+            );
+
+            return;
+          }
+        }
+
+        /*
+          OLDER / HASH-BASED FLOW
+
+          Some Supabase recovery links establish the
+          session automatically before this page loads.
+        */
         const {
-          data: { session },
-          error,
+          data: sessionData,
+          error: sessionError,
         } = await supabase.auth.getSession();
 
-        if (error) {
-          throw error;
+        if (sessionError) {
+          throw sessionError;
         }
+
+        if (sessionData?.session) {
+          if (!active) return;
+
+          setRecoveryReady(true);
+          setChecking(false);
+          return;
+        }
+
+        /*
+          If neither a code nor an existing session
+          is available, this is not a valid recovery page.
+        */
+        if (!active) return;
+
+        setRecoveryReady(false);
+
+        setErrorMessage(
+          'This password recovery link is invalid or has expired.'
+        );
+      } catch (error) {
+        console.error(
+          'Password recovery initialization error:',
+          error
+        );
+
+        if (!active) return;
+
+        setRecoveryReady(false);
+
+        const message =
+          error?.message || '';
 
         if (
-          mounted &&
-          session
+          message.toLowerCase().includes('expired') ||
+          message.toLowerCase().includes('invalid') ||
+          message.toLowerCase().includes('code')
         ) {
-          setRecoveryReady(true);
-        }
-      } catch (error) {
-        console.error(error);
-
-        if (mounted) {
           setErrorMessage(
-            error?.message ||
+            'This password recovery link is invalid or has expired. Please request a new recovery email.'
+          );
+        } else {
+          setErrorMessage(
+            message ||
               'Unable to verify the password recovery link.'
           );
         }
       } finally {
-        if (mounted) {
+        if (active) {
           setChecking(false);
         }
       }
     }
 
     /*
-      Listen for the PASSWORD_RECOVERY event.
+      Also listen for Supabase auth events.
 
-      This is important when Supabase establishes
-      the recovery session after the page loads.
+      This supports recovery links where Supabase
+      establishes the session asynchronously.
     */
-
     const {
-      data: {
-        subscription,
-      },
-    } =
-      supabase.auth.onAuthStateChange(
-        (event, session) => {
-          if (!mounted) {
-            return;
-          }
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!active) return;
 
-          if (
-            event ===
-              'PASSWORD_RECOVERY' &&
-            session
-          ) {
-            setRecoveryReady(true);
-            setChecking(false);
-            setErrorMessage('');
-          }
+        if (
+          event === 'PASSWORD_RECOVERY' &&
+          session
+        ) {
+          setRecoveryReady(true);
+          setChecking(false);
+          setErrorMessage('');
         }
-      );
+      }
+    );
 
-    initialiseRecovery();
+    prepareRecovery();
 
     return () => {
-      mounted = false;
-
+      active = false;
       subscription.unsubscribe();
     };
   }, []);
 
-  async function handleResetPassword(
-    event
-  ) {
+  async function handleResetPassword(event) {
     event.preventDefault();
 
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (
-      password.length < 8
-    ) {
+    if (password.length < 8) {
       setErrorMessage(
         'Password must be at least 8 characters.'
       );
-
       return;
     }
 
-    if (
-      password !==
-      confirmPassword
-    ) {
+    if (password !== confirmPassword) {
       setErrorMessage(
         'Passwords do not match.'
       );
-
       return;
     }
 
     if (!recoveryReady) {
       setErrorMessage(
-        'This password recovery link is invalid or has expired. Please request a new password reset email.'
+        'Your password recovery session is no longer valid. Please request a new recovery email.'
       );
-
       return;
     }
 
     setLoading(true);
 
     try {
+      /*
+        Confirm we still have an authenticated
+        recovery session before changing password.
+      */
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionData?.session) {
+        throw new Error(
+          'Password recovery session has expired.'
+        );
+      }
+
+      /*
+        Change password for the authenticated user.
+      */
       const {
         data,
         error,
-      } =
-        await supabase.auth.updateUser({
-          password,
-        });
+      } = await supabase.auth.updateUser({
+        password,
+      });
 
       if (error) {
         throw error;
@@ -168,39 +241,49 @@ export default function ResetPasswordPage() {
         );
       }
 
-      setSuccessMessage(
-        'Your password has been changed successfully. Redirecting you to login...'
-      );
-
       setPassword('');
       setConfirmPassword('');
 
-      /*
-        Sign out the recovery session so the guest
-        explicitly logs in with the new password.
-      */
+      setSuccessMessage(
+        'Password changed successfully. You can now login with your new password.'
+      );
 
+      /*
+        End the recovery session.
+
+        We want the guest to explicitly login using
+        the newly-created password.
+      */
       await supabase.auth.signOut();
 
       setTimeout(() => {
-        window.location.replace(
-          '/login?passwordReset=success'
-        );
+        window.location.href =
+          '/login?passwordReset=success';
       }, 1800);
     } catch (error) {
-      console.error(error);
+      console.error(
+        'Password update error:',
+        error
+      );
 
       const message =
         error?.message ||
         'Unable to update your password.';
 
-      if (
-        message
-          .toLowerCase()
-          .includes('same password')
-      ) {
+      const lower = message.toLowerCase();
+
+      if (lower.includes('same password')) {
         setErrorMessage(
           'Please choose a password different from your current password.'
+        );
+      } else if (
+        lower.includes('expired') ||
+        lower.includes('session')
+      ) {
+        setRecoveryReady(false);
+
+        setErrorMessage(
+          'Your password recovery session has expired. Please request a new recovery email.'
         );
       } else {
         setErrorMessage(message);
@@ -210,10 +293,12 @@ export default function ResetPasswordPage() {
     }
   }
 
-  async function requestNewLink() {
-    window.location.replace(
-      '/login'
-    );
+  function goToLogin() {
+    /*
+      Use href rather than replace().
+      This gives us a simple direct navigation.
+    */
+    window.location.href = '/login';
   }
 
   if (checking) {
@@ -226,9 +311,8 @@ export default function ResetPasswordPage() {
 
           <div className="spinner" />
 
-          <p>
-            Verifying your password
-            recovery link...
+          <p className="checking-text">
+            Verifying your password recovery link...
           </p>
         </section>
 
@@ -244,38 +328,28 @@ export default function ResetPasswordPage() {
           NightOutStays
         </div>
 
-        <h1>
-          Reset Password
-        </h1>
+        <h1>Reset Password</h1>
 
         {recoveryReady ? (
           <>
             <p className="subtitle">
-              Create a new password for
-              your NightOutStays account.
+              Create a new password for your
+              NightOutStays account.
             </p>
 
-            <form
-              onSubmit={
-                handleResetPassword
-              }
-            >
-              <Field
+            <form onSubmit={handleResetPassword}>
+              <PasswordField
                 label="NEW PASSWORD"
                 value={password}
                 onChange={setPassword}
                 placeholder="Minimum 8 characters"
-                autoComplete="new-password"
               />
 
-              <Field
+              <PasswordField
                 label="CONFIRM NEW PASSWORD"
                 value={confirmPassword}
-                onChange={
-                  setConfirmPassword
-                }
+                onChange={setConfirmPassword}
                 placeholder="Re-enter new password"
-                autoComplete="new-password"
               />
 
               {errorMessage && (
@@ -292,11 +366,11 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
+                className="primary-button"
                 disabled={
                   loading ||
                   Boolean(successMessage)
                 }
-                className="primary-button"
               >
                 {loading
                   ? 'Updating Password...'
@@ -304,6 +378,17 @@ export default function ResetPasswordPage() {
                   ? 'Password Updated'
                   : 'Save New Password'}
               </button>
+
+              {!successMessage && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={goToLogin}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+              )}
             </form>
           </>
         ) : (
@@ -314,15 +399,14 @@ export default function ResetPasswordPage() {
             </div>
 
             <p className="subtitle">
-              Please request a new
-              password recovery email
-              from the login page.
+              Request a new password recovery
+              email from the login page.
             </p>
 
             <button
               type="button"
               className="primary-button"
-              onClick={requestNewLink}
+              onClick={goToLogin}
             >
               Back to Login
             </button>
@@ -330,10 +414,9 @@ export default function ResetPasswordPage() {
         )}
 
         <div className="security-note">
-          For your security, password
-          recovery links should only be
-          used by the person who requested
-          them.
+          Password recovery links are temporary
+          and should only be used by the person
+          who requested them.
         </div>
       </section>
 
@@ -342,29 +425,25 @@ export default function ResetPasswordPage() {
   );
 }
 
-function Field({
+function PasswordField({
   label,
   value,
   onChange,
   placeholder,
-  autoComplete,
 }) {
   return (
     <div className="field">
-      <label>
-        {label}
-      </label>
+      <label>{label}</label>
 
       <input
         type="password"
         value={value}
         onChange={(event) =>
-          onChange(
-            event.target.value
-          )
+          onChange(event.target.value)
         }
         placeholder={placeholder}
-        autoComplete={autoComplete}
+        autoComplete="new-password"
+        minLength={8}
         required
       />
     </div>
@@ -384,44 +463,25 @@ function PageStyles() {
 
       .page {
         min-height: 100vh;
-
         display: flex;
         align-items: center;
         justify-content: center;
-
         padding: 28px 15px;
-
         background: #f5f7fa;
-
-        font-family:
-          Arial,
-          sans-serif;
-
+        font-family: Arial, sans-serif;
         color: #11213c;
       }
 
       .card {
         width: 100%;
         max-width: 460px;
-
         padding: 28px;
-
         background: #ffffff;
-
-        border:
-          1px solid
-          #dfe3e8;
-
+        border: 1px solid #dfe3e8;
         border-radius: 18px;
-
         box-shadow:
           0 10px 35px
-          rgba(
-            16,
-            24,
-            40,
-            0.08
-          );
+          rgba(16, 24, 40, 0.08);
       }
 
       .loading-card {
@@ -430,27 +490,24 @@ function PageStyles() {
 
       .brand {
         margin-bottom: 18px;
-
         color: #17457f;
-
         font-size: 24px;
         font-weight: 900;
       }
 
       h1 {
-        margin:
-          0 0 8px;
-
+        margin: 0 0 8px;
         font-size: 28px;
       }
 
       .subtitle {
-        margin:
-          0 0 22px;
-
+        margin: 0 0 22px;
         color: #687080;
-
         line-height: 1.5;
+      }
+
+      .checking-text {
+        color: #687080;
       }
 
       .field {
@@ -459,168 +516,117 @@ function PageStyles() {
 
       .field label {
         display: block;
-
         margin-bottom: 6px;
-
         font-size: 10px;
         font-weight: 900;
-
         letter-spacing: 1px;
       }
 
       .field input {
         width: 100%;
-
         min-height: 46px;
-
         padding: 12px;
-
-        border:
-          1px solid
-          #ccd1d8;
-
+        border: 1px solid #ccd1d8;
         border-radius: 10px;
-
         font-size: 16px;
-
         outline: none;
       }
 
       .field input:focus {
-        border-color:
-          #17457f;
+        border-color: #17457f;
       }
 
       .message {
         margin-bottom: 14px;
-
         padding: 12px;
-
         border-radius: 9px;
-
         font-size: 14px;
         font-weight: 700;
-
         line-height: 1.4;
       }
 
       .message.error {
-        background:
-          #ffeaea;
-
-        color:
-          #8b2020;
+        background: #ffeaea;
+        color: #8b2020;
       }
 
       .message.success {
-        background:
-          #eaf8ee;
-
-        color:
-          #25663a;
+        background: #eaf8ee;
+        color: #25663a;
       }
 
-      .primary-button {
+      .primary-button,
+      .secondary-button {
         width: 100%;
-
         min-height: 48px;
-
-        border: 0;
-
         border-radius: 10px;
-
-        background:
-          #17457f;
-
-        color:
-          #ffffff;
-
         font-size: 15px;
         font-weight: 900;
-
         cursor: pointer;
       }
 
-      .primary-button:disabled {
-        opacity: 0.6;
+      .primary-button {
+        border: 0;
+        background: #17457f;
+        color: #ffffff;
+      }
 
-        cursor:
-          not-allowed;
+      .secondary-button {
+        margin-top: 10px;
+        border: 1px solid #17457f;
+        background: #ffffff;
+        color: #17457f;
+      }
+
+      .primary-button:disabled,
+      .secondary-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
 
       .security-note {
         margin-top: 18px;
-
         padding: 12px;
-
         border-radius: 9px;
-
-        background:
-          #f7f8fa;
-
-        color:
-          #687080;
-
+        background: #f7f8fa;
+        color: #687080;
         font-size: 12px;
-
         line-height: 1.5;
       }
 
       .spinner {
         width: 34px;
         height: 34px;
-
-        margin:
-          20px auto;
-
-        border:
-          4px solid
-          #e2e6eb;
-
-        border-top-color:
-          #17457f;
-
+        margin: 20px auto;
+        border: 4px solid #e2e6eb;
+        border-top-color: #17457f;
         border-radius: 50%;
-
-        animation:
-          spin 0.8s
-          linear infinite;
+        animation: spin 0.8s linear infinite;
       }
 
       @keyframes spin {
         to {
-          transform:
-            rotate(360deg);
+          transform: rotate(360deg);
         }
       }
 
-      @media (
-        max-width: 520px
-      ) {
+      @media (max-width: 520px) {
         .page {
-          align-items:
-            flex-start;
-
-          padding:
-            18px 12px;
+          align-items: flex-start;
+          padding: 18px 12px;
         }
 
         .card {
-          padding:
-            22px 18px;
-
-          border-radius:
-            14px;
+          padding: 22px 18px;
+          border-radius: 14px;
         }
 
         h1 {
-          font-size:
-            24px;
+          font-size: 24px;
         }
 
         .brand {
-          font-size:
-            22px;
+          font-size: 22px;
         }
       }
     `}</style>
