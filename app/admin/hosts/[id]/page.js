@@ -43,6 +43,9 @@ export default function AdminHostDetailsPage() {
   const [bookings, setBookings] = useState([]);
   const [guests, setGuests] = useState([]);
 
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [hostPermission, setHostPermission] = useState(null);
+
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [propertySearch, setPropertySearch] = useState('');
 
@@ -52,6 +55,11 @@ export default function AdminHostDetailsPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusError, setStatusError] = useState('');
+
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -95,19 +103,79 @@ export default function AdminHostDetailsPage() {
         throw roleError;
       }
 
-      const allowed = (roles || []).some(
-        (item) =>
-          (
-            item.role === 'super_admin' ||
-            item.role === 'admin'
-          ) &&
-          item.is_active === true
-      );
+      const allowed =
+        (roles || []).some(
+          (item) =>
+            (
+              item.role === 'super_admin' ||
+              item.role === 'admin'
+            ) &&
+            item.is_active === true
+        );
 
       if (!allowed) {
         throw new Error(
           'Admin access is required.'
         );
+      }
+
+      const {
+        data: adminRow,
+        error: adminError,
+      } = await supabase
+        .from('admin_profiles')
+        .select(`
+          user_id,
+          role,
+          full_access,
+          is_active
+        `)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (adminError) {
+        throw adminError;
+      }
+
+      if (
+        !adminRow ||
+        adminRow.is_active !== true
+      ) {
+        throw new Error(
+          'Active Admin account required.'
+        );
+      }
+
+      let permissionRow = null;
+
+      if (
+        adminRow.role !== 'super_admin' &&
+        adminRow.full_access !== true
+      ) {
+        const {
+          data,
+          error: permissionError,
+        } = await supabase
+          .from('admin_permissions')
+          .select(`
+            module,
+            can_view,
+            can_add,
+            can_edit,
+            can_approve,
+            can_delete,
+            can_block,
+            can_export
+          `)
+          .eq('admin_user_id', session.user.id)
+          .eq('module', 'hosts')
+          .maybeSingle();
+
+        if (permissionError) {
+          throw permissionError;
+        }
+
+        permissionRow = data;
       }
 
       const {
@@ -137,7 +205,10 @@ export default function AdminHostDetailsPage() {
           bank_name,
           bank_branch,
           bank_account_type,
-          cancelled_cheque_path
+          cancelled_cheque_path,
+          suspension_reason,
+          blocked_at,
+          blocked_by
         `)
         .eq('id', hostId)
         .maybeSingle();
@@ -179,9 +250,12 @@ export default function AdminHostDetailsPage() {
           updated_at
         `)
         .eq('host_id', hostId)
-        .order('created_at', {
-          ascending: false,
-        });
+        .order(
+          'created_at',
+          {
+            ascending: false,
+          }
+        );
 
       if (propertyError) {
         throw propertyError;
@@ -192,7 +266,8 @@ export default function AdminHostDetailsPage() {
 
       const propertyIds =
         safeProperties.map(
-          (property) => property.id
+          (property) =>
+            property.id
         );
 
       let bookingRows = [];
@@ -297,6 +372,9 @@ export default function AdminHostDetailsPage() {
           data || [];
       }
 
+      setAdminProfile(adminRow);
+      setHostPermission(permissionRow);
+
       setHost(hostRow);
       setProperties(safeProperties);
       setBookings(bookingRows);
@@ -319,6 +397,196 @@ export default function AdminHostDetailsPage() {
     }
   }
 
+  const hasFullHostAccess =
+    adminProfile?.role ===
+      'super_admin' ||
+    adminProfile?.full_access ===
+      true;
+
+  const canEditHost =
+    hasFullHostAccess ||
+    hostPermission?.can_edit ===
+      true;
+
+  const canBlockHost =
+    hasFullHostAccess ||
+    hostPermission?.can_block ===
+      true;
+
+  async function updateHostStatus(
+    newStatus
+  ) {
+    if (!host) {
+      return;
+    }
+
+    setStatusMessage('');
+    setStatusError('');
+
+    let reason = null;
+
+    if (
+      newStatus === 'suspended'
+    ) {
+      const enteredReason =
+        window.prompt(
+          'Reason for suspending this Host?\n\nThis is optional.'
+        );
+
+      if (
+        enteredReason === null
+      ) {
+        return;
+      }
+
+      reason =
+        enteredReason.trim() ||
+        null;
+    }
+
+    let confirmationText = '';
+
+    if (
+      newStatus === 'active'
+    ) {
+      confirmationText =
+        'Activate this Host account?';
+    }
+
+    if (
+      newStatus === 'suspended'
+    ) {
+      confirmationText =
+        'Suspend this Host account?';
+    }
+
+    if (
+      newStatus === 'blocked'
+    ) {
+      confirmationText =
+        'Block this Host account?\n\nThis is a stronger restriction than suspension.';
+    }
+
+    const confirmed =
+      window.confirm(
+        confirmationText
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingStatus(true);
+
+    try {
+      const {
+        error: rpcError,
+      } = await supabase.rpc(
+        'admin_update_host_status',
+        {
+          p_host_id:
+            host.id,
+          p_status:
+            newStatus,
+          p_reason:
+            reason,
+        }
+      );
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      setHost(
+        (current) => ({
+          ...current,
+          status:
+            newStatus,
+
+          suspension_reason:
+            newStatus ===
+            'suspended'
+              ? reason
+              : null,
+
+          blocked_at:
+            newStatus ===
+            'blocked'
+              ? new Date().toISOString()
+              : null,
+        })
+      );
+
+      if (
+        newStatus === 'active'
+      ) {
+        setStatusMessage(
+          'Host account activated successfully.'
+        );
+      }
+
+      if (
+        newStatus === 'suspended'
+      ) {
+        setStatusMessage(
+          'Host account suspended successfully.'
+        );
+      }
+
+      if (
+        newStatus === 'blocked'
+      ) {
+        setStatusMessage(
+          'Host account blocked successfully.'
+        );
+      }
+
+    } catch (err) {
+      console.error(
+        'Host status update error:',
+        err
+      );
+
+      let message =
+        err?.message ||
+        'Unable to update Host status.';
+
+      if (
+        message.includes(
+          'HOST_EDIT_PERMISSION_REQUIRED'
+        )
+      ) {
+        message =
+          'You do not have permission to activate or suspend Hosts.';
+      }
+
+      if (
+        message.includes(
+          'HOST_BLOCK_PERMISSION_REQUIRED'
+        )
+      ) {
+        message =
+          'You do not have permission to block Hosts.';
+      }
+
+      if (
+        message.includes(
+          'ADMIN_ACCESS_REQUIRED'
+        )
+      ) {
+        message =
+          'Active Admin access is required.';
+      }
+
+      setStatusError(
+        message
+      );
+
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
   const propertyCounts =
     useMemo(() => ({
       total:
@@ -327,7 +595,8 @@ export default function AdminHostDetailsPage() {
       live:
         properties.filter(
           (property) =>
-            property.is_active === true &&
+            property.is_active ===
+              true &&
             property.moderation_status ===
               'approved'
         ).length,
@@ -460,9 +729,11 @@ export default function AdminHostDetailsPage() {
             propertyFilter === 'live'
           ) {
             matchesFilter =
-              property.is_active === true &&
+              property.is_active ===
+                true &&
               property.moderation_status ===
                 'approved';
+
           } else if (
             propertyFilter !== 'all'
           ) {
@@ -630,7 +901,8 @@ export default function AdminHostDetailsPage() {
   ) {
     return properties.find(
       (property) =>
-        property.id === propertyId
+        property.id ===
+        propertyId
     );
   }
 
@@ -639,7 +911,8 @@ export default function AdminHostDetailsPage() {
   ) {
     return guests.find(
       (guest) =>
-        guest.id === guestId
+        guest.id ===
+        guestId
     );
   }
 
@@ -671,6 +944,7 @@ export default function AdminHostDetailsPage() {
     return (
       <>
         <main className="nosHostDetailPage">
+
           <div className="nosHostDetailLoading">
 
             <h2>
@@ -689,6 +963,7 @@ export default function AdminHostDetailsPage() {
             </Link>
 
           </div>
+
         </main>
 
         <Styles />
@@ -731,7 +1006,10 @@ export default function AdminHostDetailsPage() {
               onClick={() =>
                 loadHostPage(true)
               }
-              disabled={refreshing}
+              disabled={
+                refreshing ||
+                updatingStatus
+              }
             >
               {refreshing
                 ? 'Refreshing...'
@@ -744,6 +1022,20 @@ export default function AdminHostDetailsPage() {
           {error && (
             <div className="nosHostError">
               {error}
+            </div>
+          )}
+
+
+          {statusMessage && (
+            <div className="nosStatusSuccess">
+              {statusMessage}
+            </div>
+          )}
+
+
+          {statusError && (
+            <div className="nosHostError">
+              {statusError}
             </div>
           )}
 
@@ -775,7 +1067,9 @@ export default function AdminHostDetailsPage() {
               </div>
 
               <HostStatus
-                status={host.status}
+                status={
+                  host.status
+                }
               />
 
             </div>
@@ -786,14 +1080,16 @@ export default function AdminHostDetailsPage() {
               <InfoCard
                 label="Phone"
                 value={
-                  host.phone || '—'
+                  host.phone ||
+                  '—'
                 }
               />
 
               <InfoCard
                 label="Email"
                 value={
-                  host.email || '—'
+                  host.email ||
+                  '—'
                 }
               />
 
@@ -813,7 +1109,8 @@ export default function AdminHostDetailsPage() {
               <InfoCard
                 label="Pincode"
                 value={
-                  host.pincode || '—'
+                  host.pincode ||
+                  '—'
                 }
               />
 
@@ -856,6 +1153,147 @@ export default function AdminHostDetailsPage() {
               />
 
             </div>
+
+
+            <div className="nosHostControlArea">
+
+              <div className="nosHostControlInfo">
+
+                <span className="nosEyebrow">
+                  HOST ACCOUNT CONTROL
+                </span>
+
+                <strong>
+                  Current Status:{' '}
+                  {prettyStatus(
+                    host.status
+                  )}
+                </strong>
+
+                <p>
+                  Suspend temporarily, block the Host, or reactivate the account according to your Admin permissions.
+                </p>
+
+              </div>
+
+
+              <div className="nosHostControlButtons">
+
+                {host.status !==
+                  'active' &&
+                  canEditHost && (
+                    <button
+                      type="button"
+                      className="nosActivateButton"
+                      disabled={
+                        updatingStatus
+                      }
+                      onClick={() =>
+                        updateHostStatus(
+                          'active'
+                        )
+                      }
+                    >
+                      {updatingStatus
+                        ? 'Updating...'
+                        : 'Activate Host'}
+                    </button>
+                  )}
+
+
+                {host.status !==
+                  'suspended' &&
+                  canEditHost && (
+                    <button
+                      type="button"
+                      className="nosSuspendButton"
+                      disabled={
+                        updatingStatus
+                      }
+                      onClick={() =>
+                        updateHostStatus(
+                          'suspended'
+                        )
+                      }
+                    >
+                      {updatingStatus
+                        ? 'Updating...'
+                        : 'Suspend Host'}
+                    </button>
+                  )}
+
+
+                {host.status !==
+                  'blocked' &&
+                  canBlockHost && (
+                    <button
+                      type="button"
+                      className="nosBlockButton"
+                      disabled={
+                        updatingStatus
+                      }
+                      onClick={() =>
+                        updateHostStatus(
+                          'blocked'
+                        )
+                      }
+                    >
+                      {updatingStatus
+                        ? 'Updating...'
+                        : 'Block Host'}
+                    </button>
+                  )}
+
+
+                {!canEditHost &&
+                  !canBlockHost && (
+                    <div className="nosNoPermission">
+                      View only. You do not have permission to change Host status.
+                    </div>
+                  )}
+
+              </div>
+
+            </div>
+
+
+            {host.status ===
+              'suspended' &&
+              host.suspension_reason && (
+                <div className="nosSuspensionReason">
+
+                  <strong>
+                    Suspension Reason
+                  </strong>
+
+                  <p>
+                    {
+                      host.suspension_reason
+                    }
+                  </p>
+
+                </div>
+              )}
+
+
+            {host.status ===
+              'blocked' &&
+              host.blocked_at && (
+                <div className="nosBlockedInfo">
+
+                  <strong>
+                    Host Blocked
+                  </strong>
+
+                  <p>
+                    Blocked on{' '}
+                    {formatDateTime(
+                      host.blocked_at
+                    )}
+                  </p>
+
+                </div>
+              )}
 
           </section>
 
@@ -1004,7 +1442,9 @@ export default function AdminHostDetailsPage() {
 
               <input
                 type="search"
-                value={propertySearch}
+                value={
+                  propertySearch
+                }
                 onChange={(event) =>
                   setPropertySearch(
                     event.target.value
@@ -1028,8 +1468,12 @@ export default function AdminHostDetailsPage() {
                 {filteredProperties.map(
                   (property) => (
                     <PropertyCard
-                      key={property.id}
-                      property={property}
+                      key={
+                        property.id
+                      }
+                      property={
+                        property
+                      }
                     />
                   )
                 )}
@@ -1174,7 +1618,9 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong>
-                  {bookingCounts.all}
+                  {
+                    bookingCounts.all
+                  }
                 </strong>
               </div>
 
@@ -1184,7 +1630,9 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong>
-                  {bookingCounts.discount}
+                  {
+                    bookingCounts.discount
+                  }
                 </strong>
               </div>
 
@@ -1194,7 +1642,9 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong className="green">
-                  {bookingCounts.confirmed}
+                  {
+                    bookingCounts.confirmed
+                  }
                 </strong>
               </div>
 
@@ -1332,10 +1782,13 @@ export default function AdminHostDetailsPage() {
                   {selectedBookingProperty
                     ? selectedBookingProperty.name
                     : 'All Properties'}
+
                   {' · '}
+
                   {
                     filteredBookings.length
                   }{' '}
+
                   {filteredBookings.length ===
                   1
                     ? 'record'
@@ -1346,7 +1799,9 @@ export default function AdminHostDetailsPage() {
 
               <input
                 type="search"
-                value={bookingSearch}
+                value={
+                  bookingSearch
+                }
                 onChange={(event) =>
                   setBookingSearch(
                     event.target.value
@@ -1421,11 +1876,11 @@ function BookingCard({
       true ||
     Number(
       booking.host_discount_amount ||
-        0
+      0
     ) > 0 ||
     Number(
       booking.auto_discount_amount ||
-        0
+      0
     ) > 0;
 
   return (
@@ -1595,7 +2050,8 @@ function BookingCard({
         <strong>
           ₹
           {Number(
-            payableAmount || 0
+            payableAmount ||
+            0
           ).toLocaleString(
             'en-IN'
           )}
@@ -1607,6 +2063,7 @@ function BookingCard({
       <div className="nosBookingDecisionGrid">
 
         <div>
+
           <span>
             Host Decision
           </span>
@@ -1617,9 +2074,11 @@ function BookingCard({
               'pending'
             )}
           </strong>
+
         </div>
 
         <div>
+
           <span>
             Offer Status
           </span>
@@ -1631,9 +2090,11 @@ function BookingCard({
                 )
               : '—'}
           </strong>
+
         </div>
 
         <div>
+
           <span>
             Payment Due
           </span>
@@ -1643,6 +2104,7 @@ function BookingCard({
               booking.payment_due_at
             )}
           </strong>
+
         </div>
 
       </div>
@@ -1666,7 +2128,7 @@ function BookingCard({
 
           {Number(
             booking.host_discount_amount ||
-              0
+            0
           ) > 0 && (
             <p>
               Host discount: ₹
@@ -1695,11 +2157,9 @@ function BookingCard({
 
         <span>
           Requested{' '}
-          {
-            formatDateTime(
-              booking.created_at
-            )
-          }
+          {formatDateTime(
+            booking.created_at
+          )}
         </span>
 
         <Link
@@ -1778,7 +2238,8 @@ function PropertyCard({
 
         ₹
         {Number(
-          property.base_price || 0
+          property.base_price ||
+          0
         ).toLocaleString(
           'en-IN'
         )}
@@ -1822,6 +2283,7 @@ function PropertyCard({
       <div className="nosPropertyMeta">
 
         <div>
+
           <span>
             Property Type
           </span>
@@ -1830,9 +2292,11 @@ function PropertyCard({
             {property.property_type ||
               '—'}
           </strong>
+
         </div>
 
         <div>
+
           <span>
             Submitted
           </span>
@@ -1842,6 +2306,7 @@ function PropertyCard({
               property.submitted_for_review_at
             )}
           </strong>
+
         </div>
 
       </div>
@@ -1898,7 +2363,8 @@ function FinancialItem({
 }) {
   const amount =
     Number(
-      value || 0
+      value ||
+      0
     );
 
   return (
@@ -2473,6 +2939,117 @@ function Styles() {
         color: #14743b;
       }
 
+      .nosHostControlArea {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        margin-top: 22px;
+        padding: 18px;
+        border: 1px solid #d6e0ea;
+        border-radius: 12px;
+        background: #f8fafc;
+      }
+
+      .nosHostControlInfo {
+        flex: 1;
+      }
+
+      .nosHostControlInfo strong {
+        display: block;
+        color: #071d38;
+        font-size: 14px;
+      }
+
+      .nosHostControlInfo p {
+        margin: 5px 0 0;
+        color: #667085;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      .nosHostControlButtons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .nosActivateButton,
+      .nosSuspendButton,
+      .nosBlockButton {
+        min-height: 40px;
+        padding: 0 15px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 10px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .nosActivateButton {
+        background: #15733d;
+        color: #ffffff;
+      }
+
+      .nosSuspendButton {
+        background: #f2a900;
+        color: #17212b;
+      }
+
+      .nosBlockButton {
+        background: #b42318;
+        color: #ffffff;
+      }
+
+      .nosNoPermission {
+        padding: 10px 13px;
+        border-radius: 8px;
+        background: #eef2f6;
+        color: #667085;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .nosSuspensionReason,
+      .nosBlockedInfo {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 9px;
+      }
+
+      .nosSuspensionReason {
+        background: #fff7e6;
+        color: #8b5e00;
+      }
+
+      .nosBlockedInfo {
+        background: #fff0ef;
+        color: #a42018;
+      }
+
+      .nosSuspensionReason strong,
+      .nosBlockedInfo strong {
+        font-size: 10px;
+      }
+
+      .nosSuspensionReason p,
+      .nosBlockedInfo p {
+        margin: 4px 0 0;
+        font-size: 10px;
+      }
+
+      .nosStatusSuccess {
+        margin-bottom: 17px;
+        padding: 11px 13px;
+        border: 1px solid #a7dfba;
+        border-radius: 8px;
+        background: #ecf9f0;
+        color: #14743b;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
       .nosHostStatusBadge,
       .nosModerationBadge,
       .nosLiveBadge,
@@ -2991,6 +3568,19 @@ function Styles() {
 
       }
 
+      @media (max-width: 800px) {
+
+        .nosHostControlArea {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .nosHostControlButtons {
+          justify-content: flex-start;
+        }
+
+      }
+
       @media (max-width: 700px) {
 
         .nosHostDetailContainer {
@@ -3035,7 +3625,8 @@ function Styles() {
         }
 
         .nosBookingCardFooter,
-        .nosPropertyActions {
+        .nosPropertyActions,
+        .nosHostControlButtons {
           flex-direction: column;
           align-items: stretch;
         }
