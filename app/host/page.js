@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -8,527 +8,942 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-const statusTabs = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'active', label: 'Active' },
-  { key: 'suspended', label: 'Suspended' },
-  { key: 'blocked', label: 'Blocked' },
-  { key: 'rejected', label: 'Rejected' },
-];
-
-export default function AdminHostsPage() {
-  const [hosts, setHosts] = useState([]);
+export default function HostDashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [host, setHost] = useState(null);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
-    loadHosts();
+    loadHost();
   }, []);
 
-  async function loadHosts() {
+  async function loadHost() {
     try {
       setLoading(true);
       setError('');
 
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
+      if (sessionError) {
+        throw sessionError;
+      }
+
       if (!session?.user) {
-        window.location.href = '/login?redirect=/admin/hosts';
+        window.location.replace(
+          '/login?redirect=/host'
+        );
         return;
       }
 
-      const { data: roles, error: roleError } = await supabase.rpc(
-        'get_my_platform_roles'
-      );
+      const { data: roles, error: roleError } =
+        await supabase.rpc(
+          'get_my_platform_roles'
+        );
 
       if (roleError) {
         throw roleError;
       }
 
       const isSuperAdmin = (roles || []).some(
-        (item) => item.role === 'super_admin' && item.is_active === true
+        (item) =>
+          item.role === 'super_admin' &&
+          item.is_active === true
       );
 
-      if (!isSuperAdmin) {
-        setError('Access denied. Super Admin access is required.');
-        setLoading(false);
+      if (isSuperAdmin) {
+        window.location.replace('/admin');
         return;
       }
 
-      const { data, error: hostsError } = await supabase
-        .from('host_profiles')
-        .select(
-          `
-          id,
-          user_id,
-          full_name,
-          business_name,
-          phone,
-          email,
-          city,
-          state,
-          gstin,
-          status,
-          approved_at,
-          created_at,
-          updated_at,
-          rejection_reason,
-          suspension_reason
-        `
-        )
-        .order('created_at', { ascending: false });
+      const isHost = (roles || []).some(
+        (item) =>
+          item.role === 'host' &&
+          item.is_active === true
+      );
 
-      if (hostsError) {
-        throw hostsError;
+      if (!isHost) {
+        window.location.replace(
+          '/account/bookings'
+        );
+        return;
       }
 
-      setHosts(data || []);
+      const { data: hostData, error: hostError } =
+        await supabase
+          .from('host_profiles')
+          .select(
+            `
+              id,
+              user_id,
+              full_name,
+              business_name,
+              email,
+              phone,
+              city,
+              state,
+              status,
+              created_at
+            `
+          )
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+      if (hostError) {
+        throw hostError;
+      }
+
+      if (!hostData) {
+        throw new Error(
+          'Your Host profile could not be found.'
+        );
+      }
+
+      setHost(hostData);
     } catch (err) {
       console.error(err);
-      setError(err?.message || 'Unable to load hosts.');
+
+      setError(
+        err?.message ||
+          'Unable to load Host Dashboard.'
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  const counts = useMemo(() => {
-    const result = {
-      all: hosts.length,
-      pending: 0,
-      active: 0,
-      suspended: 0,
-      blocked: 0,
-      rejected: 0,
-    };
-
-    hosts.forEach((host) => {
-      if (result[host.status] !== undefined) {
-        result[host.status] += 1;
-      }
-    });
-
-    return result;
-  }, [hosts]);
-
-  const visibleHosts = useMemo(() => {
-    if (activeTab === 'all') {
-      return hosts;
-    }
-
-    return hosts.filter((host) => host.status === activeTab);
-  }, [hosts, activeTab]);
-
-  function formatDate(value) {
-    if (!value) return '—';
-
-    return new Date(value).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.replace('/login');
   }
 
-  function formatStatus(status) {
-    if (!status) return 'Unknown';
+  if (loading) {
+    return (
+      <main className="loadingPage">
+        Loading Host Dashboard...
+        <Styles />
+      </main>
+    );
+  }
 
-    return status
-      .replaceAll('_', ' ')
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (error) {
+    return (
+      <main className="loadingPage">
+        <div className="errorBox">
+          <strong>
+            Unable to load Host Dashboard
+          </strong>
+
+          <span>{error}</span>
+
+          <button
+            type="button"
+            onClick={logout}
+          >
+            Logout
+          </button>
+        </div>
+
+        <Styles />
+      </main>
+    );
   }
 
   return (
     <main className="page">
-      <section className="page-header">
-        <div>
-          <p className="eyebrow">SUPER ADMIN</p>
-          <h1>Host Management</h1>
-          <p className="subtitle">
-            Review and manage all NightOutStays hosts from one place.
-          </p>
-        </div>
+      <header className="hostHeader">
+        <div className="topRow">
+          <div>
+            <a
+              href="/host"
+              className="brand"
+            >
+              NightOutStays
+            </a>
 
-        <button
-          type="button"
-          className="refresh-button"
-          onClick={loadHosts}
-          disabled={loading}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </section>
+            <span className="hostBadge">
+              HOST
+            </span>
+          </div>
 
-      <section className="summary-grid">
-        <div className="summary-card">
-          <span>Total Hosts</span>
-          <strong>{counts.all}</strong>
-        </div>
+          <div className="headerRight">
+            <a
+              href="/"
+              className="websiteButton"
+            >
+              View Website
+            </a>
 
-        <div className="summary-card">
-          <span>Pending Approval</span>
-          <strong>{counts.pending}</strong>
-        </div>
-
-        <div className="summary-card">
-          <span>Active</span>
-          <strong>{counts.active}</strong>
-        </div>
-
-        <div className="summary-card">
-          <span>Suspended / Blocked</span>
-          <strong>{counts.suspended + counts.blocked}</strong>
-        </div>
-      </section>
-
-      <section className="hosts-panel">
-        <div className="tabs">
-          {statusTabs.map((tab) => (
             <button
               type="button"
-              key={tab.key}
-              className={`tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              className="logoutButton"
+              onClick={logout}
             >
-              {tab.label}
-              <span>{counts[tab.key]}</span>
+              Logout
             </button>
-          ))}
+          </div>
         </div>
 
-        {error ? (
-          <div className="message error-message">{error}</div>
-        ) : loading ? (
-          <div className="message">Loading hosts...</div>
-        ) : visibleHosts.length === 0 ? (
-          <div className="empty-state">
-            <h2>No hosts found</h2>
-            <p>
-              {activeTab === 'all'
-                ? 'No host has registered yet.'
-                : `There are no ${activeTab} hosts.`}
+        <nav className="hostMenu">
+          <a
+            href="/host"
+            className="active"
+          >
+            Dashboard
+          </a>
+
+          <a href="/host/properties">
+            My Properties
+          </a>
+
+          <a href="/host/bookings">
+            Bookings
+          </a>
+
+          <a href="/host/calendar">
+            Calendar
+          </a>
+
+          <a href="/host/messages">
+            Messages
+          </a>
+
+          <a href="/host/offers">
+            Offers
+          </a>
+
+          <a href="/host/subscription">
+            Subscription
+          </a>
+
+          <a href="/host/promotions">
+            Promotions
+          </a>
+
+          <a href="/host/payouts">
+            Payouts
+          </a>
+
+          <a href="/host/profile">
+            Profile
+          </a>
+        </nav>
+      </header>
+
+      <section className="content">
+        <div className="welcomeRow">
+          <div>
+            <p className="eyebrow">
+              HOST DASHBOARD
+            </p>
+
+            <h1>
+              Welcome
+              {host?.full_name
+                ? `, ${host.full_name}`
+                : ''}
+            </h1>
+
+            <p className="subtitle">
+              Manage your properties, bookings
+              and NightOutStays account.
             </p>
           </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Host</th>
-                  <th>Business</th>
-                  <th>Contact</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Registered</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
 
-              <tbody>
-                {visibleHosts.map((host) => (
-                  <tr key={host.id}>
-                    <td>
-                      <div className="host-name">
-                        {host.full_name || 'Unnamed Host'}
-                      </div>
-                      <div className="secondary-text">
-                        {host.email || 'No email'}
-                      </div>
-                    </td>
+          <a
+            href="/host/properties/new"
+            className="addPropertyButton"
+          >
+            + Add Property
+          </a>
+        </div>
 
-                    <td>
-                      <div>{host.business_name || '—'}</div>
-                      {host.gstin ? (
-                        <div className="secondary-text">
-                          GSTIN {host.gstin}
-                        </div>
-                      ) : null}
-                    </td>
+        <section className="accountCard">
+          <div>
+            <span>Host Account</span>
 
-                    <td>
-                      <div>{host.phone || '—'}</div>
-                    </td>
-
-                    <td>
-                      <div>
-                        {[host.city, host.state]
-                          .filter(Boolean)
-                          .join(', ') || '—'}
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className={`status status-${host.status}`}>
-                        {formatStatus(host.status)}
-                      </span>
-                    </td>
-
-                    <td>{formatDate(host.created_at)}</td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className="view-button"
-                        onClick={() => {
-                          alert(
-                            `Host action controls will be added in the next step.\n\nHost: ${
-                              host.full_name || 'Unnamed Host'
-                            }`
-                          );
-                        }}
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <strong>
+              {host?.business_name ||
+                host?.full_name ||
+                'Host'}
+            </strong>
           </div>
-        )}
+
+          <div>
+            <span>Status</span>
+
+            <strong className="activeStatus">
+              Active
+            </strong>
+          </div>
+
+          <div>
+            <span>Location</span>
+
+            <strong>
+              {[host?.city, host?.state]
+                .filter(Boolean)
+                .join(', ') || 'Not added'}
+            </strong>
+          </div>
+        </section>
+
+        <section className="summaryGrid">
+          <DashboardCard
+            title="My Properties"
+            value="0"
+            text="Properties added"
+            href="/host/properties"
+          />
+
+          <DashboardCard
+            title="Active Listings"
+            value="0"
+            text="Properties live"
+            href="/host/properties"
+          />
+
+          <DashboardCard
+            title="Bookings"
+            value="0"
+            text="Total bookings"
+            href="/host/bookings"
+          />
+
+          <DashboardCard
+            title="Pending Requests"
+            value="0"
+            text="Awaiting your action"
+            href="/host/bookings"
+          />
+        </section>
+
+        <section className="mainGrid">
+          <div className="panel">
+            <div className="panelHeader">
+              <div>
+                <h2>
+                  Property Management
+                </h2>
+
+                <p>
+                  Add your first property and
+                  submit it for review.
+                </p>
+              </div>
+            </div>
+
+            <div className="emptyState">
+              <div className="emptyIcon">
+                +
+              </div>
+
+              <h3>
+                Start listing your properties
+              </h3>
+
+              <p>
+                Create a property listing with
+                photos, pricing, amenities,
+                house rules and availability.
+              </p>
+
+              <a
+                href="/host/properties/new"
+                className="primaryButton"
+              >
+                Add Property
+              </a>
+            </div>
+          </div>
+
+          <div className="sidePanel">
+            <h2>Quick Actions</h2>
+
+            <a href="/host/properties/new">
+              <strong>Add Property</strong>
+              <span>
+                Create a new property listing
+              </span>
+            </a>
+
+            <a href="/host/properties">
+              <strong>My Properties</strong>
+              <span>
+                Edit and manage listings
+              </span>
+            </a>
+
+            <a href="/host/calendar">
+              <strong>Property Calendar</strong>
+              <span>
+                Manage availability and rates
+              </span>
+            </a>
+
+            <a href="/host/bookings">
+              <strong>Booking Requests</strong>
+              <span>
+                Review guest requests
+              </span>
+            </a>
+
+            <a href="/host/subscription">
+              <strong>Subscription</strong>
+              <span>
+                View plans and renewals
+              </span>
+            </a>
+          </div>
+        </section>
+
+        <section className="reviewInfo">
+          <div className="reviewIcon">
+            ✓
+          </div>
+
+          <div>
+            <strong>
+              Property approval process
+            </strong>
+
+            <p>
+              You can create and edit properties
+              immediately. When your listing is
+              ready, submit it for review.
+              NightOutStays will approve it,
+              request changes, or decline the
+              listing. Only approved properties
+              will appear publicly.
+            </p>
+          </div>
+        </section>
       </section>
 
-      <style jsx>{`
-        .page {
-          min-height: 100vh;
-          background: #f6f7f9;
-          padding: 28px;
-          color: #111827;
+      <Styles />
+    </main>
+  );
+}
+
+function DashboardCard({
+  title,
+  value,
+  text,
+  href,
+}) {
+  return (
+    <a
+      href={href}
+      className="summaryCard"
+    >
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <small>{text}</small>
+    </a>
+  );
+}
+
+function Styles() {
+  return (
+    <style jsx global>{`
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      .page,
+      .loadingPage {
+        min-height: 100vh;
+        background: #f6f7f9;
+        color: #111827;
+        font-family: Arial, sans-serif;
+      }
+
+      .loadingPage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        font-weight: 700;
+      }
+
+      .errorBox {
+        width: 100%;
+        max-width: 480px;
+        background: white;
+        border: 1px solid #fecaca;
+        border-radius: 14px;
+        padding: 25px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .errorBox strong {
+        color: #b91c1c;
+        font-size: 18px;
+      }
+
+      .errorBox span {
+        color: #6b7280;
+      }
+
+      .errorBox button {
+        min-height: 42px;
+        border: 0;
+        border-radius: 8px;
+        background: #111827;
+        color: white;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .hostHeader {
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .topRow {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 0 32px;
+        border-bottom: 1px solid #eef0f2;
+      }
+
+      .topRow > div:first-child {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand {
+        color: #0b4b8c;
+        font-size: 25px;
+        font-weight: 900;
+        text-decoration: none;
+      }
+
+      .hostBadge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 27px;
+        padding: 0 11px;
+        background: #111827;
+        color: #ffffff;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.8px;
+      }
+
+      .headerRight {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .websiteButton,
+      .logoutButton {
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 13px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .websiteButton {
+        border: 1px solid #d1d5db;
+        color: #374151;
+        text-decoration: none;
+      }
+
+      .logoutButton {
+        border: 0;
+        background: #111827;
+        color: white;
+      }
+
+      .hostMenu {
+        display: flex;
+        gap: 5px;
+        padding: 10px 24px;
+        overflow-x: auto;
+      }
+
+      .hostMenu a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 13px;
+        border-radius: 8px;
+        color: #4b5563;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .hostMenu a:hover {
+        background: #f3f4f6;
+        color: #111827;
+      }
+
+      .hostMenu a.active {
+        background: #111827;
+        color: white;
+      }
+
+      .content {
+        padding: 32px;
+        max-width: 1500px;
+        margin: 0 auto;
+      }
+
+      .welcomeRow {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 25px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: #6b7280;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 1px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 34px;
+      }
+
+      .subtitle {
+        margin: 8px 0 0;
+        color: #6b7280;
+        font-size: 15px;
+      }
+
+      .addPropertyButton,
+      .primaryButton {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9px;
+        background: #111827;
+        color: white;
+        text-decoration: none;
+        font-weight: 900;
+      }
+
+      .addPropertyButton {
+        min-height: 45px;
+        padding: 0 18px;
+        font-size: 14px;
+      }
+
+      .primaryButton {
+        min-height: 43px;
+        padding: 0 18px;
+        font-size: 13px;
+      }
+
+      .accountCard {
+        display: grid;
+        grid-template-columns:
+          repeat(3, minmax(0, 1fr));
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .accountCard > div {
+        padding: 18px 20px;
+        border-right: 1px solid #eef0f2;
+      }
+
+      .accountCard > div:last-child {
+        border-right: 0;
+      }
+
+      .accountCard span {
+        display: block;
+        margin-bottom: 7px;
+        color: #6b7280;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .accountCard strong {
+        font-size: 14px;
+      }
+
+      .activeStatus {
+        color: #047857;
+      }
+
+      .summaryGrid {
+        display: grid;
+        grid-template-columns:
+          repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .summaryCard {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 20px;
+        text-decoration: none;
+        color: #111827;
+      }
+
+      .summaryCard:hover {
+        border-color: #9ca3af;
+      }
+
+      .summaryCard span {
+        display: block;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 10px;
+      }
+
+      .summaryCard strong {
+        display: block;
+        font-size: 30px;
+        margin-bottom: 6px;
+      }
+
+      .summaryCard small {
+        color: #9ca3af;
+        font-size: 12px;
+      }
+
+      .mainGrid {
+        display: grid;
+        grid-template-columns:
+          minmax(0, 2fr) minmax(280px, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .panel,
+      .sidePanel {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+      }
+
+      .panelHeader {
+        padding: 20px;
+        border-bottom: 1px solid #eef0f2;
+      }
+
+      .panel h2,
+      .sidePanel h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .panelHeader p {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 13px;
+      }
+
+      .emptyState {
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 35px;
+      }
+
+      .emptyIcon {
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #f3f4f6;
+        font-size: 30px;
+        margin-bottom: 14px;
+      }
+
+      .emptyState h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      .emptyState p {
+        max-width: 430px;
+        margin: 0 0 20px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .sidePanel {
+        padding: 20px;
+      }
+
+      .sidePanel h2 {
+        margin-bottom: 15px;
+      }
+
+      .sidePanel a {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px;
+        margin-bottom: 8px;
+        border: 1px solid #eef0f2;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #111827;
+      }
+
+      .sidePanel a:hover {
+        background: #f9fafb;
+      }
+
+      .sidePanel strong {
+        font-size: 13px;
+      }
+
+      .sidePanel span {
+        color: #6b7280;
+        font-size: 11px;
+      }
+
+      .reviewInfo {
+        display: flex;
+        gap: 15px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 14px;
+        padding: 18px;
+      }
+
+      .reviewIcon {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #17457f;
+        color: white;
+        border-radius: 50%;
+        font-weight: 900;
+      }
+
+      .reviewInfo strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .reviewInfo p {
+        margin: 0;
+        color: #4b5563;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 900px) {
+        .summaryGrid {
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
         }
 
-        .page-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 24px;
-          margin-bottom: 24px;
+        .mainGrid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 650px) {
+        .topRow {
+          min-height: 64px;
+          padding: 0 14px;
         }
 
-        .eyebrow {
-          margin: 0 0 8px;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 1px;
-          color: #6b7280;
-        }
-
-        h1 {
-          margin: 0;
-          font-size: 32px;
-          line-height: 1.2;
-        }
-
-        .subtitle {
-          margin: 8px 0 0;
-          color: #6b7280;
-          font-size: 15px;
-        }
-
-        .refresh-button {
-          border: 1px solid #d1d5db;
-          background: #ffffff;
-          color: #111827;
-          padding: 10px 16px;
-          border-radius: 9px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .refresh-button:disabled {
-          opacity: 0.6;
-          cursor: default;
-        }
-
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 16px;
-          margin-bottom: 20px;
-        }
-
-        .summary-card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          padding: 20px;
-        }
-
-        .summary-card span {
-          display: block;
-          color: #6b7280;
-          font-size: 13px;
-          font-weight: 700;
-          margin-bottom: 10px;
-        }
-
-        .summary-card strong {
-          font-size: 30px;
-        }
-
-        .hosts-panel {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          overflow: hidden;
-        }
-
-        .tabs {
-          display: flex;
-          gap: 8px;
-          padding: 16px;
-          border-bottom: 1px solid #e5e7eb;
-          overflow-x: auto;
-        }
-
-        .tab {
-          border: 0;
-          background: #f3f4f6;
-          color: #4b5563;
-          border-radius: 999px;
-          padding: 9px 13px;
-          font-size: 13px;
-          font-weight: 800;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .tab span {
-          margin-left: 6px;
-          opacity: 0.7;
-        }
-
-        .tab.active {
-          background: #111827;
-          color: #ffffff;
-        }
-
-        .table-wrap {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 920px;
-        }
-
-        th,
-        td {
-          text-align: left;
-          padding: 16px;
-          border-bottom: 1px solid #eef0f2;
-          vertical-align: middle;
-        }
-
-        th {
-          background: #fafafa;
-          font-size: 12px;
-          color: #6b7280;
-          text-transform: uppercase;
-          letter-spacing: 0.4px;
-        }
-
-        td {
-          font-size: 14px;
-        }
-
-        .host-name {
-          font-weight: 800;
-        }
-
-        .secondary-text {
-          margin-top: 4px;
-          color: #6b7280;
-          font-size: 12px;
-        }
-
-        .status {
-          display: inline-flex;
-          align-items: center;
-          padding: 6px 9px;
-          border-radius: 999px;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        .status-pending {
-          background: #fff7ed;
-          color: #9a3412;
-        }
-
-        .status-active {
-          background: #ecfdf5;
-          color: #047857;
-        }
-
-        .status-suspended {
-          background: #fef3c7;
-          color: #92400e;
-        }
-
-        .status-blocked,
-        .status-rejected {
-          background: #fef2f2;
-          color: #b91c1c;
-        }
-
-        .view-button {
-          border: 1px solid #d1d5db;
-          background: #ffffff;
-          color: #111827;
-          border-radius: 8px;
-          padding: 8px 13px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .message,
-        .empty-state {
-          padding: 54px 24px;
-          text-align: center;
-          color: #6b7280;
-        }
-
-        .empty-state h2 {
-          margin: 0 0 8px;
-          color: #111827;
+        .brand {
           font-size: 20px;
         }
 
-        .empty-state p {
-          margin: 0;
+        .hostBadge {
+          font-size: 9px;
+          padding: 0 8px;
         }
 
-        .error-message {
-          color: #b91c1c;
+        .websiteButton {
+          display: none;
         }
 
-        @media (max-width: 900px) {
-          .summary-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
+        .hostMenu {
+          padding: 8px 10px;
         }
 
-        @media (max-width: 600px) {
-          .page {
-            padding: 18px 12px;
-          }
-
-          .page-header {
-            flex-direction: column;
-          }
-
-          .summary-grid {
-            grid-template-columns: 1fr;
-          }
-
-          h1 {
-            font-size: 27px;
-          }
+        .content {
+          padding: 20px 12px;
         }
-      `}</style>
-    </main>
+
+        .welcomeRow {
+          flex-direction: column;
+        }
+
+        .addPropertyButton {
+          width: 100%;
+        }
+
+        .accountCard {
+          grid-template-columns: 1fr;
+        }
+
+        .accountCard > div {
+          border-right: 0;
+          border-bottom:
+            1px solid #eef0f2;
+        }
+
+        .accountCard > div:last-child {
+          border-bottom: 0;
+        }
+
+        .summaryGrid {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 28px;
+        }
+      }
+    `}</style>
   );
 }
