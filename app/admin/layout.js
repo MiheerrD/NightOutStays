@@ -1,4 +1,4 @@
-import AdminNav from './AdminNav';
+import AdminShell from './AdminShell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -7,10 +7,8 @@ export default function AdminLayout({
   children,
 }) {
   return (
-    <>
-      <AdminNav />
-
+    <AdminShell>
       {children}
-    </>
+    </AdminShell>
   );
 }
