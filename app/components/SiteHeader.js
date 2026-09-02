@@ -13,8 +13,9 @@ export default function SiteHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isAdmin = pathname?.startsWith('/admin');
+  const isHost = pathname?.startsWith('/host');
 
-  if (isAdmin) {
+  if (isAdmin || isHost) {
     return null;
   }
 
