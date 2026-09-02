@@ -7,58 +7,19 @@ export default function AdminNav() {
   const pathname = usePathname();
 
   const menuItems = [
-    {
-      label: 'Dashboard',
-      href: '/admin',
-    },
-    {
-      label: 'Hosts',
-      href: '/admin/hosts',
-    },
-    {
-      label: 'Properties',
-      href: '/admin/properties',
-    },
-    {
-      label: 'Guests',
-      href: '/admin/guests',
-    },
-    {
-      label: 'Bookings',
-      href: '/admin/bookings',
-    },
-    {
-      label: 'Subscriptions',
-      href: '/admin/subscriptions',
-    },
-    {
-      label: 'Promotions',
-      href: '/admin/promotions',
-    },
-    {
-      label: 'Referrals',
-      href: '/admin/referrals',
-    },
-    {
-      label: 'Payouts',
-      href: '/admin/payouts',
-    },
-    {
-      label: 'Payment Holds',
-      href: '/admin/payment-holds',
-    },
-    {
-      label: 'Messages',
-      href: '/admin/messages',
-    },
-    {
-      label: 'Reports',
-      href: '/admin/reports',
-    },
-    {
-      label: 'Settings',
-      href: '/admin/settings',
-    },
+    { label: 'Dashboard', href: '/admin' },
+    { label: 'Hosts', href: '/admin/hosts' },
+    { label: 'Properties', href: '/admin/properties' },
+    { label: 'Guests', href: '/admin/guests' },
+    { label: 'Bookings', href: '/admin/bookings' },
+    { label: 'Subscriptions', href: '/admin/subscriptions' },
+    { label: 'Promotions', href: '/admin/promotions' },
+    { label: 'Referrals', href: '/admin/referrals' },
+    { label: 'Payouts', href: '/admin/payouts' },
+    { label: 'Payment Holds', href: '/admin/payment-holds' },
+    { label: 'Messages', href: '/admin/messages' },
+    { label: 'Reports', href: '/admin/reports' },
+    { label: 'Settings', href: '/admin/settings' },
   ];
 
   function isActive(href) {
@@ -66,45 +27,47 @@ export default function AdminNav() {
       return pathname === '/admin';
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return pathname === href || pathname?.startsWith(`${href}/`);
   }
 
   return (
-    <header className="admin-header">
-      <div className="admin-topbar">
-        <div className="brand-area">
+    <header className="adminHeader">
+      <div className="topRow">
+        <div className="brandSection">
           <Link href="/admin" className="brand">
             NightOutStays
           </Link>
 
-          <span className="portal-badge">
+          <span className="badge">
             SUPER ADMIN
           </span>
         </div>
 
-        <Link href="/" className="website-link">
+        <Link href="/" className="viewWebsite">
           View Website
         </Link>
       </div>
 
-      <nav className="admin-nav">
-        {menuItems.map((item) => {
-          const active = isActive(item.href);
-
-          return (
+      <div className="menuRow">
+        <nav className="menu">
+          {menuItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`nav-item ${active ? 'active' : ''}`}
+              className={
+                isActive(item.href)
+                  ? 'menuItem active'
+                  : 'menuItem'
+              }
             >
               {item.label}
             </Link>
-          );
-        })}
-      </nav>
+          ))}
+        </nav>
+      </div>
 
       <style jsx>{`
-        .admin-header {
+        .adminHeader {
           width: 100%;
           background: #ffffff;
           border-bottom: 1px solid #e5e7eb;
@@ -113,67 +76,79 @@ export default function AdminNav() {
           z-index: 100;
         }
 
-        .admin-topbar {
-          min-height: 68px;
+        .topRow {
+          min-height: 72px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 20px;
-          padding: 0 28px;
-          background: #ffffff;
+          padding: 0 32px;
+          border-bottom: 1px solid #f0f1f3;
         }
 
-        .brand-area {
+        .brandSection {
           display: flex;
           align-items: center;
           gap: 12px;
-          min-width: 0;
         }
 
         .brand {
-          color: #111827;
-          font-size: 22px;
-          font-weight: 800;
+          color: #0b4b8c;
+          font-size: 25px;
+          line-height: 1;
+          font-weight: 900;
           text-decoration: none;
           white-space: nowrap;
         }
 
-        .portal-badge {
+        .badge {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 6px 10px;
+          min-height: 27px;
+          padding: 0 11px;
           border-radius: 999px;
           background: #111827;
           color: #ffffff;
-          font-size: 11px;
-          font-weight: 800;
+          font-size: 10px;
+          font-weight: 900;
           letter-spacing: 0.7px;
           white-space: nowrap;
         }
 
-        .website-link {
+        .viewWebsite {
           color: #374151;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
           text-decoration: none;
+          padding: 9px 13px;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
           white-space: nowrap;
         }
 
-        .website-link:hover {
+        .viewWebsite:hover {
+          background: #f9fafb;
           color: #111827;
         }
 
-        .admin-nav {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          overflow-x: auto;
-          padding: 0 22px 12px;
-          scrollbar-width: thin;
+        .menuRow {
+          width: 100%;
+          padding: 10px 24px;
+          background: #ffffff;
         }
 
-        .nav-item {
+        .menu {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          width: 100%;
+          overflow-x: auto;
+          scrollbar-width: thin;
+          padding-bottom: 2px;
+        }
+
+        .menuItem {
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -185,45 +160,44 @@ export default function AdminNav() {
           font-weight: 700;
           text-decoration: none;
           white-space: nowrap;
-          transition:
-            background 0.15s ease,
-            color 0.15s ease;
         }
 
-        .nav-item:hover {
+        .menuItem:hover {
           background: #f3f4f6;
           color: #111827;
         }
 
-        .nav-item.active {
+        .menuItem.active {
           background: #111827;
           color: #ffffff;
         }
 
         @media (max-width: 700px) {
-          .admin-topbar {
-            min-height: 62px;
+          .topRow {
+            min-height: 64px;
             padding: 0 16px;
           }
 
           .brand {
-            font-size: 19px;
+            font-size: 21px;
           }
 
-          .portal-badge {
+          .badge {
             font-size: 9px;
-            padding: 5px 8px;
+            min-height: 24px;
+            padding: 0 8px;
           }
 
-          .website-link {
-            font-size: 12px;
+          .viewWebsite {
+            font-size: 11px;
+            padding: 7px 9px;
           }
 
-          .admin-nav {
-            padding: 0 12px 10px;
+          .menuRow {
+            padding: 8px 12px;
           }
 
-          .nav-item {
+          .menuItem {
             min-height: 36px;
             padding: 0 11px;
             font-size: 12px;
