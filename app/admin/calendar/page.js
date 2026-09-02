@@ -34,63 +34,46 @@ function monthEnd(date) {
 function toDateString(date) {
   return [
     date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
+    String(
+      date.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      date.getDate()
+    ).padStart(2, '0'),
   ].join('-');
 }
 
 function parseDate(value) {
-  return new Date(`${value}T12:00:00`);
+  return new Date(
+    `${value}T12:00:00`
+  );
 }
 
 function formatMonth(date) {
-  return date.toLocaleDateString('en-IN', {
-    month: 'long',
-    year: 'numeric',
-  });
+  return date.toLocaleDateString(
+    'en-IN',
+    {
+      month: 'long',
+      year: 'numeric',
+    }
+  );
 }
 
 function formatDate(value) {
-  if (!value) return '—';
-
-  return parseDate(value).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function guestInitials(name) {
-  const words = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (!words.length) return 'G';
-
-  if (words.length === 1) {
-    return words[0].slice(0, 2).toUpperCase();
+  if (!value) {
+    return '—';
   }
 
-  return (
-    words[0][0] +
-    words[words.length - 1][0]
-  ).toUpperCase();
-}
-
-function guestShortName(name) {
-  const words = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (!words.length) return 'Guest';
-
-  if (words.length === 1) {
-    return words[0];
-  }
-
-  return `${words[0]} ${words[1][0]}.`;
+  return parseDate(
+    value
+  ).toLocaleDateString(
+    'en-IN',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }
+  );
 }
 
 function dateInStay(
@@ -115,16 +98,63 @@ function dateInBlock(
   );
 }
 
+function guestInitials(name) {
+  const words = String(
+    name || ''
+  )
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) {
+    return 'G';
+  }
+
+  if (words.length === 1) {
+    return words[0]
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  return (
+    words[0][0] +
+    words[
+      words.length - 1
+    ][0]
+  ).toUpperCase();
+}
+
+function guestShortName(name) {
+  const words = String(
+    name || ''
+  )
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) {
+    return 'Guest';
+  }
+
+  if (words.length === 1) {
+    return words[0];
+  }
+
+  return `${words[0]} ${words[1][0]}.`;
+}
+
 function sourceLabel(source) {
-  const value = String(source || '').toLowerCase();
+  const value = String(
+    source || ''
+  ).toLowerCase();
 
   if (value === 'airbnb') {
     return 'Airbnb';
   }
 
   if (
-    value === 'booking_com' ||
-    value === 'booking.com'
+    value === 'booking.com' ||
+    value === 'booking_com'
   ) {
     return 'Booking.com';
   }
@@ -133,37 +163,48 @@ function sourceLabel(source) {
     return 'Host Blocked';
   }
 
-  if (value === 'nightoutstays') {
+  if (
+    value === 'nightoutstays'
+  ) {
     return 'NightOutStays';
   }
 
   return source || 'Other Portal';
 }
 
-function getInterestStage(booking) {
+function getInterestStage(
+  booking
+) {
   if (
-    booking.booking_status === 'confirmed' &&
-    booking.payment_status === 'paid'
+    booking.booking_status ===
+      'confirmed' &&
+    booking.payment_status ===
+      'paid'
   ) {
-    return 'paid';
+    return 'Property Booked';
   }
 
   if (
-    booking.offer_status === 'host_offered'
+    booking.offer_status ===
+    'host_offered'
   ) {
     return 'Special Offer Sent';
   }
 
   if (
-    booking.offer_status === 'accepted' &&
-    booking.payment_status !== 'paid'
+    booking.offer_status ===
+      'accepted' &&
+    booking.payment_status !==
+      'paid'
   ) {
     return 'Payment Pending';
   }
 
   if (
-    booking.host_decision === 'approved' &&
-    booking.payment_status !== 'paid'
+    booking.host_decision ===
+      'approved' &&
+    booking.payment_status !==
+      'paid'
   ) {
     return 'Host Approved';
   }
@@ -175,7 +216,8 @@ function getInterestStage(booking) {
   }
 
   if (
-    booking.booking_status === 'pending'
+    booking.booking_status ===
+    'pending'
   ) {
     return 'Booking Requested';
   }
@@ -231,7 +273,9 @@ export default function AdminCalendarPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedPropertyId) {
+    if (
+      !selectedPropertyId
+    ) {
       return;
     }
 
@@ -243,7 +287,9 @@ export default function AdminCalendarPage() {
   ]);
 
   useEffect(() => {
-    if (!selectedPropertyId) {
+    if (
+      !selectedPropertyId
+    ) {
       return;
     }
 
@@ -279,7 +325,8 @@ export default function AdminCalendarPage() {
           {
             event: '*',
             schema: 'public',
-            table: 'blocked_dates',
+            table:
+              'blocked_dates',
             filter:
               `property_id=eq.${selectedPropertyId}`,
           },
@@ -313,27 +360,83 @@ export default function AdminCalendarPage() {
         data: {
           session,
         },
-        error: sessionError,
+        error:
+          sessionError,
       } =
-        await supabase.auth.getSession();
+        await supabase.auth
+          .getSession();
 
       if (sessionError) {
         throw sessionError;
       }
 
-      if (!session) {
+      if (
+        !session?.user
+      ) {
         window.location.href =
-          '/login';
+          '/admin/bookings';
 
         return;
       }
 
+      /*
+        Verify that this user
+        exists in admin_profiles.
+
+        This is more reliable than
+        relying only on user metadata.
+      */
+
       const {
-        data: propertyRows,
-        error: propertyError,
+        data:
+          adminProfile,
+        error:
+          adminError,
       } =
         await supabase
-          .from('properties')
+          .from(
+            'admin_profiles'
+          )
+          .select(
+            'user_id, role, is_active'
+          )
+          .eq(
+            'user_id',
+            session.user.id
+          )
+          .eq(
+            'is_active',
+            true
+          )
+          .maybeSingle();
+
+      if (
+        adminError
+      ) {
+        throw adminError;
+      }
+
+      if (
+        !adminProfile
+      ) {
+        setError(
+          'Admin access not available for this login.'
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data:
+          propertyRows,
+        error:
+          propertyError,
+      } =
+        await supabase
+          .from(
+            'properties'
+          )
           .select(`
             id,
             name,
@@ -348,11 +451,14 @@ export default function AdminCalendarPage() {
           .order(
             'name',
             {
-              ascending: true,
+              ascending:
+                true,
             }
           );
 
-      if (propertyError) {
+      if (
+        propertyError
+      ) {
         throw propertyError;
       }
 
@@ -363,19 +469,23 @@ export default function AdminCalendarPage() {
         rows
       );
 
-      if (rows.length) {
+      if (
+        rows.length
+      ) {
         setSelectedPropertyId(
           rows[0].id
         );
       }
-    } catch (initError) {
+    } catch (
+      initError
+    ) {
       console.error(
         initError
       );
 
       setError(
         initError.message ||
-        'Unable to load host calendar.'
+          'Unable to load host calendar.'
       );
     } finally {
       setLoading(false);
@@ -385,6 +495,10 @@ export default function AdminCalendarPage() {
   async function loadCalendarData(
     propertyId
   ) {
+    if (!propertyId) {
+      return;
+    }
+
     setError('');
 
     try {
@@ -394,7 +508,9 @@ export default function AdminCalendarPage() {
       ] =
         await Promise.all([
           supabase
-            .from('bookings')
+            .from(
+              'bookings'
+            )
             .select(`
               id,
               booking_code,
@@ -437,12 +553,15 @@ export default function AdminCalendarPage() {
             .order(
               'check_in',
               {
-                ascending: true,
+                ascending:
+                  true,
               }
             ),
 
           supabase
-            .from('blocked_dates')
+            .from(
+              'blocked_dates'
+            )
             .select(`
               id,
               property_id,
@@ -460,7 +579,8 @@ export default function AdminCalendarPage() {
             .order(
               'start_date',
               {
-                ascending: true,
+                ascending:
+                  true,
               }
             ),
         ]);
@@ -478,20 +598,24 @@ export default function AdminCalendarPage() {
       }
 
       setBookings(
-        bookingResult.data || []
+        bookingResult.data ||
+          []
       );
 
       setBlockedDates(
-        blockedResult.data || []
+        blockedResult.data ||
+          []
       );
-    } catch (loadError) {
+    } catch (
+      loadError
+    ) {
       console.error(
         loadError
       );
 
       setError(
         loadError.message ||
-        'Unable to load calendar data.'
+          'Unable to load calendar data.'
       );
     }
   }
@@ -500,7 +624,9 @@ export default function AdminCalendarPage() {
     useMemo(
       () =>
         properties.find(
-          (property) =>
+          (
+            property
+          ) =>
             property.id ===
             selectedPropertyId
         ) || null,
@@ -529,7 +655,8 @@ export default function AdminCalendarPage() {
 
       for (
         let index = 0;
-        index < startOffset;
+        index <
+        startOffset;
         index++
       ) {
         days.push(null);
@@ -537,20 +664,25 @@ export default function AdminCalendarPage() {
 
       for (
         let day = 1;
-        day <= last.getDate();
+        day <=
+        last.getDate();
         day++
       ) {
         days.push(
           new Date(
-            currentMonth.getFullYear(),
-            currentMonth.getMonth(),
+            currentMonth
+              .getFullYear(),
+            currentMonth
+              .getMonth(),
             day
           )
         );
       }
 
       while (
-        days.length % 7 !== 0
+        days.length %
+          7 !==
+        0
       ) {
         days.push(null);
       }
@@ -565,7 +697,9 @@ export default function AdminCalendarPage() {
   ) {
     const dayBookings =
       bookings.filter(
-        (booking) =>
+        (
+          booking
+        ) =>
           dateInStay(
             dateString,
             booking.check_in,
@@ -575,7 +709,9 @@ export default function AdminCalendarPage() {
 
     const paidBooking =
       dayBookings.find(
-        (booking) =>
+        (
+          booking
+        ) =>
           booking.booking_status ===
             'confirmed' &&
           booking.payment_status ===
@@ -584,7 +720,9 @@ export default function AdminCalendarPage() {
 
     const unpaidInterests =
       dayBookings.filter(
-        (booking) =>
+        (
+          booking
+        ) =>
           !(
             booking.booking_status ===
               'confirmed' &&
@@ -595,7 +733,9 @@ export default function AdminCalendarPage() {
 
     const dayBlocks =
       blockedDates.filter(
-        (block) =>
+        (
+          block
+        ) =>
           dateInBlock(
             dateString,
             block.start_date,
@@ -605,7 +745,9 @@ export default function AdminCalendarPage() {
 
     const externalBlock =
       dayBlocks.find(
-        (block) =>
+        (
+          block
+        ) =>
           String(
             block.source ||
               ''
@@ -615,7 +757,9 @@ export default function AdminCalendarPage() {
 
     const manualBlock =
       dayBlocks.find(
-        (block) =>
+        (
+          block
+        ) =>
           String(
             block.source ||
               ''
@@ -623,62 +767,89 @@ export default function AdminCalendarPage() {
           'manual'
       );
 
-    if (paidBooking) {
+    if (
+      paidBooking
+    ) {
       return {
-        type: 'booked',
+        type:
+          'booked',
+
         paidBooking,
-        interestCount:
-          unpaidInterests.length,
-      };
-    }
 
-    if (externalBlock) {
-      return {
-        type: 'external',
-        externalBlock,
-        interestCount:
-          unpaidInterests.length,
-      };
-    }
-
-    if (manualBlock) {
-      return {
-        type: 'manual',
-        manualBlock,
         interestCount:
           unpaidInterests.length,
       };
     }
 
     if (
-      unpaidInterests.length > 0
+      externalBlock
     ) {
       return {
-        type: 'interest',
+        type:
+          'external',
+
+        externalBlock,
+
+        interestCount:
+          unpaidInterests.length,
+      };
+    }
+
+    if (
+      manualBlock
+    ) {
+      return {
+        type:
+          'manual',
+
+        manualBlock,
+
+        interestCount:
+          unpaidInterests.length,
+      };
+    }
+
+    if (
+      unpaidInterests.length >
+      0
+    ) {
+      return {
+        type:
+          'interest',
+
         interestCount:
           unpaidInterests.length,
       };
     }
 
     return {
-      type: 'available',
+      type:
+        'available',
+
       interestCount: 0,
     };
   }
 
   const selectedDayDetails =
     useMemo(() => {
-      if (!selectedDate) {
+      if (
+        !selectedDate
+      ) {
         return {
-          paidBookings: [],
-          interests: [],
-          blocks: [],
+          paidBookings:
+            [],
+          interests:
+            [],
+          blocks:
+            [],
         };
       }
 
       const dayBookings =
         bookings.filter(
-          (booking) =>
+          (
+            booking
+          ) =>
             dateInStay(
               selectedDate,
               booking.check_in,
@@ -688,7 +859,9 @@ export default function AdminCalendarPage() {
 
       const paidBookings =
         dayBookings.filter(
-          (booking) =>
+          (
+            booking
+          ) =>
             booking.booking_status ===
               'confirmed' &&
             booking.payment_status ===
@@ -697,7 +870,9 @@ export default function AdminCalendarPage() {
 
       const interests =
         dayBookings.filter(
-          (booking) =>
+          (
+            booking
+          ) =>
             !(
               booking.booking_status ===
                 'confirmed' &&
@@ -708,7 +883,9 @@ export default function AdminCalendarPage() {
 
       const blocks =
         blockedDates.filter(
-          (block) =>
+          (
+            block
+          ) =>
             dateInBlock(
               selectedDate,
               block.start_date,
@@ -730,8 +907,11 @@ export default function AdminCalendarPage() {
   function previousMonth() {
     setCurrentMonth(
       new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth() - 1,
+        currentMonth
+          .getFullYear(),
+        currentMonth
+          .getMonth() -
+          1,
         1
       )
     );
@@ -742,8 +922,11 @@ export default function AdminCalendarPage() {
   function nextMonth() {
     setCurrentMonth(
       new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth() + 1,
+        currentMonth
+          .getFullYear(),
+        currentMonth
+          .getMonth() +
+          1,
         1
       )
     );
@@ -756,156 +939,50 @@ export default function AdminCalendarPage() {
       new Date();
 
     setCurrentMonth(
-      monthStart(today)
+      monthStart(
+        today
+      )
     );
 
     setSelectedDate(
-      toDateString(today)
+      toDateString(
+        today
+      )
     );
   }
 
   if (loading) {
     return (
-      <main
-        style={
-          styles.loading
-        }
-      >
+      <main className="calendar-loading">
         Loading host calendar...
       </main>
     );
   }
 
   return (
-    <main
-      style={
-        styles.page
-      }
-    >
-      <header
-        style={
-          styles.header
-        }
-      >
-        <div>
-          <div
-            style={
-              styles.brand
-            }
-          >
-            NightOutStays
-          </div>
+    <main className="calendar-page">
 
-          <div
-            style={
-              styles.subBrand
-            }
-          >
-            Host Calendar
-          </div>
-        </div>
+      <section className="calendar-container">
 
-        <nav
-          style={
-            styles.nav
-          }
-        >
-          <a
-            href="/admin/bookings"
-            style={
-              styles.navLink
-            }
-          >
-            Bookings
-          </a>
+        <div className="calendar-title-row">
 
-          <a
-            href="/admin/properties"
-            style={
-              styles.navLink
-            }
-          >
-            Properties
-          </a>
-
-          <a
-            href="/admin/calendar"
-            style={
-              styles.activeNavLink
-            }
-          >
-            Calendar
-          </a>
-
-          <a
-            href="/admin/messages"
-            style={
-              styles.navLink
-            }
-          >
-            Messages
-          </a>
-
-          <a
-            href="/admin/notifications"
-            style={
-              styles.navLink
-            }
-          >
-            Notifications
-          </a>
-
-          <a
-            href="/admin/reports"
-            style={
-              styles.navLink
-            }
-          >
-            Reports
-          </a>
-        </nav>
-      </header>
-
-      <section
-        style={
-          styles.container
-        }
-      >
-        <div
-          style={
-            styles.headingRow
-          }
-        >
           <div>
-            <h1
-              style={
-                styles.heading
-              }
-            >
+            <h1>
               Property Calendar
             </h1>
 
-            <p
-              style={
-                styles.subheading
-              }
-            >
-              Paid bookings block dates. Unpaid booking activity is shown only as guest interest.
+            <p>
+              View NightOutStays bookings, booking interest, host-blocked dates and bookings from other portals.
             </p>
           </div>
 
-          <div
-            style={
-              styles.actions
-            }
-          >
+          <div className="calendar-actions">
+
             <button
               type="button"
+              className="secondary-button"
               onClick={
                 goToday
-              }
-              style={
-                styles.secondaryButton
               }
             >
               Today
@@ -913,59 +990,59 @@ export default function AdminCalendarPage() {
 
             <button
               type="button"
+              className="primary-button"
+              disabled={
+                !selectedPropertyId
+              }
               onClick={() =>
                 loadCalendarData(
                   selectedPropertyId
                 )
               }
-              style={
-                styles.primaryButton
-              }
             >
               Refresh
             </button>
+
           </div>
         </div>
 
         {error && (
-          <div
-            style={
-              styles.errorBox
-            }
-          >
+          <div className="calendar-error">
             {error}
           </div>
         )}
 
-        <div
-          style={
-            styles.propertyBar
-          }
-        >
-          <label
-            style={
-              styles.label
-            }
-          >
-            PROPERTY
+        <div className="property-selector">
+
+          <label>
+            <span>
+              PROPERTY
+            </span>
 
             <select
               value={
                 selectedPropertyId
               }
-              onChange={(event) => {
-                setSelectedPropertyId(
-                  event.target.value
-                );
+              onChange={
+                (
+                  event
+                ) => {
+                  setSelectedPropertyId(
+                    event
+                      .target
+                      .value
+                  );
 
-                setSelectedDate('');
-              }}
-              style={
-                styles.select
+                  setSelectedDate(
+                    ''
+                  );
+                }
               }
             >
               {properties.map(
-                (property) => (
+                (
+                  property
+                ) => (
                   <option
                     key={
                       property.id
@@ -974,7 +1051,10 @@ export default function AdminCalendarPage() {
                       property.id
                     }
                   >
-                    {property.name}
+                    {
+                      property.name
+                    }
+
                     {property.location_name
                       ? ` — ${property.location_name}`
                       : ''}
@@ -984,11 +1064,8 @@ export default function AdminCalendarPage() {
             </select>
           </label>
 
-          <div
-            style={
-              styles.propertyInfo
-            }
-          >
+          <div className="selected-property">
+
             <strong>
               {selectedProperty
                 ?.name ||
@@ -1000,14 +1077,12 @@ export default function AdminCalendarPage() {
                 ?.location_name ||
                 ''}
             </span>
+
           </div>
         </div>
 
-        <div
-          style={
-            styles.legend
-          }
-        >
+        <div className="calendar-legend">
+
           <Legend
             type="booked"
             label="Property Booked"
@@ -1015,7 +1090,12 @@ export default function AdminCalendarPage() {
 
           <Legend
             type="interest"
-            label="Guests Interested"
+            label="Booking Requested"
+          />
+
+          <Legend
+            type="approved"
+            label="Booking Accepted"
           />
 
           <Legend
@@ -1032,40 +1112,25 @@ export default function AdminCalendarPage() {
             type="available"
             label="Available"
           />
+
         </div>
 
-        <div
-          style={
-            styles.layout
-          }
-        >
-          <section
-            style={
-              styles.calendarCard
-            }
-          >
-            <div
-              style={
-                styles.calendarHeader
-              }
-            >
+        <div className="calendar-layout">
+
+          <section className="calendar-card">
+
+            <div className="month-header">
+
               <button
                 type="button"
                 onClick={
                   previousMonth
                 }
-                style={
-                  styles.monthButton
-                }
               >
                 ‹
               </button>
 
-              <h2
-                style={
-                  styles.monthTitle
-                }
-              >
+              <h2>
                 {formatMonth(
                   currentMonth
                 )}
@@ -1076,19 +1141,14 @@ export default function AdminCalendarPage() {
                 onClick={
                   nextMonth
                 }
-                style={
-                  styles.monthButton
-                }
               >
                 ›
               </button>
+
             </div>
 
-            <div
-              style={
-                styles.weekHeader
-              }
-            >
+            <div className="week-header">
+
               {[
                 'Sun',
                 'Mon',
@@ -1097,34 +1157,39 @@ export default function AdminCalendarPage() {
                 'Thu',
                 'Fri',
                 'Sat',
-              ].map((day) => (
-                <div
-                  key={
-                    day
-                  }
-                  style={
-                    styles.weekDay
-                  }
-                >
-                  {day}
-                </div>
-              ))}
+              ].map(
+                (
+                  day
+                ) => (
+                  <div
+                    key={
+                      day
+                    }
+                  >
+                    {day}
+                  </div>
+                )
+              )}
+
             </div>
 
-            <div
-              style={
-                styles.calendarGrid
-              }
-            >
+            <div className="calendar-grid">
+
               {calendarDays.map(
-                (date, index) => {
-                  if (!date) {
+                (
+                  date,
+                  index
+                ) => {
+
+                  if (
+                    !date
+                  ) {
                     return (
                       <div
-                        key={`empty-${index}`}
-                        style={
-                          styles.emptyDay
+                        key={
+                          `empty-${index}`
                         }
+                        className="empty-day"
                       />
                     );
                   }
@@ -1139,15 +1204,9 @@ export default function AdminCalendarPage() {
                       dateString
                     );
 
-                  const isSelected =
+                  const selected =
                     selectedDate ===
                     dateString;
-
-                  const isPast =
-                    dateString <
-                    toDateString(
-                      new Date()
-                    );
 
                   return (
                     <button
@@ -1155,77 +1214,51 @@ export default function AdminCalendarPage() {
                         dateString
                       }
                       type="button"
+                      className={[
+                        'calendar-day',
+                        info.type,
+                        selected
+                          ? 'selected'
+                          : '',
+                      ]
+                        .filter(
+                          Boolean
+                        )
+                        .join(
+                          ' '
+                        )}
                       onClick={() =>
                         setSelectedDate(
                           dateString
                         )
                       }
-                      style={{
-                        ...styles.dayCell,
-
-                        ...(isSelected
-                          ? styles.selectedDay
-                          : {}),
-
-                        ...(info.type ===
-                        'booked'
-                          ? styles.bookedDay
-                          : {}),
-
-                        ...(info.type ===
-                        'interest'
-                          ? styles.interestDay
-                          : {}),
-
-                        ...(info.type ===
-                        'external'
-                          ? styles.externalDay
-                          : {}),
-
-                        ...(info.type ===
-                        'manual'
-                          ? styles.manualDay
-                          : {}),
-                      }}
                     >
-                      <div
-                        style={
-                          styles.dayTop
-                        }
-                      >
-                        <span
-                          style={
-                            styles.dayNumber
-                          }
-                        >
+                      <div className="day-top">
+
+                        <span className="day-number">
                           {date.getDate()}
                         </span>
 
                         {info.type ===
                           'booked' && (
-                          <span
-                            style={
-                              styles.initialBadge
-                            }
-                          >
+                          <span className="guest-initials">
                             {guestInitials(
-                              info.paidBooking
+                              info
+                                .paidBooking
                                 ?.guests
                                 ?.full_name
                             )}
                           </span>
                         )}
+
                       </div>
 
                       {info.type ===
                         'booked' && (
-                        <div
-                          style={
-                            styles.bookedLine
-                          }
-                        >
+                        <div className="booking-name">
                           {guestShortName(
-                            info.paidBooking
+                            info
+                              .paidBooking
                               ?.guests
                               ?.full_name
                           )}
@@ -1234,13 +1267,10 @@ export default function AdminCalendarPage() {
 
                       {info.type ===
                         'external' && (
-                        <div
-                          style={
-                            styles.externalLine
-                          }
-                        >
+                        <div className="external-label">
                           {sourceLabel(
-                            info.externalBlock
+                            info
+                              .externalBlock
                               ?.source
                           )}
                         </div>
@@ -1248,632 +1278,254 @@ export default function AdminCalendarPage() {
 
                       {info.type ===
                         'manual' && (
-                        <div
-                          style={
-                            styles.manualLine
-                          }
-                        >
+                        <div className="manual-label">
                           Host Blocked
                         </div>
                       )}
 
                       {info.interestCount >
                         0 && (
-                        <div
-                          style={
-                            styles.interestLine
-                          }
-                        >
-                          {info.interestCount}{' '}
-                          {info.interestCount ===
-                          1
-                            ? 'Interested'
-                            : 'Interested'}
+                        <div className="interest-label">
+                          {
+                            info.interestCount
+                          }{' '}
+                          Interested
                         </div>
                       )}
 
-                      {isPast &&
-                        info.type ===
-                          'available' &&
-                        info.interestCount ===
-                          0 && (
-                          <div
-                            style={
-                              styles.pastEmpty
-                            }
-                          >
-                            &nbsp;
-                          </div>
-                        )}
                     </button>
                   );
                 }
               )}
+
             </div>
+
           </section>
-          <aside
-            style={
-              styles.sideColumn
-            }
-          >
-            <section
-              style={
-                styles.detailsCard
-              }
-            >
-              <h3
-                style={
-                  styles.detailsTitle
-                }
-              >
+
+          <aside className="calendar-side">
+
+            <section className="side-card">
+
+              <h3>
                 Date Details
               </h3>
 
               {!selectedDate ? (
-                <div
-                  style={
-                    styles.emptyMessage
-                  }
-                >
-                  Select a date to view booking and interest details.
-                </div>
+                <p className="empty-detail">
+                  Select any date on the calendar to view booking details.
+                </p>
               ) : (
                 <>
-                  <div
-                    style={
-                      styles.selectedDateTitle
-                    }
-                  >
+                  <div className="selected-date">
                     {formatDate(
                       selectedDate
                     )}
                   </div>
 
-                  {selectedDayDetails.paidBookings.length ===
+                  {selectedDayDetails
+                    .paidBookings
+                    .length ===
                     0 &&
-                    selectedDayDetails.interests.length ===
+                    selectedDayDetails
+                      .interests
+                      .length ===
                       0 &&
-                    selectedDayDetails.blocks.length ===
+                    selectedDayDetails
+                      .blocks
+                      .length ===
                       0 && (
-                      <div
-                        style={
-                          styles.availableBox
-                        }
-                      >
+                      <div className="available-box">
                         Available
                       </div>
                     )}
 
-                  {selectedDayDetails.paidBookings.length >
+                  {selectedDayDetails
+                    .paidBookings
+                    .length >
                     0 && (
-                    <div
-                      style={
-                        styles.sectionBlock
-                      }
+                    <DetailSection
+                      title="Confirmed Booking"
                     >
-                      <div
-                        style={
-                          styles.sectionTitle
-                        }
-                      >
-                        Confirmed Booking
-                      </div>
-
-                      {selectedDayDetails.paidBookings.map(
-                        (
-                          booking
-                        ) => (
-                          <div
-                            key={
-                              booking.id
-                            }
-                            style={
-                              styles.bookingCard
-                            }
-                          >
-                            <div
-                              style={
-                                styles.paidStatus
-                              }
-                            >
-                              Property Booked
-                            </div>
-
-                            <DetailRow
-                              label="Guest"
-                              value={
-                                booking
-                                  .guests
-                                  ?.full_name ||
-                                'Guest'
-                              }
-                            />
-
-                            <DetailRow
-                              label="Guests"
-                              value={
-                                booking.guests_count ||
-                                1
-                              }
-                            />
-
-                            <DetailRow
-                              label="Booking ID"
-                              value={
-                                booking.booking_code
-                              }
-                            />
-
-                            <DetailRow
-                              label="Check-in"
-                              value={formatDate(
-                                booking.check_in
-                              )}
-                            />
-
-                            <DetailRow
-                              label="Check-out"
-                              value={formatDate(
-                                booking.check_out
-                              )}
-                            />
-
-                            <DetailRow
-                              label="Payment"
-                              value="Paid"
-                            />
-
-                            <DetailRow
-                              label="Source"
-                              value="NightOutStays"
-                            />
-
-                            {booking
-                              .guests
-                              ?.phone && (
-                              <DetailRow
-                                label="Phone"
-                                value={
-                                  booking
-                                    .guests
-                                    .phone
-                                }
-                              />
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                  {selectedDayDetails.interests.length >
-                    0 && (
-                    <div
-                      style={
-                        styles.sectionBlock
-                      }
-                    >
-                      <div
-                        style={
-                          styles.sectionTitle
-                        }
-                      >
-                        Interested Guests
-                      </div>
-
-                      <div
-                        style={
-                          styles.interestSummary
-                        }
-                      >
-                        {
-                          selectedDayDetails
-                            .interests
-                            .length
-                        }{' '}
-                        {selectedDayDetails
-                          .interests
-                          .length ===
-                        1
-                          ? 'guest interested'
-                          : 'guests interested'}
-                      </div>
-
-                      {selectedDayDetails.interests.map(
-                        (
-                          booking
-                        ) => {
-                          const stage =
-                            getInterestStage(
-                              booking
-                            );
-
-                          let deadline =
-                            null;
-
-                          if (
-                            booking.host_decision ===
-                              'approved' &&
-                            booking.host_decided_at &&
-                            booking.payment_status !==
-                              'paid'
-                          ) {
-                            const approvedAt =
-                              new Date(
-                                booking.host_decided_at
-                              );
-
-                            deadline =
-                              new Date(
-                                approvedAt.getTime() +
-                                  24 *
-                                    60 *
-                                    60 *
-                                    1000
-                              );
-                          }
-
-                          return (
-                            <div
+                      {selectedDayDetails
+                        .paidBookings
+                        .map(
+                          (
+                            booking
+                          ) => (
+                            <BookingDetail
                               key={
                                 booking.id
                               }
-                              style={
-                                styles.interestCard
+                              booking={
+                                booking
                               }
-                            >
-                              <div
-                                style={
-                                  styles.interestStage
-                                }
-                              >
-                                {
-                                  stage
-                                }
-                              </div>
-
-                              <DetailRow
-                                label="Guest"
-                                value={
-                                  booking
-                                    .guests
-                                    ?.full_name ||
-                                  'Guest'
-                                }
-                              />
-
-                              <DetailRow
-                                label="Guests"
-                                value={
-                                  booking.guests_count ||
-                                  1
-                                }
-                              />
-
-                              <DetailRow
-                                label="Booking ID"
-                                value={
-                                  booking.booking_code
-                                }
-                              />
-
-                              <DetailRow
-                                label="Check-in"
-                                value={formatDate(
-                                  booking.check_in
-                                )}
-                              />
-
-                              <DetailRow
-                                label="Check-out"
-                                value={formatDate(
-                                  booking.check_out
-                                )}
-                              />
-
-                              <DetailRow
-                                label="Payment"
-                                value={
-                                  booking.payment_status ||
-                                  'unpaid'
-                                }
-                              />
-
-                              {deadline && (
-                                <DetailRow
-                                  label="Approval Deadline"
-                                  value={deadline.toLocaleString(
-                                    'en-IN',
-                                    {
-                                      day:
-                                        '2-digit',
-                                      month:
-                                        'short',
-                                      year:
-                                        'numeric',
-                                      hour:
-                                        '2-digit',
-                                      minute:
-                                        '2-digit',
-                                    }
-                                  )}
-                                />
-                              )}
-
-                              {booking
-                                .host_offer_final_amount && (
-                                <DetailRow
-                                  label="Special Offer"
-                                  value={`₹${Number(
-                                    booking.host_offer_final_amount
-                                  ).toLocaleString(
-                                    'en-IN'
-                                  )}`}
-                                />
-                              )}
-
-                              <div
-                                style={
-                                  styles.interestNote
-                                }
-                              >
-                                This guest has not blocked the property yet.
-                              </div>
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
+                              paid
+                            />
+                          )
+                        )}
+                    </DetailSection>
                   )}
 
-                  {selectedDayDetails.blocks.length >
+                  {selectedDayDetails
+                    .interests
+                    .length >
                     0 && (
-                    <div
-                      style={
-                        styles.sectionBlock
-                      }
+                    <DetailSection
+                      title="Interested Guests"
                     >
-                      <div
-                        style={
-                          styles.sectionTitle
-                        }
-                      >
-                        Calendar Blocks
-                      </div>
+                      {selectedDayDetails
+                        .interests
+                        .map(
+                          (
+                            booking
+                          ) => (
+                            <InterestDetail
+                              key={
+                                booking.id
+                              }
+                              booking={
+                                booking
+                              }
+                            />
+                          )
+                        )}
+                    </DetailSection>
+                  )}
 
-                      {selectedDayDetails.blocks.map(
-                        (
-                          block
-                        ) => {
-                          const isManual =
-                            String(
-                              block.source ||
-                                ''
-                            ).toLowerCase() ===
-                            'manual';
-
-                          return (
-                            <div
+                  {selectedDayDetails
+                    .blocks
+                    .length >
+                    0 && (
+                    <DetailSection
+                      title="Calendar Blocks"
+                    >
+                      {selectedDayDetails
+                        .blocks
+                        .map(
+                          (
+                            block
+                          ) => (
+                            <BlockDetail
                               key={
                                 block.id
                               }
-                              style={
-                                styles.blockCard
+                              block={
+                                block
                               }
-                            >
-                              <div
-                                style={
-                                  styles.blockStatus
-                                }
-                              >
-                                {isManual
-                                  ? 'Host Blocked'
-                                  : 'Booked by Other Portal'}
-                              </div>
-
-                              <DetailRow
-                                label="Source"
-                                value={sourceLabel(
-                                  block.source
-                                )}
-                              />
-
-                              <DetailRow
-                                label="From"
-                                value={formatDate(
-                                  block.start_date
-                                )}
-                              />
-
-                              <DetailRow
-                                label="To"
-                                value={formatDate(
-                                  block.end_date
-                                )}
-                              />
-
-                              <DetailRow
-                                label="Remark"
-                                value={
-                                  block.reason ||
-                                  (isManual
-                                    ? 'Blocked by host'
-                                    : 'Booked by other portal')
-                                }
-                              />
-
-                              {block.external_uid && (
-                                <DetailRow
-                                  label="Reference"
-                                  value={
-                                    block.external_uid
-                                  }
-                                />
-                              )}
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
+                            />
+                          )
+                        )}
+                    </DetailSection>
                   )}
+
                 </>
               )}
+
             </section>
 
-            <section
-              style={
-                styles.syncCard
-              }
-            >
-              <h3
-                style={
-                  styles.detailsTitle
-                }
-              >
+            <section className="side-card">
+
+              <h3>
                 Calendar Sync
               </h3>
 
-              <p
-                style={
-                  styles.syncHelp
-                }
-              >
-                Import dates from Airbnb or other portals and export this property calendar to external websites.
+              <p className="sync-description">
+                Connect this property calendar with Airbnb, Booking.com and other portals.
               </p>
 
-              <div
-                style={
-                  styles.syncProperty
-                }
-              >
+              <div className="sync-property-box">
+
                 <span>
-                  Selected Property
+                  Property
                 </span>
 
                 <strong>
                   {selectedProperty
                     ?.name ||
-                    'No property selected'}
+                    'Select property'}
                 </strong>
+
               </div>
 
-              <div
-                style={
-                  styles.syncSection
-                }
-              >
-                <div
-                  style={
-                    styles.syncTitle
-                  }
-                >
-                  Export NightOutStays Calendar
-                </div>
+              <div className="sync-section">
 
-                <p
-                  style={
-                    styles.syncText
-                  }
-                >
-                  This property will have its own iCal link for Airbnb, Booking.com and other compatible portals.
+                <h4>
+                  NightOutStays Export Calendar
+                </h4>
+
+                <p>
+                  This calendar link can later be added to Airbnb, Booking.com or another compatible website.
                 </p>
 
-                {selectedPropertyId && (
-                  <div
-                    style={
-                      styles.exportRow
-                    }
-                  >
+                {selectedPropertyId ? (
+                  <div className="ical-row">
+
                     <input
                       readOnly
                       value={
                         typeof window !==
                         'undefined'
                           ? `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`
-                          : `/api/calendar/${selectedPropertyId}.ics`
-                      }
-                      style={
-                        styles.exportInput
+                          : ''
                       }
                     />
 
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          const url =
-                            `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`;
+                      onClick={
+                        async () => {
+                          try {
+                            const url =
+                              `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`;
 
-                          await navigator.clipboard.writeText(
-                            url
-                          );
+                            await navigator
+                              .clipboard
+                              .writeText(
+                                url
+                              );
 
-                          alert(
-                            'Calendar link copied.'
-                          );
-                        } catch (
-                          copyError
-                        ) {
-                          console.error(
+                            alert(
+                              'Calendar link copied.'
+                            );
+                          } catch (
                             copyError
-                          );
+                          ) {
+                            console.error(
+                              copyError
+                            );
 
-                          alert(
-                            'Unable to copy calendar link.'
-                          );
+                            alert(
+                              'Unable to copy calendar link.'
+                            );
+                          }
                         }
-                      }}
-                      style={
-                        styles.copyButton
                       }
                     >
                       Copy
                     </button>
+
                   </div>
+                ) : (
+                  <p>
+                    Select a property first.
+                  </p>
                 )}
 
-                <div
-                  style={
-                    styles.noticeBox
-                  }
-                >
-                  Do not add this link to Airbnb yet. We will create the live iCal export endpoint next.
-                </div>
               </div>
 
-              <div
-                style={
-                  styles.divider
-                }
-              />
+              <div className="sync-divider" />
 
-              <div
-                style={
-                  styles.syncSection
-                }
-              >
-                <div
-                  style={
-                    styles.syncTitle
-                  }
-                >
+              <div className="sync-section">
+
+                <h4>
                   Import External Calendar
-                </div>
+                </h4>
 
-                <p
-                  style={
-                    styles.syncText
-                  }
-                >
-                  Airbnb and other portal iCal links will be connected here after the internal calendar is tested.
+                <p>
+                  Airbnb or another portal&apos;s iCal URL will be added here so externally booked dates can automatically appear on this calendar.
                 </p>
 
-                <select
-                  disabled
-                  style={
-                    styles.disabledInput
-                  }
-                >
+                <select disabled>
                   <option>
                     Airbnb
                   </option>
@@ -1890,26 +1542,692 @@ export default function AdminCalendarPage() {
                 <input
                   disabled
                   placeholder="Paste external iCal URL"
-                  style={
-                    styles.disabledInput
-                  }
                 />
 
                 <button
-                  type="button"
                   disabled
-                  style={
-                    styles.disabledButton
-                  }
+                  type="button"
+                  className="disabled-button"
                 >
                   Add Calendar
                 </button>
+
               </div>
+
             </section>
+
           </aside>
+
         </div>
+
       </section>
+
+      <style jsx global>{`
+
+        .calendar-page {
+          min-height: 100vh;
+          background: #f5f7fa;
+          color: #102a43;
+          font-family: Arial, sans-serif;
+        }
+
+        .calendar-loading {
+          min-height: 70vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #174f91;
+          font-weight: 700;
+          font-family: Arial, sans-serif;
+        }
+
+        .calendar-container {
+          width: 94%;
+          max-width: 1450px;
+          margin: 0 auto;
+          padding: 32px 0 70px;
+        }
+
+        .calendar-title-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+
+        .calendar-title-row h1 {
+          margin: 0;
+          font-size: 30px;
+        }
+
+        .calendar-title-row p {
+          margin: 7px 0 0;
+          color: #667085;
+          font-size: 14px;
+          max-width: 700px;
+        }
+
+        .calendar-actions {
+          display: flex;
+          gap: 10px;
+        }
+
+        .primary-button,
+        .secondary-button {
+          padding: 11px 18px;
+          border-radius: 9px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .primary-button {
+          border: 0;
+          background: #174f91;
+          color: white;
+        }
+
+        .secondary-button {
+          border: 1px solid #ccd4dd;
+          background: white;
+          color: #174f91;
+        }
+
+        .calendar-error {
+          margin-top: 18px;
+          padding: 14px;
+          border-radius: 10px;
+          background: #fdeaea;
+          color: #9c2d2d;
+          font-weight: 700;
+        }
+
+        .property-selector {
+          margin-top: 22px;
+          background: white;
+          border: 1px solid #dfe4ea;
+          border-radius: 15px;
+          padding: 18px;
+
+          display: grid;
+          grid-template-columns:
+            minmax(280px, 480px)
+            1fr;
+
+          gap: 25px;
+          align-items: end;
+        }
+
+        .property-selector label {
+          display: grid;
+          gap: 8px;
+        }
+
+        .property-selector label span {
+          font-size: 11px;
+          font-weight: 800;
+          color: #475467;
+        }
+
+        .property-selector select {
+          width: 100%;
+          padding: 13px;
+          border: 1px solid #ccd4dd;
+          border-radius: 10px;
+          background: white;
+          font-size: 14px;
+        }
+
+        .selected-property {
+          display: grid;
+          gap: 4px;
+        }
+
+        .selected-property span {
+          color: #667085;
+          font-size: 13px;
+        }
+
+        .calendar-legend {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 17px;
+          margin: 16px 0;
+          color: #475467;
+          font-size: 12px;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .legend-dot {
+          width: 15px;
+          height: 15px;
+          border-radius: 4px;
+          border: 1px solid;
+        }
+
+        .calendar-layout {
+          display: grid;
+          grid-template-columns:
+            minmax(0, 1fr)
+            380px;
+
+          gap: 20px;
+          align-items: start;
+        }
+
+        .calendar-card {
+          background: white;
+          border: 1px solid #dfe4ea;
+          border-radius: 16px;
+          overflow: hidden;
+          min-width: 0;
+        }
+
+        .month-header {
+          min-height: 68px;
+
+          display: grid;
+          grid-template-columns:
+            60px 1fr 60px;
+
+          align-items: center;
+
+          border-bottom:
+            1px solid #e4e7ec;
+        }
+
+        .month-header h2 {
+          margin: 0;
+          text-align: center;
+          font-size: 21px;
+        }
+
+        .month-header button {
+          border: 0;
+          background: transparent;
+          color: #174f91;
+          font-size: 32px;
+          cursor: pointer;
+        }
+
+        .week-header {
+          display: grid;
+          grid-template-columns:
+            repeat(
+              7,
+              minmax(
+                0,
+                1fr
+              )
+            );
+
+          background: #f8fafc;
+        }
+
+        .week-header div {
+          padding: 12px 4px;
+          text-align: center;
+          color: #667085;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .calendar-grid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              7,
+              minmax(
+                0,
+                1fr
+              )
+            );
+        }
+
+        .calendar-day,
+        .empty-day {
+          min-height: 108px;
+          border: 0;
+          border-top:
+            1px solid #edf0f3;
+          border-right:
+            1px solid #edf0f3;
+        }
+
+        .empty-day {
+          background: #fafbfc;
+        }
+
+        .calendar-day {
+          padding: 8px;
+          background: white;
+          text-align: left;
+          cursor: pointer;
+          color: #102a43;
+        }
+
+        .calendar-day.selected {
+          outline:
+            3px solid #174f91;
+          outline-offset:
+            -3px;
+        }
+
+        .calendar-day.booked {
+          background: #e7f6eb;
+        }
+
+        .calendar-day.interest {
+          background: #fff8e5;
+        }
+
+        .calendar-day.external {
+          background: #f4eeff;
+        }
+
+        .calendar-day.manual {
+          background: #fdeeee;
+        }
+
+        .day-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .day-number {
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .guest-initials {
+          background: #24723a;
+          color: white;
+          padding: 4px 7px;
+          border-radius: 999px;
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .booking-name,
+        .interest-label,
+        .external-label,
+        .manual-label {
+          margin-top: 10px;
+          padding-left: 6px;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .booking-name {
+          border-left:
+            3px solid #24723a;
+        }
+
+        .interest-label {
+          border-left:
+            3px solid #d7a628;
+          color: #886207;
+        }
+
+        .external-label {
+          border-left:
+            3px solid #7d58b5;
+        }
+
+        .manual-label {
+          border-left:
+            3px solid #c95d5d;
+        }
+
+        .calendar-side {
+          display: grid;
+          gap: 18px;
+        }
+
+        .side-card {
+          background: white;
+          border: 1px solid #dfe4ea;
+          border-radius: 16px;
+          padding: 20px;
+        }
+
+        .side-card h3 {
+          margin: 0;
+          font-size: 20px;
+        }
+
+        .empty-detail {
+          color: #667085;
+          line-height: 1.5;
+        }
+
+        .selected-date {
+          margin-top: 15px;
+          padding-bottom: 12px;
+          border-bottom:
+            1px solid #edf0f3;
+          font-weight: 800;
+        }
+
+        .available-box {
+          margin-top: 15px;
+          padding: 12px;
+          border-radius: 9px;
+          background: #edf8f0;
+          color: #24723a;
+          font-weight: 800;
+        }
+
+        .detail-section {
+          margin-top: 18px;
+        }
+
+        .detail-section-title {
+          font-weight: 800;
+          margin-bottom: 10px;
+        }
+
+        .booking-detail,
+        .interest-detail,
+        .block-detail {
+          margin-top: 10px;
+          padding: 13px;
+          border-radius: 10px;
+          display: grid;
+          gap: 8px;
+        }
+
+        .booking-detail {
+          background: #f3faf5;
+          border: 1px solid #cfe6d5;
+        }
+
+        .interest-detail {
+          background: #fffbef;
+          border: 1px solid #ebdca8;
+        }
+
+        .block-detail {
+          background: #faf7ff;
+          border: 1px solid #ddd0f1;
+        }
+
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 15px;
+          font-size: 12px;
+        }
+
+        .detail-row span {
+          color: #667085;
+        }
+
+        .detail-row strong {
+          text-align: right;
+          word-break: break-word;
+        }
+
+        .status-green {
+          color: #24723a;
+          font-weight: 800;
+        }
+
+        .status-yellow {
+          color: #886207;
+          font-weight: 800;
+        }
+
+        .status-purple {
+          color: #7047a6;
+          font-weight: 800;
+        }
+
+        .sync-description {
+          color: #667085;
+          line-height: 1.5;
+        }
+
+        .sync-property-box {
+          margin-top: 16px;
+          padding: 13px;
+          background: #f7f9fc;
+          border-radius: 10px;
+          display: grid;
+          gap: 4px;
+        }
+
+        .sync-property-box span {
+          color: #667085;
+          font-size: 12px;
+        }
+
+        .sync-section {
+          margin-top: 22px;
+        }
+
+        .sync-section h4 {
+          margin-bottom: 6px;
+        }
+
+        .sync-section p {
+          color: #667085;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .ical-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .ical-row input,
+        .sync-section select,
+        .sync-section > input {
+          width: 100%;
+          padding: 11px;
+          border: 1px solid #ccd4dd;
+          border-radius: 9px;
+          box-sizing: border-box;
+        }
+
+        .ical-row button {
+          border: 0;
+          background: #174f91;
+          color: white;
+          padding: 0 15px;
+          border-radius: 9px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .sync-divider {
+          height: 1px;
+          background: #e4e7ec;
+          margin: 24px 0;
+        }
+
+        .sync-section select,
+        .sync-section > input {
+          margin-top: 8px;
+        }
+
+        .disabled-button {
+          width: 100%;
+          margin-top: 9px;
+          padding: 11px;
+          border: 0;
+          border-radius: 9px;
+          background: #d0d5dd;
+          color: white;
+        }
+
+        @media (
+          max-width: 900px
+        ) {
+
+          .calendar-layout {
+            grid-template-columns:
+              1fr;
+          }
+
+          .property-selector {
+            grid-template-columns:
+              1fr;
+          }
+
+          .calendar-side {
+            grid-template-columns:
+              1fr;
+          }
+
+        }
+
+        @media (
+          max-width: 650px
+        ) {
+
+          .calendar-container {
+            width: 94%;
+            padding-top: 24px;
+          }
+
+          .calendar-title-row {
+            align-items:
+              stretch;
+          }
+
+          .calendar-title-row h1 {
+            font-size: 26px;
+          }
+
+          .calendar-actions {
+            width: 100%;
+          }
+
+          .calendar-actions button {
+            flex: 1;
+          }
+
+          .calendar-card {
+            overflow-x: auto;
+          }
+
+          .month-header,
+          .week-header,
+          .calendar-grid {
+            min-width: 650px;
+          }
+
+          .calendar-day,
+          .empty-day {
+            min-height: 92px;
+          }
+
+          .calendar-side {
+            width: 100%;
+          }
+
+          .ical-row {
+            display: grid;
+            grid-template-columns:
+              1fr;
+          }
+
+          .ical-row button {
+            padding: 11px;
+          }
+
+        }
+
+      `}</style>
+
     </main>
+  );
+}
+
+function Legend({
+  type,
+  label,
+}) {
+  const colors = {
+    booked: [
+      '#e4f5e9',
+      '#68a979',
+    ],
+
+    interest: [
+      '#fff5d9',
+      '#d9af47',
+    ],
+
+    approved: [
+      '#e6f1ff',
+      '#7fa8d8',
+    ],
+
+    external: [
+      '#f0e8ff',
+      '#9471cc',
+    ],
+
+    manual: [
+      '#fde9e9',
+      '#d98686',
+    ],
+
+    available: [
+      '#ffffff',
+      '#ccd3dc',
+    ],
+  };
+
+  const color =
+    colors[type] ||
+    colors.available;
+
+  return (
+    <div className="legend-item">
+
+      <span
+        className="legend-dot"
+        style={{
+          background:
+            color[0],
+          borderColor:
+            color[1],
+        }}
+      />
+
+      {label}
+
+    </div>
+  );
+}
+
+function DetailSection({
+  title,
+  children,
+}) {
+  return (
+    <div className="detail-section">
+
+      <div className="detail-section-title">
+        {title}
+      </div>
+
+      {children}
+
+    </div>
   );
 }
 
@@ -1918,1022 +2236,239 @@ function DetailRow({
   value,
 }) {
   return (
-    <div
-      style={
-        styles.detailRow
-      }
-    >
-      <span
-        style={
-          styles.detailLabel
-        }
-      >
+    <div className="detail-row">
+
+      <span>
         {label}
       </span>
 
-      <strong
-        style={
-          styles.detailValue
-        }
-      >
+      <strong>
         {value || '—'}
       </strong>
+
     </div>
   );
 }
 
-function Legend({
-  type,
-  label,
+function BookingDetail({
+  booking,
 }) {
-  const map = {
-    booked: {
-      background:
-        '#e4f5e9',
-      border:
-        '#68a979',
-    },
-
-    interest: {
-      background:
-        '#fff5d9',
-      border:
-        '#d9af47',
-    },
-
-    external: {
-      background:
-        '#f0e8ff',
-      border:
-        '#9471cc',
-    },
-
-    manual: {
-      background:
-        '#fde9e9',
-      border:
-        '#d98686',
-    },
-
-    available: {
-      background:
-        '#ffffff',
-      border:
-        '#ccd3dc',
-    },
-  };
-
-  const current =
-    map[type] ||
-    map.available;
-
   return (
-    <div
-      style={
-        styles.legendItem
-      }
-    >
-      <span
-        style={{
-          ...styles.legendDot,
+    <div className="booking-detail">
 
-          background:
-            current.background,
+      <div className="status-green">
+        Property Booked
+      </div>
 
-          borderColor:
-            current.border,
-        }}
+      <DetailRow
+        label="Guest"
+        value={
+          booking
+            .guests
+            ?.full_name ||
+          'Guest'
+        }
       />
 
-      {label}
+      <DetailRow
+        label="Guests"
+        value={
+          booking.guests_count ||
+          1
+        }
+      />
+
+      <DetailRow
+        label="Booking ID"
+        value={
+          booking.booking_code
+        }
+      />
+
+      <DetailRow
+        label="Check-in"
+        value={
+          formatDate(
+            booking.check_in
+          )
+        }
+      />
+
+      <DetailRow
+        label="Check-out"
+        value={
+          formatDate(
+            booking.check_out
+          )
+        }
+      />
+
+      <DetailRow
+        label="Payment"
+        value="Paid"
+      />
+
+      {booking
+        .guests
+        ?.phone && (
+        <DetailRow
+          label="Phone"
+          value={
+            booking
+              .guests
+              .phone
+          }
+        />
+      )}
+
     </div>
   );
 }
 
-const styles = {
-  page: {
-    minHeight:
-      '100vh',
-    background:
-      '#f5f7fa',
-    color:
-      '#102a43',
-    fontFamily:
-      'Arial, sans-serif',
-  },
-
-  loading: {
-    minHeight:
-      '100vh',
-    display:
-      'flex',
-    alignItems:
-      'center',
-    justifyContent:
-      'center',
-    background:
-      '#f5f7fa',
-    color:
-      '#174f91',
-    fontWeight:
-      700,
-    fontFamily:
-      'Arial, sans-serif',
-  },
-
-  header: {
-    minHeight:
-      70,
-    padding:
-      '10px 4%',
-    background:
-      '#ffffff',
-    borderBottom:
-      '1px solid #e3e7ec',
-    display:
-      'flex',
-    alignItems:
-      'center',
-    justifyContent:
-      'space-between',
-    gap:
-      20,
-    position:
-      'sticky',
-    top:
-      0,
-    zIndex:
-      50,
-  },
-
-  brand: {
-    fontSize:
-      21,
-    fontWeight:
-      800,
-    color:
-      '#174f91',
-  },
-
-  subBrand: {
-    marginTop:
-      3,
-    color:
-      '#667085',
-    fontSize:
-      10,
-  },
-
-  nav: {
-    display:
-      'flex',
-    gap:
-      7,
-    flexWrap:
-      'wrap',
-    alignItems:
-      'center',
-  },
-
-  navLink: {
-    textDecoration:
-      'none',
-    color:
-      '#174f91',
-    padding:
-      '8px 10px',
-    borderRadius:
-      7,
-    fontSize:
-      11,
-    fontWeight:
-      700,
-  },
-
-  activeNavLink: {
-    textDecoration:
-      'none',
-    color:
-      '#ffffff',
-    background:
-      '#174f91',
-    padding:
-      '8px 11px',
-    borderRadius:
-      7,
-    fontSize:
-      11,
-    fontWeight:
-      800,
-  },
-
-  container: {
-    width:
-      '94%',
-    maxWidth:
-      1450,
-    margin:
-      '0 auto',
-    padding:
-      '28px 0 70px',
-  },
-
-  headingRow: {
-    display:
-      'flex',
-    alignItems:
-      'flex-end',
-    justifyContent:
-      'space-between',
-    gap:
-      20,
-    flexWrap:
-      'wrap',
-  },
-
-  heading: {
-    margin:
-      0,
-    fontSize:
-      27,
-  },
-
-  subheading: {
-    margin:
-      '7px 0 0',
-    color:
-      '#667085',
-    fontSize:
-      12,
-  },
-
-  actions: {
-    display:
-      'flex',
-    gap:
-      8,
-  },
-
-  primaryButton: {
-    border:
-      0,
-    background:
-      '#174f91',
-    color:
-      '#ffffff',
-    padding:
-      '9px 14px',
-    borderRadius:
-      8,
-    cursor:
-      'pointer',
-    fontWeight:
-      700,
-  },
-
-  secondaryButton: {
-    border:
-      '1px solid #ccd4dd',
-    background:
-      '#ffffff',
-    color:
-      '#174f91',
-    padding:
-      '9px 14px',
-    borderRadius:
-      8,
-    cursor:
-      'pointer',
-    fontWeight:
-      700,
-  },
-
-  errorBox: {
-    marginTop:
-      15,
-    padding:
-      11,
-    background:
-      '#fdeaea',
-    color:
-      '#a02a2a',
-    borderRadius:
-      8,
-    fontSize:
-      11,
-  },
-
-  propertyBar: {
-    marginTop:
-      20,
-    background:
-      '#ffffff',
-    border:
-      '1px solid #dfe4ea',
-    borderRadius:
-      12,
-    padding:
-      14,
-    display:
-      'grid',
-    gridTemplateColumns:
-      'minmax(260px, 430px) 1fr',
-    gap:
-      20,
-    alignItems:
-      'end',
-  },
-
-  label: {
-    display:
-      'grid',
-    gap:
-      6,
-    fontSize:
-      9,
-    fontWeight:
-      800,
-    color:
-      '#475467',
-  },
-
-  select: {
-    width:
-      '100%',
-    padding:
-      '10px 11px',
-    border:
-      '1px solid #ccd4dd',
-    borderRadius:
-      8,
-    background:
-      '#ffffff',
-  },
-
-  propertyInfo: {
-    display:
-      'grid',
-    gap:
-      3,
-    fontSize:
-      12,
-  },
-
-  legend: {
-    display:
-      'flex',
-    gap:
-      14,
-    flexWrap:
-      'wrap',
-    alignItems:
-      'center',
-    margin:
-      '14px 0',
-    fontSize:
-      10,
-    color:
-      '#475467',
-  },
-
-  legendItem: {
-    display:
-      'flex',
-    alignItems:
-      'center',
-    gap:
-      5,
-  },
-
-  legendDot: {
-    width:
-      12,
-    height:
-      12,
-    borderRadius:
-      3,
-    border:
-      '1px solid',
-  },
-
-  layout: {
-    display:
-      'grid',
-    gridTemplateColumns:
-      'minmax(0, 1fr) 350px',
-    gap:
-      18,
-    alignItems:
-      'start',
-  },
-
-  calendarCard: {
-    background:
-      '#ffffff',
-    border:
-      '1px solid #dfe4ea',
-    borderRadius:
-      14,
-    overflow:
-      'hidden',
-  },
-
-  calendarHeader: {
-    minHeight:
-      60,
-    display:
-      'grid',
-    gridTemplateColumns:
-      '50px 1fr 50px',
-    alignItems:
-      'center',
-    borderBottom:
-      '1px solid #e4e7ec',
-  },
-
-  monthButton: {
-    border:
-      0,
-    background:
-      'transparent',
-    color:
-      '#174f91',
-    fontSize:
-      30,
-    cursor:
-      'pointer',
-  },
-
-  monthTitle: {
-    margin:
-      0,
-    textAlign:
-      'center',
-    fontSize:
-      20,
-  },
-
-  weekHeader: {
-    display:
-      'grid',
-    gridTemplateColumns:
-      'repeat(7, minmax(0, 1fr))',
-    background:
-      '#f8fafc',
-    borderBottom:
-      '1px solid #e4e7ec',
-  },
-
-  weekDay: {
-    padding:
-      '10px 5px',
-    textAlign:
-      'center',
-    fontSize:
-      10,
-    fontWeight:
-      800,
-    color:
-      '#667085',
-  },
-
-  calendarGrid: {
-    display:
-      'grid',
-    gridTemplateColumns:
-      'repeat(7, minmax(0, 1fr))',
-  },
-
-  emptyDay: {
-    minHeight:
-      108,
-    background:
-      '#fafbfc',
-    borderRight:
-      '1px solid #edf0f3',
-    borderBottom:
-      '1px solid #edf0f3',
-  },
-
-  dayCell: {
-    minHeight:
-      108,
-    padding:
-      8,
-    background:
-      '#ffffff',
-    border:
-      0,
-    borderRight:
-      '1px solid #edf0f3',
-    borderBottom:
-      '1px solid #edf0f3',
-    textAlign:
-      'left',
-    cursor:
-      'pointer',
-  },
-
-  selectedDay: {
-    outline:
-      '2px solid #174f91',
-    outlineOffset:
-      '-2px',
-  },
-
-  bookedDay: {
-    background:
-      '#e7f6eb',
-  },
-
-  interestDay: {
-    background:
-      '#fff8e5',
-  },
-
-  externalDay: {
-    background:
-      '#f4eeff',
-  },
-
-  manualDay: {
-    background:
-      '#fdeeee',
-  },
-
-  dayTop: {
-    display:
-      'flex',
-    justifyContent:
-      'space-between',
-    alignItems:
-      'center',
-    gap:
-      5,
-  },
-
-  dayNumber: {
-    fontSize:
-      12,
-    fontWeight:
-      800,
-    color:
-      '#344054',
-  },
-
-  initialBadge: {
-    background:
-      '#24723a',
-    color:
-      '#ffffff',
-    borderRadius:
-      20,
-    padding:
-      '3px 6px',
-    fontSize:
-      8,
-    fontWeight:
-      800,
-  },
-
-  bookedLine: {
-    marginTop:
-      12,
-    paddingLeft:
-      6,
-    borderLeft:
-      '3px solid #24723a',
-    fontSize:
-      9,
-    fontWeight:
-      800,
-  },
-
-  interestLine: {
-    marginTop:
-      7,
-    paddingLeft:
-      6,
-    borderLeft:
-      '3px solid #d7a628',
-    fontSize:
-      9,
-    fontWeight:
-      800,
-    color:
-      '#8a6507',
-  },
-
-  externalLine: {
-    marginTop:
-      12,
-    paddingLeft:
-      6,
-    borderLeft:
-      '3px solid #7d58b5',
-    fontSize:
-      9,
-    fontWeight:
-      800,
-  },
-
-  manualLine: {
-    marginTop:
-      12,
-    paddingLeft:
-      6,
-    borderLeft:
-      '3px solid #c95d5d',
-    fontSize:
-      9,
-    fontWeight:
-      800,
-  },
-
-  pastEmpty: {
-    minHeight:
-      25,
-  },
-
-  sideColumn: {
-    display:
-      'grid',
-    gap:
-      15,
-  },
-
-  detailsCard: {
-    background:
-      '#ffffff',
-    border:
-      '1px solid #dfe4ea',
-    borderRadius:
-      14,
-    padding:
-      15,
-  },
-
-  syncCard: {
-    background:
-      '#ffffff',
-    border:
-      '1px solid #dfe4ea',
-    borderRadius:
-      14,
-    padding:
-      15,
-  },
-
-  detailsTitle: {
-    margin:
-      0,
-    fontSize:
-      16,
-  },
-
-  emptyMessage: {
-    marginTop:
-      12,
-    color:
-      '#667085',
-    fontSize:
-      10,
-    lineHeight:
-      1.5,
-  },
-
-  selectedDateTitle: {
-    marginTop:
-      12,
-    paddingBottom:
-      9,
-    borderBottom:
-      '1px solid #edf0f3',
-    fontWeight:
-      800,
-  },
-
-  availableBox: {
-    marginTop:
-      12,
-    background:
-      '#edf8f0',
-    color:
-      '#24723a',
-    borderRadius:
-      8,
-    padding:
-      10,
-    fontWeight:
-      800,
-    fontSize:
-      11,
-  },
-
-  sectionBlock: {
-    marginTop:
-      14,
-  },
-
-  sectionTitle: {
-    fontSize:
-      11,
-    fontWeight:
-      800,
-    color:
-      '#344054',
-    marginBottom:
-      7,
-  },
-
-  interestSummary: {
-    background:
-      '#fff8e5',
-    color:
-      '#886207',
-    padding:
-      8,
-    borderRadius:
-      7,
-    fontSize:
-      10,
-    fontWeight:
-      800,
-    marginBottom:
-      8,
-  },
-
-  bookingCard: {
-    background:
-      '#f3faf5',
-    border:
-      '1px solid #cfe6d5',
-    borderRadius:
-      9,
-    padding:
-      11,
-    display:
-      'grid',
-    gap:
-      7,
-    marginTop:
-      8,
-  },
-
-  interestCard: {
-    background:
-      '#fffbef',
-    border:
-      '1px solid #ebdca8',
-    borderRadius:
-      9,
-    padding:
-      11,
-    display:
-      'grid',
-    gap:
-      7,
-    marginTop:
-      8,
-  },
-
-  blockCard: {
-    background:
-      '#faf7ff',
-    border:
-      '1px solid #ddd0f1',
-    borderRadius:
-      9,
-    padding:
-      11,
-    display:
-      'grid',
-    gap:
-      7,
-    marginTop:
-      8,
-  },
-
-  paidStatus: {
-    color:
-      '#24723a',
-    fontSize:
-      11,
-    fontWeight:
-      800,
-  },
-
-  interestStage: {
-    color:
-      '#8a6507',
-    fontSize:
-      11,
-    fontWeight:
-      800,
-  },
-
-  interestNote: {
-    marginTop:
-      3,
-    padding:
-      6,
-    borderRadius:
-      6,
-    background:
-      '#fff4cf',
-    color:
-      '#7b5b0c',
-    fontSize:
-      8,
-    lineHeight:
-      1.4,
-  },
-
-  blockStatus: {
-    color:
-      '#7047a6',
-    fontSize:
-      11,
-    fontWeight:
-      800,
-  },
-
-  detailRow: {
-    display:
-      'flex',
-    justifyContent:
-      'space-between',
-    gap:
-      10,
-    fontSize:
-      10,
-  },
-
-  detailLabel: {
-    color:
-      '#667085',
-  },
-
-  detailValue: {
-    textAlign:
-      'right',
-    wordBreak:
-      'break-word',
-  },
-
-  syncHelp: {
-    margin:
-      '7px 0 0',
-    color:
-      '#667085',
-    fontSize:
-      9,
-    lineHeight:
-      1.45,
-  },
-
-  syncProperty: {
-    marginTop:
-      12,
-    background:
-      '#f7f9fc',
-    padding:
-      9,
-    borderRadius:
-      7,
-    display:
-      'grid',
-    gap:
-      3,
-    fontSize:
-      9,
-  },
-
-  syncSection: {
-    marginTop:
-      14,
-    display:
-      'grid',
-    gap:
-      7,
-  },
-
-  syncTitle: {
-    fontSize:
-      11,
-    fontWeight:
-      800,
-  },
-
-  syncText: {
-    margin:
-      0,
-    color:
-      '#667085',
-    fontSize:
-      9,
-    lineHeight:
-      1.4,
-  },
-
-  exportRow: {
-    display:
-      'grid',
-    gridTemplateColumns:
-      '1fr auto',
-    gap:
-      6,
-  },
-
-  exportInput: {
-    minWidth:
-      0,
-    border:
-      '1px solid #d2d8df',
-    borderRadius:
-      7,
-    padding:
-      8,
-    fontSize:
-      8,
-    background:
-      '#fafafa',
-  },
-
-  copyButton: {
-    border:
-      0,
-    background:
-      '#174f91',
-    color:
-      '#ffffff',
-    borderRadius:
-      7,
-    padding:
-      '8px 10px',
-    cursor:
-      'pointer',
-    fontSize:
-      9,
-    fontWeight:
-      700,
-  },
-
-  noticeBox: {
-    background:
-      '#fff8e7',
-    color:
-      '#896a1f',
-    padding:
-      7,
-    borderRadius:
-      6,
-    fontSize:
-      8,
-    lineHeight:
-      1.4,
-  },
-
-  divider: {
-    height:
-      1,
-    background:
-      '#edf0f3',
-    margin:
-      '16px 0',
-  },
-
-  disabledInput: {
-    width:
-      '100%',
-    boxSizing:
-      'border-box',
-    border:
-      '1px solid #d6dce3',
-    borderRadius:
-      7,
-    padding:
-      8,
-    background:
-      '#f4f5f7',
-    color:
-      '#98a2b3',
-    fontSize:
-      9,
-  },
-
-  disabledButton: {
-    border:
-      0,
-    borderRadius:
-      7,
-    padding:
-      8,
-    background:
-      '#d0d5dd',
-    color:
-      '#ffffff',
-    fontSize:
-      9,
-  },
-};
+function InterestDetail({
+  booking,
+}) {
+  const stage =
+    getInterestStage(
+      booking
+    );
+
+  const amount =
+    booking
+      .host_offer_final_amount ||
+    booking
+      .final_payable_amount ||
+    booking.total_amount;
+
+  return (
+    <div className="interest-detail">
+
+      <div className="status-yellow">
+        {stage}
+      </div>
+
+      <DetailRow
+        label="Guest"
+        value={
+          booking
+            .guests
+            ?.full_name ||
+          'Guest'
+        }
+      />
+
+      <DetailRow
+        label="Guests"
+        value={
+          booking.guests_count ||
+          1
+        }
+      />
+
+      <DetailRow
+        label="Booking ID"
+        value={
+          booking.booking_code
+        }
+      />
+
+      <DetailRow
+        label="Check-in"
+        value={
+          formatDate(
+            booking.check_in
+          )
+        }
+      />
+
+      <DetailRow
+        label="Check-out"
+        value={
+          formatDate(
+            booking.check_out
+          )
+        }
+      />
+
+      <DetailRow
+        label="Payment"
+        value={
+          booking.payment_status ||
+          'unpaid'
+        }
+      />
+
+      {amount && (
+        <DetailRow
+          label="Current Amount"
+          value={`₹${Number(
+            amount
+          ).toLocaleString(
+            'en-IN'
+          )}`}
+        />
+      )}
+
+    </div>
+  );
+}
+
+function BlockDetail({
+  block,
+}) {
+  const manual =
+    String(
+      block.source ||
+        ''
+    ).toLowerCase() ===
+    'manual';
+
+  return (
+    <div className="block-detail">
+
+      <div className="status-purple">
+        {manual
+          ? 'Host Blocked'
+          : 'Booked by Other Portal'}
+      </div>
+
+      <DetailRow
+        label="Source"
+        value={
+          sourceLabel(
+            block.source
+          )
+        }
+      />
+
+      <DetailRow
+        label="From"
+        value={
+          formatDate(
+            block.start_date
+          )
+        }
+      />
+
+      <DetailRow
+        label="To"
+        value={
+          formatDate(
+            block.end_date
+          )
+        }
+      />
+
+      <DetailRow
+        label="Remark"
+        value={
+          block.reason ||
+          (manual
+            ? 'Blocked by host'
+            : 'External booking')
+        }
+      />
+
+    </div>
+  );
+}
