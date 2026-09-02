@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 import PropertyPhotoManager from './PropertyPhotoManager';
@@ -12,4735 +12,1473 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-const kitchenOptions = [
-  'Gas Stove',
-  'Induction',
-  'Microwave',
-  'Electric Kettle',
-  'Tea / Coffee Setup',
-  'Cooking Utensils',
-  'Plates & Cutlery',
-  'Drinking Water',
-  'RO Water Purifier',
-  'Toaster',
+const FILTERS = [
+  { key: 'all', label: 'All Properties' },
+  { key: 'pending_review', label: 'Pending Review' },
+  { key: 'live', label: 'Live' },
+  { key: 'changes_requested', label: 'Changes Requested' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'declined', label: 'Declined' },
 ];
 
-const amenityOptions = [
-  'Wi-Fi',
-  'Free Parking',
-  'Covered Parking',
-  'Hot Water',
-  'Power Backup',
-  'Garden',
-  'Balcony',
-  'Terrace',
-  'Swimming Pool',
-  'Gym',
-  'Clubhouse',
-  'Security',
-  'CCTV',
-  'Lift',
-  'Mountain View',
-  'City View',
-];
-
-const emptyForm = {
-  id: '',
-
-  name: '',
-  slug: '',
-  short_description: '',
-  description: '',
-  location_name: '',
-  address: '',
-  google_maps_url: '',
-
-  bedrooms: 1,
-  bathrooms: 1,
-
-  queen_bed_count: 0,
-  single_bed_count: 0,
-  sofa_cum_bed_count: 0,
-
-  min_guests: 1,
-  included_guests: 4,
-  max_guests: 6,
-
-  base_price: 2599,
-  extra_guest_fee: 699,
-  cleaning_fee: 0,
-  security_deposit: 0,
-
-  min_stay_nights: 1,
-  max_stay_nights: 30,
-
-  check_in_time: '14:00',
-  check_out_time: '11:00',
-  late_checkout_hourly_fee: 0,
-
-  wifi_available: false,
-  tv_available: false,
-  fridge_available: false,
-  washing_machine_available: false,
-
-  ac_available: false,
-  ac_count: 0,
-
-  water_heater_count: 0,
-
-  pets_allowed: false,
-  parties_allowed: false,
-  couples_allowed: true,
-  alcohol_allowed: false,
-  smoking_allowed: false,
-
-  quiet_hours_enabled: false,
-  quiet_hours_start: '22:00',
-  quiet_hours_end: '07:00',
-
-  kitchen_features: [],
-  amenities: [],
-  features: [],
-
-  house_rules_text: '',
-  direction_instructions: '',
-
-  dynamic_pricing_enabled: false,
-
-  weekend_markup_percent: 0,
-  long_weekend_markup_percent: 0,
-  festival_markup_percent: 0,
-  season_markup_percent: 0,
-
-  is_active: true,
-};
-
-function numberValue(value, fallback = 0) {
-  const result = Number(value);
-
-  return Number.isNaN(result)
-    ? fallback
-    : result;
+function money(value) {
+  return Number(value || 0).toLocaleString('en-IN');
 }
 
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+function formatDate(value) {
+  if (!value) return '—';
+
+  try {
+    return new Date(value).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '—';
+  }
 }
 
-function normalizeProperty(property) {
-  return {
-    ...emptyForm,
-    ...property,
-
-    check_in_time:
-      property?.check_in_time?.slice(0, 5) ||
-      '14:00',
-
-    check_out_time:
-      property?.check_out_time?.slice(0, 5) ||
-      '11:00',
-
-    quiet_hours_start:
-      property?.quiet_hours_start?.slice(0, 5) ||
-      '22:00',
-
-    quiet_hours_end:
-      property?.quiet_hours_end?.slice(0, 5) ||
-      '07:00',
-
-    amenities:
-      Array.isArray(property?.amenities)
-        ? property.amenities
-        : [],
-
-    kitchen_features:
-      Array.isArray(property?.kitchen_features)
-        ? property.kitchen_features
-        : [],
-
-    features:
-      Array.isArray(property?.features)
-        ? property.features
-        : [],
-
-    house_rules_text:
-      Array.isArray(property?.house_rules)
-        ? property.house_rules.join('\n')
-        : '',
+function statusLabel(status) {
+  const map = {
+    draft: 'Draft',
+    pending_review: 'Pending Review',
+    changes_requested: 'Changes Requested',
+    approved: 'Approved',
+    declined: 'Declined',
   };
+
+  return map[status] || 'Draft';
+}
+
+function statusClass(status) {
+  const map = {
+    draft: 'nosapBadgeDraft',
+    pending_review: 'nosapBadgePending',
+    changes_requested: 'nosapBadgeChanges',
+    approved: 'nosapBadgeApproved',
+    declined: 'nosapBadgeDeclined',
+  };
+
+  return map[status] || 'nosapBadgeDraft';
+}
+
+function hostName(property) {
+  return (
+    property?._host?.business_name ||
+    property?._host?.full_name ||
+    (property?.host_id ? 'Host' : 'No Host Assigned')
+  );
 }
 
 export default function AdminPropertiesPage() {
-  const [checkingSession, setCheckingSession] =
-    useState(true);
+  const [session, setSession] = useState(null);
+  const [admin, setAdmin] = useState(null);
 
-  const [session, setSession] =
-    useState(null);
+  const [properties, setProperties] = useState([]);
+  const [selected, setSelected] = useState(null);
 
-  const [adminProfile, setAdminProfile] =
-    useState(null);
+  const [filter, setFilter] = useState('all');
+  const [tab, setTab] = useState('review');
 
-  const [properties, setProperties] =
-    useState([]);
+  const [reviewNote, setReviewNote] = useState('');
 
-  const [form, setForm] =
-    useState({
-      ...emptyForm,
-    });
+  const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [working, setWorking] = useState(false);
 
-  /*
-    Main page modes:
-
-    list
-    Shows all existing properties first.
-
-    add
-    Shows the Add New Property form.
-
-    manage
-    Opens one existing property with:
-    Details
-    Photos
-    Pricing & Offers
-    Calendar
-  */
-
-  const [screen, setScreen] =
-    useState('list');
-
-  const [manageTab, setManageTab] =
-    useState('details');
-
-  const [loadingProperties, setLoadingProperties] =
-    useState(false);
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState('');
-
-  const [successMessage, setSuccessMessage] =
-    useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    startPage();
+    initialise();
   }, []);
 
-  async function startPage() {
+  async function initialise() {
+    setChecking(true);
+    setError('');
+
     try {
       const {
-        data: { session },
-        error,
-      } =
-        await supabase.auth.getSession();
+        data: { session: currentSession },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (error) {
-        throw error;
-      }
+      if (sessionError) throw sessionError;
 
-      setSession(session);
-
-      if (!session) {
+      if (!currentSession) {
+        window.location.replace('/login');
         return;
       }
 
-      const {
-        data: profile,
-        error: profileError,
-      } =
-        await supabase
-          .from('admin_profiles')
-          .select(
-            'user_id, full_name, role, is_active'
-          )
-          .eq(
-            'user_id',
-            session.user.id
-          )
-          .eq(
-            'is_active',
-            true
-          )
-          .single();
+      setSession(currentSession);
 
-      if (
-        profileError ||
-        !profile
-      ) {
+      const {
+        data: adminData,
+        error: adminError,
+      } = await supabase
+        .from('admin_profiles')
+        .select('user_id, full_name, role, is_active')
+        .eq('user_id', currentSession.user.id)
+        .eq('is_active', true)
+        .single();
+
+      if (adminError || !adminData) {
+        throw new Error('Active Admin account not found.');
+      }
+
+      if (adminData.role !== 'super_admin') {
         throw new Error(
-          'This account does not have permission to manage properties.'
+          'Only the Super Admin can access Property Moderation.'
         );
       }
 
-      setAdminProfile(profile);
+      setAdmin(adminData);
 
       await loadProperties();
-    } catch (error) {
-      console.error(error);
-
-      setErrorMessage(
-        error.message ||
-          'Unable to open property management.'
-      );
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to open Property Management.');
     } finally {
-      setCheckingSession(false);
+      setChecking(false);
     }
   }
 
   async function loadProperties() {
-    setLoadingProperties(true);
+    setLoading(true);
+
+    try {
+      const {
+        data: propertyRows,
+        error: propertyError,
+      } = await supabase
+        .from('properties')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (propertyError) throw propertyError;
+
+      const rows = propertyRows || [];
+
+      const hostIds = [
+        ...new Set(rows.map((item) => item.host_id).filter(Boolean)),
+      ];
+
+      const hostMap = {};
+
+      if (hostIds.length > 0) {
+        const {
+          data: hostRows,
+          error: hostError,
+        } = await supabase
+          .from('host_profiles')
+          .select(
+            'id, user_id, full_name, business_name, phone, email, city, state, status'
+          )
+          .in('id', hostIds);
+
+        if (hostError) throw hostError;
+
+        (hostRows || []).forEach((host) => {
+          hostMap[host.id] = host;
+        });
+      }
+
+      const enriched = rows.map((property) => ({
+        ...property,
+        moderation_status: property.moderation_status || 'draft',
+        _host: property.host_id ? hostMap[property.host_id] || null : null,
+      }));
+
+      setProperties(enriched);
+
+      if (selected?.id) {
+        const refreshed = enriched.find(
+          (property) => property.id === selected.id
+        );
+
+        if (refreshed) {
+          setSelected(refreshed);
+          setReviewNote(refreshed.moderation_notes || '');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to load properties.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openProperty(property, nextTab = 'review') {
+    setSelected(property);
+    setTab(nextTab);
+    setReviewNote(property.moderation_notes || '');
+    setError('');
+    setSuccess('');
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }
+
+  function closeProperty() {
+    setSelected(null);
+    setTab('review');
+    setReviewNote('');
+    setError('');
+    setSuccess('');
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }
+
+  async function updateModeration(action) {
+    if (!selected?.id || !session?.user?.id) return;
+
+    setError('');
+    setSuccess('');
+
+    const note = reviewNote.trim();
+
+    if (
+      (action === 'changes_requested' || action === 'declined') &&
+      !note
+    ) {
+      setError(
+        action === 'changes_requested'
+          ? 'Please enter the changes required for the Host.'
+          : 'Please enter the reason for declining this property.'
+      );
+      return;
+    }
+
+    let confirmation = '';
+
+    if (action === 'approved') {
+      confirmation =
+        'Approve this property and make it live for guests?';
+    }
+
+    if (action === 'changes_requested') {
+      confirmation =
+        'Return this property to the Host for the requested changes?';
+    }
+
+    if (action === 'declined') {
+      confirmation =
+        'Decline this property? It will remain offline.';
+    }
+
+    if (!window.confirm(confirmation)) return;
+
+    setWorking(true);
+
+    try {
+      const now = new Date().toISOString();
+
+      let payload;
+
+      if (action === 'approved') {
+        payload = {
+          moderation_status: 'approved',
+          moderation_notes: null,
+          is_active: true,
+          reviewed_at: now,
+          reviewed_by: session.user.id,
+          updated_at: now,
+        };
+      } else if (action === 'changes_requested') {
+        payload = {
+          moderation_status: 'changes_requested',
+          moderation_notes: note,
+          is_active: false,
+          reviewed_at: now,
+          reviewed_by: session.user.id,
+          updated_at: now,
+        };
+      } else {
+        payload = {
+          moderation_status: 'declined',
+          moderation_notes: note,
+          is_active: false,
+          reviewed_at: now,
+          reviewed_by: session.user.id,
+          updated_at: now,
+        };
+      }
+
+      const {
+        data,
+        error: updateError,
+      } = await supabase
+        .from('properties')
+        .update(payload)
+        .eq('id', selected.id)
+        .select('*')
+        .single();
+
+      if (updateError) throw updateError;
+
+      const updated = {
+        ...selected,
+        ...data,
+      };
+
+      setSelected(updated);
+      setReviewNote(data.moderation_notes || '');
+
+      setSuccess(
+        action === 'approved'
+          ? 'Property approved and made live successfully.'
+          : action === 'changes_requested'
+            ? 'Changes requested successfully. The Host can now edit and resubmit the property.'
+            : 'Property declined successfully.'
+      );
+
+      await loadProperties();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to update property moderation.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function setLiveState(makeLive) {
+    if (!selected?.id) return;
+
+    if (selected.moderation_status !== 'approved') {
+      setError('Only an approved property can be made live.');
+      return;
+    }
+
+    const message = makeLive
+      ? 'Make this approved property live?'
+      : 'Take this property offline?';
+
+    if (!window.confirm(message)) return;
+
+    setWorking(true);
+    setError('');
+    setSuccess('');
 
     try {
       const {
         data,
-        error,
-      } =
-        await supabase
-          .from('properties')
-          .select('*')
-          .order(
-            'created_at',
-            {
-              ascending: false,
-            }
-          );
+        error: updateError,
+      } = await supabase
+        .from('properties')
+        .update({
+          is_active: makeLive,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selected.id)
+        .select('*')
+        .single();
 
-      if (error) {
-        throw error;
-      }
+      if (updateError) throw updateError;
 
-      setProperties(
-        data || []
-      );
-    } catch (error) {
-      console.error(error);
-
-      setErrorMessage(
-        `Unable to load properties: ${
-          error.message
-        }`
-      );
-    } finally {
-      setLoadingProperties(false);
-    }
-  }
-
-  function updateField(
-    field,
-    value
-  ) {
-    setForm(
-      (previous) => ({
+      setSelected((previous) => ({
         ...previous,
-        [field]: value,
-      })
-    );
-
-    setErrorMessage('');
-    setSuccessMessage('');
-  }
-
-  function toggleArrayItem(
-    field,
-    value
-  ) {
-    setForm(
-      (previous) => {
-        const existing =
-          Array.isArray(
-            previous[field]
-          )
-            ? previous[field]
-            : [];
-
-        return {
-          ...previous,
-
-          [field]:
-            existing.includes(value)
-              ? existing.filter(
-                  (item) =>
-                    item !== value
-                )
-              : [
-                  ...existing,
-                  value,
-                ],
-        };
-      }
-    );
-
-    setErrorMessage('');
-    setSuccessMessage('');
-  }
-
-  function showPropertyList() {
-    setScreen('list');
-
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  }
-
-  function startNewProperty() {
-    setForm({
-      ...emptyForm,
-    });
-
-    setScreen('add');
-    setManageTab('details');
-
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  }
-
-  function manageProperty(
-    property,
-    tab = 'details'
-  ) {
-    setForm(
-      normalizeProperty(
-        property
-      )
-    );
-
-    setScreen('manage');
-    setManageTab(tab);
-
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  }
-
-  async function saveProperty(event) {
-    event.preventDefault();
-
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    if (
-      !form.name.trim()
-    ) {
-      setErrorMessage(
-        'Property name is required.'
-      );
-
-      return;
-    }
-
-    if (
-      !form.location_name.trim()
-    ) {
-      setErrorMessage(
-        'Location is required.'
-      );
-
-      return;
-    }
-
-    const minGuests =
-      numberValue(
-        form.min_guests,
-        1
-      );
-
-    const includedGuests =
-      numberValue(
-        form.included_guests,
-        1
-      );
-
-    const maxGuests =
-      numberValue(
-        form.max_guests,
-        1
-      );
-
-    if (
-      minGuests < 1
-    ) {
-      setErrorMessage(
-        'Minimum guests must be at least 1.'
-      );
-
-      return;
-    }
-
-    if (
-      includedGuests <
-      minGuests
-    ) {
-      setErrorMessage(
-        'Guests included in base price cannot be lower than minimum guests.'
-      );
-
-      return;
-    }
-
-    if (
-      includedGuests >
-      maxGuests
-    ) {
-      setErrorMessage(
-        'Guests included in base price cannot exceed maximum guests.'
-      );
-
-      return;
-    }
-
-    if (
-      maxGuests <
-      minGuests
-    ) {
-      setErrorMessage(
-        'Maximum guests cannot be lower than minimum guests.'
-      );
-
-      return;
-    }
-
-    const minStay =
-      numberValue(
-        form.min_stay_nights,
-        1
-      );
-
-    const maxStay =
-      numberValue(
-        form.max_stay_nights,
-        30
-      );
-
-    if (
-      minStay < 1
-    ) {
-      setErrorMessage(
-        'Minimum stay must be at least one night.'
-      );
-
-      return;
-    }
-
-    if (
-      maxStay <
-      minStay
-    ) {
-      setErrorMessage(
-        'Maximum stay cannot be lower than minimum stay.'
-      );
-
-      return;
-    }
-
-    const houseRules =
-      String(
-        form.house_rules_text ||
-          ''
-      )
-        .split('\n')
-        .map(
-          (item) =>
-            item.trim()
-        )
-        .filter(Boolean);
-
-    const automaticFeatures = [
-      'Wi-Fi',
-      'TV',
-      'Fridge',
-      'Washing Machine',
-      'Air Conditioning',
-    ];
-
-    const featureList =
-      (
-        form.features ||
-        []
-      ).filter(
-        (item) =>
-          !automaticFeatures.includes(
-            item
-          )
-      );
-
-    if (
-      form.wifi_available
-    ) {
-      featureList.push(
-        'Wi-Fi'
-      );
-    }
-
-    if (
-      form.tv_available
-    ) {
-      featureList.push(
-        'TV'
-      );
-    }
-
-    if (
-      form.fridge_available
-    ) {
-      featureList.push(
-        'Fridge'
-      );
-    }
-
-    if (
-      form.washing_machine_available
-    ) {
-      featureList.push(
-        'Washing Machine'
-      );
-    }
-
-    if (
-      form.ac_available
-    ) {
-      featureList.push(
-        'Air Conditioning'
-      );
-    }
-
-    const payload = {
-      name:
-        form.name.trim(),
-
-      slug:
-        form.slug.trim() ||
-        slugify(
-          form.name
-        ),
-
-      short_description:
-        form.short_description?.trim() ||
-        '',
-
-      description:
-        form.description?.trim() ||
-        '',
-
-      location_name:
-        form.location_name.trim(),
-
-      address:
-        form.address?.trim() ||
-        '',
-
-      google_maps_url:
-        form.google_maps_url?.trim() ||
-        '',
-
-      bedrooms:
-        numberValue(
-          form.bedrooms,
-          1
-        ),
-
-      bathrooms:
-        numberValue(
-          form.bathrooms,
-          1
-        ),
-
-      queen_bed_count:
-        numberValue(
-          form.queen_bed_count
-        ),
-
-      single_bed_count:
-        numberValue(
-          form.single_bed_count
-        ),
-
-      sofa_cum_bed_count:
-        numberValue(
-          form.sofa_cum_bed_count
-        ),
-
-      min_guests:
-        minGuests,
-
-      included_guests:
-        includedGuests,
-
-      max_guests:
-        maxGuests,
-
-      base_price:
-        numberValue(
-          form.base_price
-        ),
-
-      extra_guest_fee:
-        numberValue(
-          form.extra_guest_fee
-        ),
-
-      cleaning_fee:
-        numberValue(
-          form.cleaning_fee
-        ),
-
-      security_deposit:
-        numberValue(
-          form.security_deposit
-        ),
-
-      min_stay_nights:
-        minStay,
-
-      max_stay_nights:
-        maxStay,
-
-      check_in_time:
-        form.check_in_time,
-
-      check_out_time:
-        form.check_out_time,
-
-      late_checkout_hourly_fee:
-        numberValue(
-          form.late_checkout_hourly_fee
-        ),
-
-      wifi_available:
-        Boolean(
-          form.wifi_available
-        ),
-
-      tv_available:
-        Boolean(
-          form.tv_available
-        ),
-
-      fridge_available:
-        Boolean(
-          form.fridge_available
-        ),
-
-      washing_machine_available:
-        Boolean(
-          form.washing_machine_available
-        ),
-
-      ac_available:
-        Boolean(
-          form.ac_available
-        ),
-
-      ac_count:
-        form.ac_available
-          ? numberValue(
-              form.ac_count
-            )
-          : 0,
-
-      water_heater_count:
-        numberValue(
-          form.water_heater_count
-        ),
-
-      pets_allowed:
-        Boolean(
-          form.pets_allowed
-        ),
-
-      parties_allowed:
-        Boolean(
-          form.parties_allowed
-        ),
-
-      couples_allowed:
-        Boolean(
-          form.couples_allowed
-        ),
-
-      alcohol_allowed:
-        Boolean(
-          form.alcohol_allowed
-        ),
-
-      smoking_allowed:
-        Boolean(
-          form.smoking_allowed
-        ),
-
-      quiet_hours_enabled:
-        Boolean(
-          form.quiet_hours_enabled
-        ),
-
-      quiet_hours_start:
-        form.quiet_hours_enabled
-          ? form.quiet_hours_start
-          : null,
-
-      quiet_hours_end:
-        form.quiet_hours_enabled
-          ? form.quiet_hours_end
-          : null,
-
-      kitchen_features:
-        form.kitchen_features ||
-        [],
-
-      amenities:
-        form.amenities ||
-        [],
-
-      features: [
-        ...new Set(
-          featureList
-        ),
-      ],
-
-      house_rules:
-        houseRules,
-
-      direction_instructions:
-        form.direction_instructions?.trim() ||
-        '',
-
-      dynamic_pricing_enabled:
-        Boolean(
-          form.dynamic_pricing_enabled
-        ),
-
-      weekend_markup_percent:
-        numberValue(
-          form.weekend_markup_percent
-        ),
-
-      long_weekend_markup_percent:
-        numberValue(
-          form.long_weekend_markup_percent
-        ),
-
-      festival_markup_percent:
-        numberValue(
-          form.festival_markup_percent
-        ),
-
-      season_markup_percent:
-        numberValue(
-          form.season_markup_percent
-        ),
-
-      is_active:
-        Boolean(
-          form.is_active
-        ),
-
-      updated_at:
-        new Date().toISOString(),
-    };
-
-    setSaving(true);
-
-    try {
-      let savedProperty;
-
-      if (
-        form.id
-      ) {
-        const {
-          data,
-          error,
-        } =
-          await supabase
-            .from('properties')
-            .update(payload)
-            .eq(
-              'id',
-              form.id
-            )
-            .select('*')
-            .single();
-
-        if (error) {
-          throw error;
-        }
-
-        savedProperty =
-          data;
-
-        setSuccessMessage(
-          'Property updated successfully.'
-        );
-      } else {
-        const {
-          data,
-          error,
-        } =
-          await supabase
-            .from('properties')
-            .insert(payload)
-            .select('*')
-            .single();
-
-        if (error) {
-          throw error;
-        }
-
-        savedProperty =
-          data;
-
-        setSuccessMessage(
-          'Property created successfully.'
-        );
-      }
-
-      setForm(
-        normalizeProperty(
-          savedProperty
-        )
-      );
-
-      /*
-        A newly created property
-        immediately opens in Manage mode.
-
-        Photos is opened first so the host
-        can complete the listing quickly.
-      */
-
-      setScreen(
-        'manage'
-      );
-
-      setManageTab(
-        form.id
-          ? manageTab
-          : 'photos'
+        ...data,
+      }));
+
+      setSuccess(
+        makeLive
+          ? 'Property is now live.'
+          : 'Property has been taken offline.'
       );
 
       await loadProperties();
-    } catch (error) {
-      console.error(error);
-
-      setErrorMessage(
-        `Unable to save property: ${
-          error.message ||
-          'Unknown error'
-        }`
-      );
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to update property visibility.');
     } finally {
-      setSaving(false);
+      setWorking(false);
     }
   }
-  async function toggleProperty(property) {
-    setErrorMessage('');
-    setSuccessMessage('');
 
-    try {
-      const { error } =
-        await supabase
-          .from('properties')
-          .update({
-            is_active:
-              !property.is_active,
+  const counts = useMemo(() => {
+    return {
+      all: properties.length,
 
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq(
-            'id',
-            property.id
-          );
+      pending_review: properties.filter(
+        (property) => property.moderation_status === 'pending_review'
+      ).length,
 
-      if (error) {
-        throw error;
-      }
+      live: properties.filter(
+        (property) =>
+          property.moderation_status === 'approved' &&
+          property.is_active === true
+      ).length,
 
-      await loadProperties();
+      changes_requested: properties.filter(
+        (property) =>
+          property.moderation_status === 'changes_requested'
+      ).length,
 
-      if (
-        form.id ===
-        property.id
-      ) {
-        setForm(
-          (previous) => ({
-            ...previous,
+      draft: properties.filter(
+        (property) => property.moderation_status === 'draft'
+      ).length,
 
-            is_active:
-              !property.is_active,
-          })
-        );
-      }
-    } catch (error) {
-      console.error(error);
+      declined: properties.filter(
+        (property) => property.moderation_status === 'declined'
+      ).length,
+    };
+  }, [properties]);
 
-      setErrorMessage(
-        `Unable to update property status: ${
-          error.message
-        }`
+  const filteredProperties = useMemo(() => {
+    if (filter === 'all') return properties;
+
+    if (filter === 'live') {
+      return properties.filter(
+        (property) =>
+          property.moderation_status === 'approved' &&
+          property.is_active === true
       );
     }
-  }
 
-  async function logout() {
-    await supabase.auth.signOut();
+    return properties.filter(
+      (property) => property.moderation_status === filter
+    );
+  }, [properties, filter]);
 
-    window.location.href =
-      '/admin/bookings';
-  }
-
-  if (checkingSession) {
+  if (checking) {
     return (
-      <main className="nosPropPage">
-        <div className="nosPropLoadingBox">
-          Loading property management...
-        </div>
+      <>
+        <main className="nosapPage">
+          <div className="nosapLoading">
+            Loading Super Admin Property Management...
+          </div>
+        </main>
 
-        <PageStyles />
-      </main>
+        <Styles />
+      </>
     );
   }
 
-  if (
-    !session ||
-    !adminProfile
-  ) {
+  if (!admin) {
     return (
-      <main className="nosPropPage">
-        <div className="nosPropLoginNotice">
-          <h2>
-            Admin login required
-          </h2>
+      <>
+        <main className="nosapPage">
+          <div className="nosapLoading">
+            <h2>Access Denied</h2>
+            <p>{error || 'Super Admin access is required.'}</p>
 
-          <p>
-            Please log in before
-            managing properties.
-          </p>
-<a
-  href="/login"
-  className="nosPropPrimaryLink"
->
-  Go to Admin Login
-</a>        </div>
+            <a href="/login" className="nosapPrimary">
+              Go to Login
+            </a>
+          </div>
+        </main>
 
-        <PageStyles />
-      </main>
+        <Styles />
+      </>
     );
   }
 
-  return (
-    <main className="nosPropPage">
-      <header className="nosPropHeader">
-        <div className="nosPropBrandArea">
-          <div className="nosPropBrand">
-            NightOutStays
-          </div>
-
-          <div className="nosPropMuted">
-            Host Property Management
-          </div>
-        </div>
-
-        <div className="nosPropHeaderRight">
-          <div className="nosPropProfile">
-            <strong>
-              {adminProfile.full_name ||
-                'Admin'}
-            </strong>
-
-            <span>
-              {adminProfile.role ||
-                'Admin'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={logout}
-            className="nosPropLogoutButton"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <section className="nosPropContent">
-        <div className="nosPropPageHeading">
-          <div>
-            <h1>
-              Properties
-            </h1>
-
-            <p>
-              Manage listings,
-              photos, pricing,
-              offers and property
-              calendars.
-            </p>
-          </div>
-        </div>
-
-        <div className="nosPropMainTabs">
-          <button
-            type="button"
-            onClick={
-              showPropertyList
-            }
-            className={
-              screen === 'list'
-                ? 'nosPropMainTab nosPropMainTabActive'
-                : 'nosPropMainTab'
-            }
-          >
-            My Properties
-          </button>
-
-          <button
-            type="button"
-            onClick={
-              startNewProperty
-            }
-            className={
-              screen === 'add'
-                ? 'nosPropMainTab nosPropMainTabActive'
-                : 'nosPropMainTab'
-            }
-          >
-            + Add New Property
-          </button>
-        </div>
-
-        {screen === 'list' && (
-          <>
-            {errorMessage && (
-              <div className="nosPropError">
-                {errorMessage}
-              </div>
-            )}
-
-            <MyProperties
-              properties={
-                properties
-              }
-              loading={
-                loadingProperties
-              }
-              onManage={
-                manageProperty
-              }
-              onToggle={
-                toggleProperty
-              }
-              onAdd={
-                startNewProperty
-              }
-            />
-          </>
-        )}
-
-        {screen === 'add' && (
-          <div className="nosPropEditor">
+  if (selected) {
+    return (
+      <>
+        <main className="nosapPage">
+          <div className="nosapContainer">
             <button
               type="button"
-              onClick={
-                showPropertyList
-              }
-              className="nosPropBackButton"
+              className="nosapBack"
+              onClick={closeProperty}
             >
-              ← My Properties
+              ← Back to Properties
             </button>
 
-            <div className="nosPropEditorTitle">
-              <h2>
-                Add New Property
-              </h2>
-
-              <p>
-                Add the basic
-                property information,
-                pricing, facilities,
-                rules and booking
-                settings.
-              </p>
-            </div>
-
-            <PropertyDetailsForm
-              form={form}
-              updateField={
-                updateField
-              }
-              toggleArrayItem={
-                toggleArrayItem
-              }
-              saving={
-                saving
-              }
-              errorMessage={
-                errorMessage
-              }
-              successMessage={
-                successMessage
-              }
-              onSubmit={
-                saveProperty
-              }
-              isEditing={
-                false
-              }
-            />
-          </div>
-        )}
-
-        {screen === 'manage' &&
-          form.id && (
-            <div className="nosPropEditor">
-              <div className="nosPropManageHeader">
-                <div className="nosPropManageLeft">
-                  <button
-                    type="button"
-                    onClick={
-                      showPropertyList
-                    }
-                    className="nosPropBackButton"
-                  >
-                    ← My Properties
-                  </button>
-
-                  <div className="nosPropManageTitleRow">
-                    <div>
-                      <div className="nosPropSmallTitle">
-                        MANAGE PROPERTY
-                      </div>
-
-                      <h2>
-                        {form.name}
-                      </h2>
-
-                      <p>
-                        {form.location_name ||
-                          'Location not added'}
-                      </p>
-                    </div>
-
-                    <span
-                      className={
-                        form.is_active
-                          ? 'nosPropStatus nosPropStatusActive'
-                          : 'nosPropStatus nosPropStatusInactive'
-                      }
-                    >
-                      {form.is_active
-                        ? 'Active'
-                        : 'Inactive'}
-                    </span>
-                  </div>
+            <div className="nosapPropertyHeader">
+              <div>
+                <div className="nosapEyebrow">
+                  SUPER ADMIN PROPERTY MANAGEMENT
                 </div>
 
-                {form.slug && (
-                  <a
-                    href={`/property/${form.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="nosPropPreviewTop"
-                  >
-                    View Property
-                  </a>
-                )}
+                <h1>{selected.name}</h1>
+
+                <p>
+                  {selected.area || selected.location_name || 'Location'}
+                  {selected.city ? `, ${selected.city}` : ''}
+                </p>
               </div>
 
-              <div className="nosPropManageTabsWrap">
-                <div className="nosPropManageTabs">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setManageTab(
-                        'details'
-                      )
-                    }
-                    className={
-                      manageTab ===
-                      'details'
-                        ? 'nosPropManageTab nosPropManageTabActive'
-                        : 'nosPropManageTab'
-                    }
-                  >
-                    Details
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setManageTab(
-                        'photos'
-                      )
-                    }
-                    className={
-                      manageTab ===
-                      'photos'
-                        ? 'nosPropManageTab nosPropManageTabActive'
-                        : 'nosPropManageTab'
-                    }
-                  >
-                    Photos
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setManageTab(
-                        'offers'
-                      )
-                    }
-                    className={
-                      manageTab ===
-                      'offers'
-                        ? 'nosPropManageTab nosPropManageTabActive'
-                        : 'nosPropManageTab'
-                    }
-                  >
-                    Pricing & Offers
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setManageTab(
-                        'calendar'
-                      )
-                    }
-                    className={
-                      manageTab ===
-                      'calendar'
-                        ? 'nosPropManageTab nosPropManageTabActive'
-                        : 'nosPropManageTab'
-                    }
-                  >
-                    Calendar
-                  </button>
-                </div>
-              </div>
-
-              {manageTab ===
-                'details' && (
-                <PropertyDetailsForm
-                  form={form}
-                  updateField={
-                    updateField
-                  }
-                  toggleArrayItem={
-                    toggleArrayItem
-                  }
-                  saving={
-                    saving
-                  }
-                  errorMessage={
-                    errorMessage
-                  }
-                  successMessage={
-                    successMessage
-                  }
-                  onSubmit={
-                    saveProperty
-                  }
-                  isEditing={
-                    true
-                  }
-                />
-              )}
-
-              {manageTab ===
-                'photos' && (
-                <div className="nosPropManagerPanel">
-                  <div className="nosPropManagerHeading">
-                    <h3>
-                      Property Photos
-                    </h3>
-
-                    <p>
-                      Upload and manage
-                      photos for{' '}
-                      <strong>
-                        {form.name}
-                      </strong>
-                      .
-                    </p>
-                  </div>
-
-                  <PropertyPhotoManager
-                    propertyId={
-                      form.id
-                    }
-                    propertyName={
-                      form.name
-                    }
-                  />
-                </div>
-              )}
-
-              {manageTab ===
-                'offers' && (
-                <div className="nosPropManagerPanel">
-                  <div className="nosPropManagerHeading">
-                    <h3>
-                      Pricing & Offers
-                    </h3>
-
-                    <p>
-                      Manage discounts
-                      and property
-                      offers for{' '}
-                      <strong>
-                        {form.name}
-                      </strong>
-                      .
-                    </p>
-                  </div>
-
-                  <PropertyDiscountManager
-                    propertyId={
-                      form.id
-                    }
-                    propertyName={
-                      form.name
-                    }
-                  />
-                </div>
-              )}
-
-              {manageTab ===
-                'calendar' && (
-                <div className="nosPropManagerPanel">
-                  <div className="nosPropManagerHeading">
-                    <h3>
-                      Property Calendar
-                    </h3>
-
-                    <p>
-                      Manage date-wise
-                      pricing and
-                      availability for{' '}
-                      <strong>
-                        {form.name}
-                      </strong>
-                      .
-                    </p>
-                  </div>
-
-                  <PropertyCalendarManager
-                    propertyId={
-                      form.id
-                    }
-                    propertyName={
-                      form.name
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          )}
-      </section>
-
-      <PageStyles />
-    </main>
-  );
-}
-
-/* =====================================================
-   MY PROPERTIES LIST
-===================================================== */
-
-function MyProperties({
-  properties,
-  loading,
-  onManage,
-  onToggle,
-  onAdd,
-}) {
-  if (loading) {
-    return (
-      <div className="nosPropLoadingBox">
-        Loading properties...
-      </div>
-    );
-  }
-
-  if (!properties.length) {
-    return (
-      <div className="nosPropEmptyState">
-        <div className="nosPropEmptyIcon">
-          🏠
-        </div>
-
-        <h2>
-          No properties added yet
-        </h2>
-
-        <p>
-          Add your first property
-          and start preparing it
-          for direct bookings.
-        </p>
-
-        <button
-          type="button"
-          onClick={onAdd}
-          className="nosPropPrimaryButton"
-        >
-          + Add New Property
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <section className="nosPropListSection">
-      <div className="nosPropListHeading">
-        <div>
-          <h2>
-            My Properties
-          </h2>
-
-          <p>
-            {properties.length}{' '}
-            {properties.length === 1
-              ? 'property'
-              : 'properties'}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onAdd}
-          className="nosPropAddButton"
-        >
-          + Add Property
-        </button>
-      </div>
-
-      <div className="nosPropPropertyGrid">
-        {properties.map(
-          (property) => (
-            <article
-              key={
-                property.id
-              }
-              className="nosPropPropertyCard"
-            >
-              <div className="nosPropCardTop">
-                <div className="nosPropCardTitle">
-                  <h3>
-                    {property.name}
-                  </h3>
-
-                  <p>
-                    {property.location_name ||
-                      'Location not added'}
-                  </p>
-                </div>
+              <div className="nosapHeaderBadges">
+                <span
+                  className={`nosapBadge ${statusClass(
+                    selected.moderation_status
+                  )}`}
+                >
+                  {statusLabel(selected.moderation_status)}
+                </span>
 
                 <span
                   className={
-                    property.is_active
-                      ? 'nosPropStatus nosPropStatusActive'
-                      : 'nosPropStatus nosPropStatusInactive'
+                    selected.is_active
+                      ? 'nosapLiveBadge'
+                      : 'nosapOfflineBadge'
                   }
                 >
-                  {property.is_active
-                    ? 'Active'
-                    : 'Inactive'}
+                  {selected.is_active ? 'LIVE' : 'OFFLINE'}
                 </span>
               </div>
+            </div>
 
-              <div className="nosPropPrice">
-                ₹
-                {numberValue(
-                  property.base_price
-                ).toLocaleString(
-                  'en-IN'
+            <div className="nosapSummaryGrid">
+              <Summary
+                label="Host"
+                value={hostName(selected)}
+                sub={
+                  selected._host?.phone ||
+                  selected._host?.email ||
+                  ''
+                }
+              />
+
+              <Summary
+                label="Nightly Rate"
+                value={`₹${money(selected.base_price)}`}
+              />
+
+              <Summary
+                label="Submitted"
+                value={formatDate(
+                  selected.submitted_for_review_at
                 )}
+              />
 
-                <span>
-                  / night
-                </span>
-              </div>
+              <Summary
+                label="Reviewed"
+                value={formatDate(selected.reviewed_at)}
+              />
+            </div>
 
-              <div className="nosPropCardInfo">
+            {error && <div className="nosapError">{error}</div>}
+            {success && <div className="nosapSuccess">{success}</div>}
+
+            {selected.moderation_status === 'pending_review' && (
+              <section className="nosapReviewPanel">
                 <div>
-                  <strong>
-                    {property.bedrooms ||
-                      0}
-                  </strong>
+                  <div className="nosapEyebrow">PROPERTY REVIEW</div>
+                  <h2>Review Host Submission</h2>
 
-                  <span>
-                    Bedrooms
-                  </span>
+                  <p>
+                    Check the property information and photos before
+                    approving the listing.
+                  </p>
                 </div>
 
-                <div>
-                  <strong>
-                    {property.bathrooms ||
-                      0}
-                  </strong>
+                <label className="nosapNoteField">
+                  <span>Notes to Host</span>
 
-                  <span>
-                    Bathrooms
-                  </span>
-                </div>
+                  <textarea
+                    rows="4"
+                    value={reviewNote}
+                    onChange={(event) =>
+                      setReviewNote(event.target.value)
+                    }
+                    placeholder="Required when requesting changes or declining."
+                  />
+                </label>
 
-                <div>
-                  <strong>
-                    {property.max_guests ||
-                      0}
-                  </strong>
-
-                  <span>
-                    Max Guests
-                  </span>
-                </div>
-              </div>
-
-              <div className="nosPropBaseGuestInfo">
-                Base price includes{' '}
-                <strong>
-                  {property.included_guests ||
-                    1}
-                </strong>{' '}
-                guest(s)
-              </div>
-
-              {property.dynamic_pricing_enabled && (
-                <div className="nosPropDynamicBadge">
-                  Dynamic Pricing Active
-                </div>
-              )}
-
-              <div className="nosPropCardActions">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onManage(
-                      property,
-                      'details'
-                    )
-                  }
-                  className="nosPropCardPrimary"
-                >
-                  Manage
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onManage(
-                      property,
-                      'photos'
-                    )
-                  }
-                  className="nosPropCardSecondary"
-                >
-                  Photos
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onManage(
-                      property,
-                      'offers'
-                    )
-                  }
-                  className="nosPropCardSecondary"
-                >
-                  Offers
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onManage(
-                      property,
-                      'calendar'
-                    )
-                  }
-                  className="nosPropCardSecondary"
-                >
-                  Calendar
-                </button>
-
-                {property.slug && (
-                  <a
-                    href={`/property/${property.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="nosPropCardSecondary nosPropCardLink"
+                <div className="nosapReviewActions">
+                  <button
+                    type="button"
+                    className="nosapApprove"
+                    disabled={working}
+                    onClick={() => updateModeration('approved')}
                   >
-                    Preview
-                  </a>
-                )}
+                    {working
+                      ? 'Processing...'
+                      : 'Approve & Make Live'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="nosapChanges"
+                    disabled={working}
+                    onClick={() =>
+                      updateModeration('changes_requested')
+                    }
+                  >
+                    Request Changes
+                  </button>
+
+                  <button
+                    type="button"
+                    className="nosapDecline"
+                    disabled={working}
+                    onClick={() => updateModeration('declined')}
+                  >
+                    Decline Property
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {selected.moderation_status === 'changes_requested' && (
+              <section className="nosapMessage nosapMessageChanges">
+                <strong>Changes Requested</strong>
+
+                <p>
+                  {selected.moderation_notes ||
+                    'No moderation note available.'}
+                </p>
+
+                <small>
+                  The Host can edit this property and submit it again
+                  for review.
+                </small>
+              </section>
+            )}
+
+            {selected.moderation_status === 'declined' && (
+              <section className="nosapMessage nosapMessageDeclined">
+                <strong>Property Declined</strong>
+
+                <p>
+                  {selected.moderation_notes ||
+                    'No decline reason available.'}
+                </p>
+              </section>
+            )}
+
+            {selected.moderation_status === 'approved' && (
+              <section className="nosapMessage nosapMessageApproved">
+                <div>
+                  <strong>Property Approved</strong>
+
+                  <p>
+                    {selected.is_active
+                      ? 'This property is approved and visible to guests.'
+                      : 'This property is approved but currently offline.'}
+                  </p>
+                </div>
 
                 <button
                   type="button"
-                  onClick={() =>
-                    onToggle(
-                      property
-                    )
-                  }
+                  disabled={working}
                   className={
-                    property.is_active
-                      ? 'nosPropCardDanger'
-                      : 'nosPropCardActivate'
+                    selected.is_active
+                      ? 'nosapSecondary'
+                      : 'nosapApprove'
                   }
+                  onClick={() => setLiveState(!selected.is_active)}
                 >
-                  {property.is_active
-                    ? 'Deactivate'
-                    : 'Activate'}
+                  {selected.is_active
+                    ? 'Take Property Offline'
+                    : 'Make Property Live'}
                 </button>
+              </section>
+            )}
+
+            <nav className="nosapTabs">
+              <button
+                type="button"
+                className={tab === 'review' ? 'active' : ''}
+                onClick={() => setTab('review')}
+              >
+                Property Details
+              </button>
+
+              <button
+                type="button"
+                className={tab === 'photos' ? 'active' : ''}
+                onClick={() => setTab('photos')}
+              >
+                Photos
+              </button>
+
+              <button
+                type="button"
+                className={tab === 'offers' ? 'active' : ''}
+                onClick={() => setTab('offers')}
+              >
+                Pricing & Offers
+              </button>
+
+              <button
+                type="button"
+                className={tab === 'calendar' ? 'active' : ''}
+                onClick={() => setTab('calendar')}
+              >
+                Calendar
+              </button>
+            </nav>
+
+            {tab === 'review' && (
+              <PropertyDetails property={selected} />
+            )}
+
+            {tab === 'photos' && (
+              <section className="nosapManager">
+                <div className="nosapManagerHeading">
+                  <h2>Property Photos</h2>
+                  <p>Review and manage the property photos.</p>
+                </div>
+
+                <PropertyPhotoManager
+                  propertyId={selected.id}
+                  propertyName={selected.name}
+                />
+              </section>
+            )}
+
+            {tab === 'offers' && (
+              <section className="nosapManager">
+                <div className="nosapManagerHeading">
+                  <h2>Pricing & Offers</h2>
+                  <p>
+                    Manage pricing and offers for this property.
+                  </p>
+                </div>
+
+                <PropertyDiscountManager
+                  propertyId={selected.id}
+                  propertyName={selected.name}
+                />
+              </section>
+            )}
+
+            {tab === 'calendar' && (
+              <section className="nosapManager">
+                <div className="nosapManagerHeading">
+                  <h2>Property Calendar</h2>
+                  <p>
+                    Manage availability and date-wise pricing.
+                  </p>
+                </div>
+
+                <PropertyCalendarManager
+                  propertyId={selected.id}
+                  propertyName={selected.name}
+                />
+              </section>
+            )}
+          </div>
+        </main>
+
+        <Styles />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <main className="nosapPage">
+        <div className="nosapContainer">
+          <div className="nosapTitleRow">
+            <div>
+              <div className="nosapEyebrow">
+                SUPER ADMIN
               </div>
-            </article>
-          )
-        )}
-      </div>
-    </section>
+
+              <h1>Property Management</h1>
+
+              <p>
+                Review Host properties and control which listings
+                become live on NightOutStays.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="nosapSecondary"
+              onClick={loadProperties}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+
+          {error && <div className="nosapError">{error}</div>}
+
+          <div className="nosapStats">
+            {FILTERS.map((item) => (
+              <button
+                type="button"
+                key={item.key}
+                className={
+                  filter === item.key
+                    ? 'nosapStat nosapStatActive'
+                    : 'nosapStat'
+                }
+                onClick={() => setFilter(item.key)}
+              >
+                <span>{item.label}</span>
+                <strong>{counts[item.key]}</strong>
+              </button>
+            ))}
+          </div>
+
+          <div className="nosapListHeading">
+            <div>
+              <h2>
+                {FILTERS.find((item) => item.key === filter)?.label}
+              </h2>
+
+              <p>
+                {filteredProperties.length}{' '}
+                {filteredProperties.length === 1
+                  ? 'property'
+                  : 'properties'}
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="nosapLoading">
+              Loading properties...
+            </div>
+          ) : filteredProperties.length === 0 ? (
+            <div className="nosapEmpty">
+              <h3>No properties found</h3>
+              <p>There are no properties in this category.</p>
+            </div>
+          ) : (
+            <div className="nosapGrid">
+              {filteredProperties.map((property) => (
+                <PropertyCard
+                  key={property.id}
+                  property={property}
+                  onOpen={openProperty}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+
+      <Styles />
+    </>
   );
 }
 
-/* =====================================================
-   PROPERTY DETAILS FORM
-===================================================== */
-
-function PropertyDetailsForm({
-  form,
-  updateField,
-  toggleArrayItem,
-  saving,
-  errorMessage,
-  successMessage,
-  onSubmit,
-  isEditing,
-}) {
+function Summary({ label, value, sub }) {
   return (
-    <form
-      onSubmit={onSubmit}
-      className="nosPropForm"
-    >
-      <FormSection title="Basic Property Information">
-        <TextField
-          label="PROPERTY NAME"
-          value={form.name}
-          onChange={(value) =>
-            updateField(
-              'name',
-              value
-            )
-          }
-        />
+    <div className="nosapSummary">
+      <span>{label}</span>
+      <strong>{value || '—'}</strong>
+      {sub ? <small>{sub}</small> : null}
+    </div>
+  );
+}
 
-        <TextField
-          label="LOCATION"
-          value={
-            form.location_name
-          }
-          onChange={(value) =>
-            updateField(
-              'location_name',
-              value
-            )
-          }
-        />
+function PropertyCard({ property, onOpen }) {
+  return (
+    <article className="nosapCard">
+      <div className="nosapCardTop">
+        <div>
+          <h3>{property.name}</h3>
 
-        <TextField
-          label="PROPERTY URL SLUG"
-          value={form.slug}
-          placeholder="Leave blank to generate automatically"
-          onChange={(value) =>
-            updateField(
-              'slug',
-              value
-            )
-          }
-        />
+          <p>
+            {property.area ||
+              property.location_name ||
+              'Location not added'}
+            {property.city ? `, ${property.city}` : ''}
+          </p>
+        </div>
 
-        <TextField
-          label="GOOGLE MAPS LINK"
-          value={
-            form.google_maps_url
-          }
-          onChange={(value) =>
-            updateField(
-              'google_maps_url',
-              value
-            )
-          }
-        />
+        <div className="nosapCardBadges">
+          <span
+            className={`nosapBadge ${statusClass(
+              property.moderation_status
+            )}`}
+          >
+            {statusLabel(property.moderation_status)}
+          </span>
 
-        <TextArea
-          label="FULL ADDRESS"
-          value={form.address}
-          onChange={(value) =>
-            updateField(
-              'address',
-              value
-            )
-          }
-        />
+          <span
+            className={
+              property.is_active
+                ? 'nosapLiveBadge'
+                : 'nosapOfflineBadge'
+            }
+          >
+            {property.is_active ? 'LIVE' : 'OFFLINE'}
+          </span>
+        </div>
+      </div>
 
-        <TextArea
-          label="SHORT DESCRIPTION"
-          value={
-            form.short_description
-          }
-          onChange={(value) =>
-            updateField(
-              'short_description',
-              value
-            )
-          }
-        />
+      <div className="nosapHost">
+        <span>HOST</span>
+        <strong>{hostName(property)}</strong>
 
-        <TextArea
-          label="FULL DESCRIPTION"
-          value={
-            form.description
-          }
-          onChange={(value) =>
-            updateField(
-              'description',
-              value
-            )
-          }
-        />
-      </FormSection>
+        {property._host?.city && (
+          <small>
+            {property._host.city}
+            {property._host.state
+              ? `, ${property._host.state}`
+              : ''}
+          </small>
+        )}
+      </div>
 
-      <FormSection title="Rooms, Beds & Capacity">
-        <NumberField
-          label="BEDROOMS"
-          value={
-            form.bedrooms
-          }
-          onChange={(value) =>
-            updateField(
-              'bedrooms',
-              value
-            )
-          }
-        />
+      <div className="nosapPrice">
+        ₹{money(property.base_price)}
+        <small>/ night</small>
+      </div>
 
-        <NumberField
-          label="BATHROOMS"
-          value={
-            form.bathrooms
-          }
-          onChange={(value) =>
-            updateField(
-              'bathrooms',
-              value
-            )
-          }
-        />
+      <div className="nosapMiniGrid">
+        <div>
+          <strong>{property.bedrooms || 0}</strong>
+          <span>Bedrooms</span>
+        </div>
 
-        <NumberField
-          label="QUEEN SIZE BEDS"
-          value={
-            form.queen_bed_count
-          }
-          onChange={(value) =>
-            updateField(
-              'queen_bed_count',
-              value
-            )
-          }
-        />
+        <div>
+          <strong>{property.bathrooms || 0}</strong>
+          <span>Bathrooms</span>
+        </div>
 
-        <NumberField
-          label="SINGLE BEDS"
-          value={
-            form.single_bed_count
-          }
-          onChange={(value) =>
-            updateField(
-              'single_bed_count',
-              value
-            )
-          }
-        />
+        <div>
+          <strong>{property.max_guests || 0}</strong>
+          <span>Guests</span>
+        </div>
+      </div>
 
-        <NumberField
-          label="SOFA-CUM-BEDS"
-          value={
-            form.sofa_cum_bed_count
-          }
-          onChange={(value) =>
-            updateField(
-              'sofa_cum_bed_count',
-              value
-            )
-          }
-        />
+      <div className="nosapCardMeta">
+        <div>
+          <span>Property Type</span>
+          <strong>{property.property_type || '—'}</strong>
+        </div>
 
-        <NumberField
-          label="MINIMUM GUESTS"
-          value={
-            form.min_guests
-          }
-          onChange={(value) =>
-            updateField(
-              'min_guests',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="GUESTS INCLUDED IN BASE PRICE"
-          value={
-            form.included_guests
-          }
-          onChange={(value) =>
-            updateField(
-              'included_guests',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="MAXIMUM GUESTS"
-          value={
-            form.max_guests
-          }
-          onChange={(value) =>
-            updateField(
-              'max_guests',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Pricing">
-        <NumberField
-          label="BASE NIGHTLY PRICE ₹"
-          value={
-            form.base_price
-          }
-          onChange={(value) =>
-            updateField(
-              'base_price',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="EXTRA GUEST ₹ / PERSON / NIGHT"
-          value={
-            form.extra_guest_fee
-          }
-          onChange={(value) =>
-            updateField(
-              'extra_guest_fee',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="CLEANING FEE ₹"
-          value={
-            form.cleaning_fee
-          }
-          onChange={(value) =>
-            updateField(
-              'cleaning_fee',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="SECURITY DEPOSIT ₹"
-          value={
-            form.security_deposit
-          }
-          onChange={(value) =>
-            updateField(
-              'security_deposit',
-              value
-            )
-          }
-        />
-
-        <div className="nosPropInfoBox">
-          Base price ₹
-          {numberValue(
-            form.base_price
-          ).toLocaleString(
-            'en-IN'
-          )}{' '}
-          includes{' '}
+        <div>
+          <span>Submitted</span>
           <strong>
-            {form.included_guests}
-          </strong>{' '}
-          guest(s). Extra guests
-          are charged ₹
-          {numberValue(
-            form.extra_guest_fee
-          ).toLocaleString(
-            'en-IN'
-          )}{' '}
-          per person per night.
+            {formatDate(property.submitted_for_review_at)}
+          </strong>
         </div>
-      </FormSection>
+      </div>
 
-      <FormSection title="Stay Duration & Timing">
-        <NumberField
-          label="MINIMUM STAY NIGHTS"
-          value={
-            form.min_stay_nights
-          }
-          onChange={(value) =>
-            updateField(
-              'min_stay_nights',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="MAXIMUM STAY NIGHTS"
-          value={
-            form.max_stay_nights
-          }
-          onChange={(value) =>
-            updateField(
-              'max_stay_nights',
-              value
-            )
-          }
-        />
-
-        <TimeField
-          label="CHECK-IN TIME"
-          value={
-            form.check_in_time
-          }
-          onChange={(value) =>
-            updateField(
-              'check_in_time',
-              value
-            )
-          }
-        />
-
-        <TimeField
-          label="CHECK-OUT TIME"
-          value={
-            form.check_out_time
-          }
-          onChange={(value) =>
-            updateField(
-              'check_out_time',
-              value
-            )
-          }
-        />
-
-        <NumberField
-          label="LATE CHECK-OUT ₹ / HOUR"
-          value={
-            form.late_checkout_hourly_fee
-          }
-          onChange={(value) =>
-            updateField(
-              'late_checkout_hourly_fee',
-              value
-            )
-          }
-        />
-      </FormSection>
-      <FormSection title="Facilities">
-        <Toggle
-          label="Wi-Fi"
-          checked={
-            form.wifi_available
-          }
-          onChange={(value) =>
-            updateField(
-              'wifi_available',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="TV"
-          checked={
-            form.tv_available
-          }
-          onChange={(value) =>
-            updateField(
-              'tv_available',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Fridge"
-          checked={
-            form.fridge_available
-          }
-          onChange={(value) =>
-            updateField(
-              'fridge_available',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Washing Machine"
-          checked={
-            form.washing_machine_available
-          }
-          onChange={(value) =>
-            updateField(
-              'washing_machine_available',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Air Conditioning"
-          checked={
-            form.ac_available
-          }
-          onChange={(value) =>
-            updateField(
-              'ac_available',
-              value
-            )
-          }
-        />
-
-        {form.ac_available && (
-          <NumberField
-            label="NUMBER OF ACs"
-            value={
-              form.ac_count
-            }
-            onChange={(value) =>
-              updateField(
-                'ac_count',
-                value
-              )
-            }
-          />
-        )}
-
-        <NumberField
-          label="WATER HEATERS / GEYSERS"
-          value={
-            form.water_heater_count
-          }
-          onChange={(value) =>
-            updateField(
-              'water_heater_count',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Kitchen Features">
-        <CheckboxGrid
-          items={
-            kitchenOptions
-          }
-          selected={
-            form.kitchen_features
-          }
-          onToggle={(value) =>
-            toggleArrayItem(
-              'kitchen_features',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Amenities">
-        <CheckboxGrid
-          items={
-            amenityOptions
-          }
-          selected={
-            form.amenities
-          }
-          onToggle={(value) =>
-            toggleArrayItem(
-              'amenities',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Rules & Permissions">
-        <Toggle
-          label="Pets Allowed"
-          checked={
-            form.pets_allowed
-          }
-          onChange={(value) =>
-            updateField(
-              'pets_allowed',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Parties Allowed"
-          checked={
-            form.parties_allowed
-          }
-          onChange={(value) =>
-            updateField(
-              'parties_allowed',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Couples Allowed"
-          checked={
-            form.couples_allowed
-          }
-          onChange={(value) =>
-            updateField(
-              'couples_allowed',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Alcohol Allowed"
-          checked={
-            form.alcohol_allowed
-          }
-          onChange={(value) =>
-            updateField(
-              'alcohol_allowed',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Smoking Allowed"
-          checked={
-            form.smoking_allowed
-          }
-          onChange={(value) =>
-            updateField(
-              'smoking_allowed',
-              value
-            )
-          }
-        />
-
-        <Toggle
-          label="Enable Quiet Hours"
-          checked={
-            form.quiet_hours_enabled
-          }
-          onChange={(value) =>
-            updateField(
-              'quiet_hours_enabled',
-              value
-            )
-          }
-        />
-
-        {form.quiet_hours_enabled && (
-          <>
-            <TimeField
-              label="QUIET HOURS FROM"
-              value={
-                form.quiet_hours_start
-              }
-              onChange={(value) =>
-                updateField(
-                  'quiet_hours_start',
-                  value
-                )
-              }
-            />
-
-            <TimeField
-              label="QUIET HOURS UNTIL"
-              value={
-                form.quiet_hours_end
-              }
-              onChange={(value) =>
-                updateField(
-                  'quiet_hours_end',
-                  value
-                )
-              }
-            />
-          </>
-        )}
-
-        <TextArea
-          label="OTHER HOUSE RULES — ONE PER LINE"
-          value={
-            form.house_rules_text
-          }
-          onChange={(value) =>
-            updateField(
-              'house_rules_text',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Directions / Arrival Instructions">
-        <TextArea
-          label="DIRECTION INSTRUCTIONS"
-          value={
-            form.direction_instructions
-          }
-          onChange={(value) =>
-            updateField(
-              'direction_instructions',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      <FormSection title="Automatic Dynamic Pricing">
-        <Toggle
-          label="Enable Dynamic Pricing"
-          checked={
-            form.dynamic_pricing_enabled
-          }
-          onChange={(value) =>
-            updateField(
-              'dynamic_pricing_enabled',
-              value
-            )
-          }
-        />
-
-        {form.dynamic_pricing_enabled && (
-          <>
-            <NumberField
-              label="WEEKEND MARKUP %"
-              value={
-                form.weekend_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'weekend_markup_percent',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="LONG WEEKEND MARKUP %"
-              value={
-                form.long_weekend_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'long_weekend_markup_percent',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="FESTIVAL MARKUP %"
-              value={
-                form.festival_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'festival_markup_percent',
-                  value
-                )
-              }
-            />
-
-            <NumberField
-              label="SEASON MARKUP %"
-              value={
-                form.season_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'season_markup_percent',
-                  value
-                )
-              }
-            />
-          </>
-        )}
-      </FormSection>
-
-      <FormSection title="Publishing">
-        <Toggle
-          label="Property Active / Visible to Guests"
-          checked={
-            form.is_active
-          }
-          onChange={(value) =>
-            updateField(
-              'is_active',
-              value
-            )
-          }
-        />
-      </FormSection>
-
-      {errorMessage && (
-        <div className="nosPropError">
-          {errorMessage}
+      {property.moderation_status === 'pending_review' && (
+        <div className="nosapPendingNotice">
+          Awaiting Super Admin Review
         </div>
       )}
 
-      {successMessage && (
-        <div className="nosPropSuccess">
-          {successMessage}
-        </div>
-      )}
+      {property.moderation_status === 'changes_requested' &&
+        property.moderation_notes && (
+          <div className="nosapSmallNote">
+            <strong>Changes requested</strong>
+            <span>{property.moderation_notes}</span>
+          </div>
+        )}
 
-      <div className="nosPropSaveArea">
+      <div className="nosapCardActions">
         <button
-          type="submit"
-          disabled={saving}
-          className="nosPropSaveButton"
+          type="button"
+          className={
+            property.moderation_status === 'pending_review'
+              ? 'nosapReviewButton'
+              : 'nosapPrimary'
+          }
+          onClick={() => onOpen(property, 'review')}
         >
-          {saving
-            ? 'Saving Property...'
-            : isEditing
-            ? 'Update Property'
-            : 'Create Property'}
+          {property.moderation_status === 'pending_review'
+            ? 'Review Property'
+            : 'Manage Property'}
+        </button>
+
+        <button
+          type="button"
+          className="nosapSecondary"
+          onClick={() => onOpen(property, 'photos')}
+        >
+          Photos
+        </button>
+
+        <button
+          type="button"
+          className="nosapSecondary"
+          onClick={() => onOpen(property, 'offers')}
+        >
+          Offers
+        </button>
+
+        <button
+          type="button"
+          className="nosapSecondary"
+          onClick={() => onOpen(property, 'calendar')}
+        >
+          Calendar
         </button>
       </div>
-    </form>
+    </article>
   );
 }
 
-/* =====================================================
-   FORM HELPERS
-===================================================== */
+function PropertyDetails({ property }) {
+  const houseRules = Array.isArray(property.house_rules)
+    ? property.house_rules
+    : [];
 
-function FormSection({
-  title,
-  children,
-}) {
+  const amenities = Array.isArray(property.amenities)
+    ? property.amenities
+    : [];
+
+  const kitchen = Array.isArray(property.kitchen_features)
+    ? property.kitchen_features
+    : [];
+
   return (
-    <section className="nosPropFormSection">
-      <h3>
-        {title}
-      </h3>
+    <div className="nosapDetails">
+      <DetailSection title="Property Information">
+        <Detail label="Property Name" value={property.name} />
+        <Detail
+          label="Property Type"
+          value={property.property_type}
+        />
+        <Detail label="City" value={property.city} />
+        <Detail label="Area" value={property.area} />
+        <Detail
+          label="Display Location"
+          value={property.location_name}
+        />
+        <Detail
+          label="Nightly Rate"
+          value={`₹${money(property.base_price)}`}
+        />
+      </DetailSection>
 
-      <div className="nosPropFormGrid">
-        {children}
-      </div>
+      <DetailSection title="Description">
+        <DetailWide
+          label="Short Description"
+          value={property.short_description}
+        />
+
+        <DetailWide
+          label="Full Description"
+          value={property.description}
+        />
+      </DetailSection>
+
+      <DetailSection title="Address & Location">
+        <DetailWide label="Address" value={property.address} />
+
+        <DetailWide
+          label="Google Maps"
+          value={property.google_maps_url}
+          link
+        />
+
+        <Detail
+          label="Latitude"
+          value={property.latitude}
+        />
+
+        <Detail
+          label="Longitude"
+          value={property.longitude}
+        />
+      </DetailSection>
+
+      <DetailSection title="Rooms & Guests">
+        <Detail label="Bedrooms" value={property.bedrooms} />
+        <Detail label="Bathrooms" value={property.bathrooms} />
+        <Detail
+          label="Minimum Guests"
+          value={property.min_guests}
+        />
+        <Detail
+          label="Guests Included"
+          value={property.included_guests}
+        />
+        <Detail
+          label="Maximum Guests"
+          value={property.max_guests}
+        />
+        <Detail
+          label="Queen Beds"
+          value={property.queen_bed_count}
+        />
+        <Detail
+          label="Single Beds"
+          value={property.single_bed_count}
+        />
+        <Detail
+          label="Sofa Cum Beds"
+          value={property.sofa_cum_bed_count}
+        />
+      </DetailSection>
+
+      <DetailSection title="Pricing">
+        <Detail
+          label="Base Rate"
+          value={`₹${money(property.base_price)}`}
+        />
+
+        <Detail
+          label="Extra Guest Fee"
+          value={`₹${money(property.extra_guest_fee)}`}
+        />
+
+        <Detail
+          label="Cleaning Fee"
+          value={`₹${money(property.cleaning_fee)}`}
+        />
+
+        <Detail
+          label="Security Deposit"
+          value={`₹${money(property.security_deposit)}`}
+        />
+
+        <Detail
+          label="Minimum Nights"
+          value={property.min_stay_nights}
+        />
+
+        <Detail
+          label="Maximum Nights"
+          value={property.max_stay_nights}
+        />
+
+        <Detail
+          label="Late Checkout / Hour"
+          value={`₹${money(property.late_checkout_hourly_fee)}`}
+        />
+      </DetailSection>
+
+      <DetailSection title="Check-in & Check-out">
+        <Detail
+          label="Check-in"
+          value={property.check_in_time}
+        />
+
+        <Detail
+          label="Check-out"
+          value={property.check_out_time}
+        />
+      </DetailSection>
+
+      <DetailSection title="Facilities">
+        <BooleanDetail label="Wi-Fi" value={property.wifi_available} />
+        <BooleanDetail label="TV" value={property.tv_available} />
+        <BooleanDetail
+          label="Fridge"
+          value={property.fridge_available}
+        />
+        <BooleanDetail
+          label="Washing Machine"
+          value={property.washing_machine_available}
+        />
+        <BooleanDetail label="AC" value={property.ac_available} />
+        <Detail label="AC Count" value={property.ac_count} />
+        <Detail
+          label="Water Heaters"
+          value={property.water_heater_count}
+        />
+      </DetailSection>
+
+      <DetailSection title="Guest Policies">
+        <BooleanDetail
+          label="Pets Allowed"
+          value={property.pets_allowed}
+        />
+        <BooleanDetail
+          label="Parties Allowed"
+          value={property.parties_allowed}
+        />
+        <BooleanDetail
+          label="Couples Allowed"
+          value={property.couples_allowed}
+        />
+        <BooleanDetail
+          label="Alcohol Allowed"
+          value={property.alcohol_allowed}
+        />
+        <BooleanDetail
+          label="Smoking Allowed"
+          value={property.smoking_allowed}
+        />
+        <BooleanDetail
+          label="Quiet Hours"
+          value={property.quiet_hours_enabled}
+        />
+      </DetailSection>
+
+      {amenities.length > 0 && (
+        <TagSection title="Amenities" items={amenities} />
+      )}
+
+      {kitchen.length > 0 && (
+        <TagSection title="Kitchen Features" items={kitchen} />
+      )}
+
+      {houseRules.length > 0 && (
+        <TagSection title="House Rules" items={houseRules} />
+      )}
+
+      <DetailSection title="Directions">
+        <DetailWide
+          label="Direction Instructions"
+          value={property.direction_instructions}
+        />
+      </DetailSection>
+
+      <DetailSection title="Dynamic Pricing">
+        <BooleanDetail
+          label="Dynamic Pricing"
+          value={property.dynamic_pricing_enabled}
+        />
+
+        <Detail
+          label="Weekend Markup"
+          value={`${Number(
+            property.weekend_markup_percent || 0
+          )}%`}
+        />
+
+        <Detail
+          label="Long Weekend"
+          value={`${Number(
+            property.long_weekend_markup_percent || 0
+          )}%`}
+        />
+
+        <Detail
+          label="Festival"
+          value={`${Number(
+            property.festival_markup_percent || 0
+          )}%`}
+        />
+
+        <Detail
+          label="Season"
+          value={`${Number(
+            property.season_markup_percent || 0
+          )}%`}
+        />
+      </DetailSection>
+    </div>
+  );
+}
+
+function DetailSection({ title, children }) {
+  return (
+    <section className="nosapDetailSection">
+      <h2>{title}</h2>
+      <div className="nosapDetailGrid">{children}</div>
     </section>
   );
 }
 
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder = '',
-}) {
+function Detail({ label, value }) {
   return (
-    <label className="nosPropField">
-      <span>
-        {label}
-      </span>
-
-      <input
-        type="text"
-        value={value ?? ''}
-        placeholder={
-          placeholder
-        }
-        onChange={(event) =>
-          onChange(
-            event.target.value
-          )
-        }
-      />
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-}) {
-  return (
-    <label className="nosPropField">
-      <span>
-        {label}
-      </span>
-
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={value ?? ''}
-        onChange={(event) =>
-          onChange(
-            event.target.value
-          )
-        }
-      />
-    </label>
-  );
-}
-
-function TimeField({
-  label,
-  value,
-  onChange,
-}) {
-  return (
-    <label className="nosPropField">
-      <span>
-        {label}
-      </span>
-
-      <input
-        type="time"
-        value={value || ''}
-        onChange={(event) =>
-          onChange(
-            event.target.value
-          )
-        }
-      />
-    </label>
-  );
-}
-
-function TextArea({
-  label,
-  value,
-  onChange,
-}) {
-  return (
-    <label className="nosPropField nosPropFullWidth">
-      <span>
-        {label}
-      </span>
-
-      <textarea
-        value={value ?? ''}
-        onChange={(event) =>
-          onChange(
-            event.target.value
-          )
-        }
-        rows="5"
-      />
-    </label>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}) {
-  return (
-    <label className="nosPropToggle">
-      <input
-        type="checkbox"
-        checked={
-          Boolean(checked)
-        }
-        onChange={(event) =>
-          onChange(
-            event.target.checked
-          )
-        }
-      />
-
-      <span className="nosPropToggleSwitch" />
-
+    <div className="nosapDetail">
+      <span>{label}</span>
       <strong>
-        {label}
+        {value === null || value === undefined || value === ''
+          ? '—'
+          : String(value)}
       </strong>
-    </label>
+    </div>
   );
 }
 
-function CheckboxGrid({
-  items,
-  selected,
-  onToggle,
-}) {
+function DetailWide({ label, value, link = false }) {
   return (
-    <div className="nosPropCheckboxGrid nosPropFullWidth">
-      {items.map(
-        (item) => (
-          <label
-            key={item}
-            className="nosPropCheckboxItem"
-          >
-            <input
-              type="checkbox"
-              checked={
-                selected?.includes(
-                  item
-                ) || false
-              }
-              onChange={() =>
-                onToggle(item)
-              }
-            />
+    <div className="nosapDetail nosapDetailWide">
+      <span>{label}</span>
 
-            <span>
-              {item}
-            </span>
-          </label>
-        )
+      {link && value ? (
+        <a href={value} target="_blank" rel="noreferrer">
+          Open Google Maps
+        </a>
+      ) : (
+        <strong>
+          {value === null || value === undefined || value === ''
+            ? '—'
+            : String(value)}
+        </strong>
       )}
     </div>
   );
 }
 
-/* =====================================================
-   RESPONSIVE STYLES
-===================================================== */
-
-function PageStyles() {
+function BooleanDetail({ label, value }) {
   return (
-    <style jsx global>{`
-      .nosPropPage {
-        min-height: 100vh;
-        background: #f5f7fa;
-        color: #172033;
-        font-family: Arial, Helvetica, sans-serif;
-      }
-
-      .nosPropPage *,
-      .nosPropPage *::before,
-      .nosPropPage *::after {
-        box-sizing: border-box;
-      }
-
-      .nosPropHeader {
-        min-height: 76px;
-        padding: 14px 28px;
-        background: #ffffff;
-        border-bottom: 1px solid #e3e7ee;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-      }
-
-      .nosPropBrand {
-        font-size: 22px;
-        font-weight: 800;
-        letter-spacing: -0.4px;
-      }
-
-      .nosPropMuted,
-      .nosPropHeaderRight span,
-      .nosPropPageHeading p,
-      .nosPropEditorTitle p,
-      .nosPropManageTitleRow p,
-      .nosPropManagerHeading p,
-      .nosPropListHeading p,
-      .nosPropCardTitle p {
-        color: #697386;
-      }
-
-      .nosPropBrandArea .nosPropMuted {
-        margin-top: 4px;
-        font-size: 13px;
-      }
-
-      .nosPropHeaderRight {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-      }
-
-      .nosPropProfile {
-        display: flex;
-        flex-direction: column;
-        text-align: right;
-        gap: 3px;
-        font-size: 13px;
-      }
-
-      .nosPropProfile strong {
-        font-size: 14px;
-      }
-
-      .nosPropLogoutButton,
-      .nosPropBackButton,
-      .nosPropMainTab,
-      .nosPropAddButton,
-      .nosPropPrimaryButton,
-      .nosPropSaveButton,
-      .nosPropManageTab,
-      .nosPropCardActions button,
-      .nosPropCardActions a,
-      .nosPropPreviewTop {
-        min-height: 44px;
-        cursor: pointer;
-        font: inherit;
-      }
-
-      .nosPropLogoutButton {
-        border: 1px solid #d8dee8;
-        background: #ffffff;
-        padding: 9px 16px;
-        border-radius: 9px;
-        font-weight: 700;
-      }
-
-      .nosPropContent {
-        width: min(1400px, calc(100% - 48px));
-        margin: 0 auto;
-        padding: 32px 0 60px;
-      }
-
-      .nosPropPageHeading h1 {
-        margin: 0;
-        font-size: 30px;
-      }
-
-      .nosPropPageHeading p {
-        margin: 8px 0 0;
-        line-height: 1.5;
-      }
-
-      .nosPropMainTabs {
-        margin-top: 24px;
-        display: inline-flex;
-        padding: 5px;
-        background: #e9edf3;
-        border-radius: 12px;
-        gap: 5px;
-      }
-
-      .nosPropMainTab {
-        border: 0;
-        background: transparent;
-        padding: 10px 18px;
-        border-radius: 9px;
-        font-weight: 700;
-        color: #536071;
-      }
-
-      .nosPropMainTabActive {
-        background: #ffffff;
-        color: #172033;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-      }
-
-      .nosPropListSection {
-        margin-top: 28px;
-      }
-
-      .nosPropListHeading {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 18px;
-      }
-
-      .nosPropListHeading h2 {
-        margin: 0;
-        font-size: 22px;
-      }
-
-      .nosPropListHeading p {
-        margin: 5px 0 0;
-        font-size: 14px;
-      }
-
-      .nosPropAddButton,
-      .nosPropPrimaryButton,
-      .nosPropSaveButton {
-        border: 0;
-        background: #172033;
-        color: #ffffff;
-        border-radius: 9px;
-        padding: 10px 18px;
-        font-weight: 800;
-      }
-
-      .nosPropPropertyGrid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 18px;
-      }
-
-      .nosPropPropertyCard {
-        background: #ffffff;
-        border: 1px solid #e1e6ed;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 4px 14px rgba(21, 32, 51, 0.04);
-        min-width: 0;
-      }
-
-      .nosPropCardTop {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-      }
-
-      .nosPropCardTitle {
-        min-width: 0;
-      }
-
-      .nosPropCardTitle h3 {
-        margin: 0;
-        font-size: 18px;
-        line-height: 1.35;
-        overflow-wrap: anywhere;
-      }
-
-      .nosPropCardTitle p {
-        margin: 6px 0 0;
-        font-size: 13px;
-        line-height: 1.4;
-      }
-
-      .nosPropStatus {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 28px;
-        padding: 5px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-        white-space: nowrap;
-      }
-
-      .nosPropStatusActive {
-        background: #e8f7ee;
-        color: #16733d;
-      }
-
-      .nosPropStatusInactive {
-        background: #f1f2f4;
-        color: #697386;
-      }
-
-      .nosPropPrice {
-        margin-top: 20px;
-        font-size: 24px;
-        font-weight: 800;
-      }
-
-      .nosPropPrice span {
-        font-size: 13px;
-        font-weight: 500;
-        color: #697386;
-      }
-
-      .nosPropCardInfo {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        margin-top: 18px;
-        border: 1px solid #e8ebf0;
-        border-radius: 11px;
-        overflow: hidden;
-      }
-
-      .nosPropCardInfo > div {
-        min-width: 0;
-        padding: 11px 7px;
-        text-align: center;
-        border-right: 1px solid #e8ebf0;
-      }
-
-      .nosPropCardInfo > div:last-child {
-        border-right: 0;
-      }
-
-      .nosPropCardInfo strong,
-      .nosPropCardInfo span {
-        display: block;
-      }
-
-      .nosPropCardInfo strong {
-        font-size: 16px;
-      }
-
-      .nosPropCardInfo span {
-        margin-top: 4px;
-        color: #697386;
-        font-size: 11px;
-      }
-
-      .nosPropBaseGuestInfo {
-        margin-top: 13px;
-        color: #697386;
-        font-size: 12px;
-      }
-
-      .nosPropDynamicBadge {
-        margin-top: 12px;
-        display: inline-block;
-        padding: 6px 9px;
-        border-radius: 7px;
-        background: #fff4d6;
-        color: #795800;
-        font-size: 11px;
-        font-weight: 800;
-      }
-
-      .nosPropCardActions {
-        margin-top: 18px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      .nosPropCardActions button,
-      .nosPropCardActions a {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-weight: 700;
-        font-size: 12px;
-        text-decoration: none;
-        text-align: center;
-      }
-
-      .nosPropCardPrimary {
-        border: 1px solid #172033;
-        background: #172033;
-        color: #ffffff;
-      }
-
-      .nosPropCardSecondary {
-        border: 1px solid #dbe1e9;
-        background: #ffffff;
-        color: #27364a;
-      }
-
-      .nosPropCardDanger {
-        border: 1px solid #f1cccc;
-        background: #fff5f5;
-        color: #a12b2b;
-      }
-
-      .nosPropCardActivate {
-        border: 1px solid #bfe3cd;
-        background: #f1fbf5;
-        color: #16733d;
-      }
-
-      .nosPropEditor {
-        margin-top: 28px;
-      }
-
-      .nosPropBackButton {
-        border: 0;
-        background: transparent;
-        padding: 0 4px;
-        color: #41546d;
-        font-weight: 800;
-      }
-
-      .nosPropEditorTitle {
-        margin: 10px 0 20px;
-      }
-
-      .nosPropEditorTitle h2,
-      .nosPropManageTitleRow h2 {
-        margin: 0;
-        font-size: 25px;
-      }
-
-      .nosPropEditorTitle p,
-      .nosPropManageTitleRow p {
-        margin: 7px 0 0;
-        line-height: 1.5;
-      }
-
-      .nosPropManageHeader {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        gap: 20px;
-        margin-bottom: 18px;
-      }
-
-      .nosPropManageLeft {
-        min-width: 0;
-        flex: 1;
-      }
-
-      .nosPropManageTitleRow {
-        margin-top: 10px;
-        display: flex;
-        align-items: flex-start;
-        gap: 14px;
-      }
-
-      .nosPropSmallTitle {
-        margin-bottom: 5px;
-        color: #8791a0;
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 1px;
-      }
-
-      .nosPropPreviewTop {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid #d8dee8;
-        background: #ffffff;
-        color: #27364a;
-        border-radius: 9px;
-        padding: 9px 16px;
-        text-decoration: none;
-        font-weight: 700;
-        white-space: nowrap;
-      }
-
-      .nosPropManageTabsWrap {
-        overflow-x: auto;
-        scrollbar-width: thin;
-        margin-bottom: 20px;
-      }
-
-      .nosPropManageTabs {
-        min-width: max-content;
-        display: flex;
-        gap: 6px;
-        padding: 5px;
-        background: #e9edf3;
-        border-radius: 11px;
-      }
-
-      .nosPropManageTab {
-        border: 0;
-        background: transparent;
-        color: #536071;
-        padding: 9px 16px;
-        border-radius: 8px;
-        font-weight: 800;
-        white-space: nowrap;
-      }
-
-      .nosPropManageTabActive {
-        background: #ffffff;
-        color: #172033;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-      }
-
-      .nosPropManagerPanel,
-      .nosPropFormSection {
-        background: #ffffff;
-        border: 1px solid #e1e6ed;
-        border-radius: 14px;
-        padding: 22px;
-        margin-bottom: 18px;
-      }
-
-      .nosPropManagerHeading {
-        padding-bottom: 16px;
-        margin-bottom: 18px;
-        border-bottom: 1px solid #e8ebf0;
-      }
-
-      .nosPropManagerHeading h3,
-      .nosPropFormSection h3 {
-        margin: 0;
-        font-size: 18px;
-      }
-
-      .nosPropManagerHeading p {
-        margin: 6px 0 0;
-        line-height: 1.45;
-      }
-
-      .nosPropForm {
-        width: 100%;
-      }
-
-      .nosPropFormGrid {
-        margin-top: 18px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-        gap: 16px;
-        align-items: start;
-      }
-
-      .nosPropField {
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
-      }
-
-      .nosPropField > span {
-        color: #59677a;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.25px;
-      }
-
-      .nosPropField input,
-      .nosPropField textarea {
-        width: 100%;
-        min-height: 44px;
-        border: 1px solid #d8dee8;
-        border-radius: 8px;
-        background: #ffffff;
-        color: #172033;
-        padding: 10px 12px;
-        font: inherit;
-        outline: none;
-      }
-
-      .nosPropField textarea {
-        min-height: 110px;
-        resize: vertical;
-        line-height: 1.5;
-      }
-
-      .nosPropField input:focus,
-      .nosPropField textarea:focus {
-        border-color: #7e8ca0;
-        box-shadow: 0 0 0 3px rgba(90, 110, 140, 0.09);
-      }
-
-      .nosPropFullWidth {
-        grid-column: 1 / -1;
-      }
-
-      .nosPropInfoBox {
-        grid-column: 1 / -1;
-        padding: 12px 14px;
-        background: #f6f8fb;
-        border: 1px solid #e2e7ee;
-        border-radius: 8px;
-        color: #536071;
-        font-size: 13px;
-        line-height: 1.5;
-      }
-
-      .nosPropToggle {
-        min-height: 50px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border: 1px solid #e1e6ed;
-        border-radius: 9px;
-        cursor: pointer;
-        user-select: none;
-      }
-
-      .nosPropToggle input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      .nosPropToggleSwitch {
-        position: relative;
-        width: 40px;
-        height: 23px;
-        flex: 0 0 40px;
-        border-radius: 999px;
-        background: #c9d0da;
-        transition: 0.2s ease;
-      }
-
-      .nosPropToggleSwitch::after {
-        content: '';
-        position: absolute;
-        width: 17px;
-        height: 17px;
-        left: 3px;
-        top: 3px;
-        border-radius: 50%;
-        background: #ffffff;
-        transition: 0.2s ease;
-      }
-
-      .nosPropToggle input:checked + .nosPropToggleSwitch {
-        background: #172033;
-      }
-
-      .nosPropToggle input:checked + .nosPropToggleSwitch::after {
-        transform: translateX(17px);
-      }
-
-      .nosPropToggle strong {
-        font-size: 13px;
-      }
-
-      .nosPropCheckboxGrid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .nosPropCheckboxItem {
-        min-height: 46px;
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        padding: 9px 11px;
-        border: 1px solid #e1e6ed;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 13px;
-      }
-
-      .nosPropCheckboxItem input {
-        width: 17px;
-        height: 17px;
-        flex: 0 0 17px;
-      }
-
-      .nosPropSaveArea {
-        display: flex;
-        justify-content: flex-end;
-        padding: 4px 0 24px;
-      }
-
-      .nosPropSaveButton {
-        min-width: 190px;
-      }
-
-      .nosPropSaveButton:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-
-      .nosPropError,
-      .nosPropSuccess {
-        margin: 14px 0;
-        padding: 12px 14px;
-        border-radius: 9px;
-        font-size: 13px;
-        line-height: 1.5;
-      }
-
-      .nosPropError {
-        background: #fff3f3;
-        border: 1px solid #f0cccc;
-        color: #9d2929;
-      }
-
-      .nosPropSuccess {
-        background: #effaf3;
-        border: 1px solid #c9e8d4;
-        color: #17663a;
-      }
-
-      .nosPropLoadingBox,
-      .nosPropLoginNotice,
-      .nosPropEmptyState {
-        margin-top: 28px;
-        background: #ffffff;
-        border: 1px solid #e1e6ed;
-        border-radius: 14px;
-        padding: 32px;
-        text-align: center;
-      }
-
-      .nosPropLoginNotice {
-        width: min(520px, calc(100% - 32px));
-        margin: 60px auto;
-      }
-
-      .nosPropLoginNotice h2,
-      .nosPropEmptyState h2 {
-        margin: 8px 0;
-      }
-
-      .nosPropLoginNotice p,
-      .nosPropEmptyState p {
-        color: #697386;
-        line-height: 1.5;
-      }
-
-      .nosPropPrimaryLink {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 44px;
-        margin-top: 8px;
-        padding: 10px 18px;
-        border-radius: 9px;
-        background: #172033;
-        color: #ffffff;
-        text-decoration: none;
-        font-weight: 800;
-      }
-
-      .nosPropEmptyIcon {
-        font-size: 36px;
-      }
-
-      @media (max-width: 1100px) {
-        .nosPropPropertyGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropCheckboxGrid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-      }
-
-      @media (max-width: 768px) {
-        .nosPropHeader {
-          padding: 13px 18px;
-          align-items: flex-start;
-          flex-wrap: wrap;
-        }
-
-        .nosPropHeaderRight {
-          width: 100%;
-          justify-content: space-between;
-          border-top: 1px solid #edf0f4;
-          padding-top: 11px;
-        }
-
-        .nosPropProfile {
-          text-align: left;
-        }
-
-        .nosPropContent {
-          width: calc(100% - 28px);
-          padding-top: 22px;
-        }
-
-        .nosPropPageHeading h1 {
-          font-size: 26px;
-        }
-
-        .nosPropMainTabs {
-          width: 100%;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-        }
-
-        .nosPropMainTab {
-          padding-left: 8px;
-          padding-right: 8px;
-          font-size: 13px;
-        }
-
-        .nosPropPropertyGrid {
-          grid-template-columns: 1fr;
-        }
-
-        .nosPropListHeading {
-          align-items: flex-end;
-        }
-
-        .nosPropManageHeader {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-
-        .nosPropPreviewTop {
-          width: 100%;
-        }
-
-        .nosPropManageTitleRow {
-          justify-content: space-between;
-        }
-
-        .nosPropManagerPanel,
-        .nosPropFormSection {
-          padding: 17px;
-          border-radius: 12px;
-        }
-
-        .nosPropFormGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropCheckboxGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropSaveButton {
-          width: 100%;
-        }
-      }
-
-      @media (max-width: 520px) {
-        .nosPropBrand {
-          font-size: 20px;
-        }
-
-        .nosPropContent {
-          width: calc(100% - 20px);
-        }
-
-        .nosPropListHeading {
-          align-items: stretch;
-          flex-direction: column;
-        }
-
-        .nosPropAddButton {
-          width: 100%;
-        }
-
-        .nosPropPropertyCard {
-          padding: 16px;
-        }
-
-        .nosPropCardTop {
-          gap: 8px;
-        }
-
-        .nosPropCardInfo {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .nosPropCardActions {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropFormGrid {
-          grid-template-columns: 1fr;
-        }
-
-        .nosPropCheckboxGrid {
-          grid-template-columns: 1fr;
-        }
-
-        .nosPropFullWidth,
-        .nosPropInfoBox {
-          grid-column: 1;
-        }
-
-        .nosPropManageTitleRow {
-          flex-direction: column;
-        }
-
-        .nosPropManageTabsWrap {
-          margin-left: -10px;
-          margin-right: -10px;
-          padding: 0 10px;
-        }
-
-        .nosPropEditorTitle h2,
-        .nosPropManageTitleRow h2 {
-          font-size: 22px;
-        }
-      }
-
-      @media (max-width: 360px) {
-        .nosPropCardActions {
-          grid-template-columns: 1fr;
-        }
-
-        .nosPropMainTabs {
-          grid-template-columns: 1fr;
-        }
-      }
-    `}</style>
+    <Detail
+      label={label}
+      value={value ? 'Yes' : 'No'}
+    />
   );
 }
-      onSubmit={onSubmit}
-      className="nosPropForm"
-    >
-      {errorMessage && (
-        <div className="nosPropError">
-          {errorMessage}
-        </div>
-      )}
 
-      {successMessage && (
-        <div className="nosPropSuccess">
-          {successMessage}
-        </div>
-      )}
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>PROPERTY INFORMATION</span>
-            <h3>Basic Details</h3>
-          </div>
-        </div>
-
-        <div className="nosPropGrid2">
-          <label className="nosPropField">
-            <span>Property Name</span>
-
-            <input
-              value={form.name}
-              onChange={(event) =>
-                updateField(
-                  'name',
-                  event.target.value
-                )
-              }
-              placeholder="Example: Cozy 2BHK Apartment"
-              required
-            />
-          </label>
-
-          <label className="nosPropField">
-            <span>Property Type</span>
-
-            <select
-              value={form.property_type || ''}
-              onChange={(event) =>
-                updateField(
-                  'property_type',
-                  event.target.value
-                )
-              }
-            >
-              <option value="">
-                Select Property Type
-              </option>
-
-              <option value="Apartment">
-                Apartment
-              </option>
-
-              <option value="Villa">
-                Villa
-              </option>
-
-              <option value="Bungalow">
-                Bungalow
-              </option>
-
-              <option value="Studio">
-                Studio
-              </option>
-
-              <option value="Condo">
-                Condo
-              </option>
-
-              <option value="Farmhouse">
-                Farmhouse
-              </option>
-
-              <option value="Cottage">
-                Cottage
-              </option>
-
-              <option value="Row House">
-                Row House
-              </option>
-
-              <option value="Guest House">
-                Guest House
-              </option>
-
-              <option value="Service Apartment">
-                Service Apartment
-              </option>
-            </select>
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Short Description</span>
-
-            <input
-              value={form.short_description || ''}
-              onChange={(event) =>
-                updateField(
-                  'short_description',
-                  event.target.value
-                )
-              }
-              placeholder="Short description for cards and search results"
-            />
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Full Description</span>
-
-            <textarea
-              rows="6"
-              value={form.description || ''}
-              onChange={(event) =>
-                updateField(
-                  'description',
-                  event.target.value
-                )
-              }
-              placeholder="Describe the property, experience and important information."
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>LOCATION</span>
-            <h3>Property Location</h3>
-          </div>
-        </div>
-
-        <div className="nosPropGrid2">
-          <label className="nosPropField">
-            <span>City</span>
-
-            <input
-              value={form.city || ''}
-              onChange={(event) =>
-                updateField(
-                  'city',
-                  event.target.value
-                )
-              }
-              placeholder="Pune"
-            />
-          </label>
-
-          <label className="nosPropField">
-            <span>Area</span>
-
-            <input
-              value={form.area || ''}
-              onChange={(event) =>
-                updateField(
-                  'area',
-                  event.target.value
-                )
-              }
-              placeholder="Bavdhan"
-            />
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Display Location</span>
-
-            <input
-              value={form.location_name || ''}
-              onChange={(event) =>
-                updateField(
-                  'location_name',
-                  event.target.value
-                )
-              }
-              placeholder="Bavdhan, Pune"
-              required
-            />
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Full Address</span>
-
-            <textarea
-              rows="3"
-              value={form.address || ''}
-              onChange={(event) =>
-                updateField(
-                  'address',
-                  event.target.value
-                )
-              }
-              placeholder="Complete property address"
-            />
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Google Maps URL</span>
-
-            <input
-              value={form.google_maps_url || ''}
-              onChange={(event) =>
-                updateField(
-                  'google_maps_url',
-                  event.target.value
-                )
-              }
-              placeholder="Google Maps location link"
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>CAPACITY</span>
-            <h3>Rooms, Beds & Guests</h3>
-          </div>
-        </div>
-
-        <div className="nosPropGrid4">
-          <NumberField
-            label="Bedrooms"
-            value={form.bedrooms}
-            onChange={(value) =>
-              updateField('bedrooms', value)
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Bathrooms"
-            value={form.bathrooms}
-            onChange={(value) =>
-              updateField('bathrooms', value)
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Queen Beds"
-            value={form.queen_bed_count}
-            onChange={(value) =>
-              updateField(
-                'queen_bed_count',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Single Beds"
-            value={form.single_bed_count}
-            onChange={(value) =>
-              updateField(
-                'single_bed_count',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Sofa Cum Beds"
-            value={form.sofa_cum_bed_count}
-            onChange={(value) =>
-              updateField(
-                'sofa_cum_bed_count',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Minimum Guests"
-            value={form.min_guests}
-            onChange={(value) =>
-              updateField(
-                'min_guests',
-                value
-              )
-            }
-            min="1"
-          />
-
-          <NumberField
-            label="Guests Included"
-            value={form.included_guests}
-            onChange={(value) =>
-              updateField(
-                'included_guests',
-                value
-              )
-            }
-            min="1"
-          />
-
-          <NumberField
-            label="Maximum Guests"
-            value={form.max_guests}
-            onChange={(value) =>
-              updateField(
-                'max_guests',
-                value
-              )
-            }
-            min="1"
-          />
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>PRICING</span>
-            <h3>Base Pricing</h3>
-          </div>
-        </div>
-
-        <div className="nosPropGrid4">
-          <NumberField
-            label="Base Nightly Rate ₹"
-            value={form.base_price}
-            onChange={(value) =>
-              updateField(
-                'base_price',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Extra Guest Fee ₹"
-            value={form.extra_guest_fee}
-            onChange={(value) =>
-              updateField(
-                'extra_guest_fee',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Cleaning Fee ₹"
-            value={form.cleaning_fee}
-            onChange={(value) =>
-              updateField(
-                'cleaning_fee',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Security Deposit ₹"
-            value={form.security_deposit}
-            onChange={(value) =>
-              updateField(
-                'security_deposit',
-                value
-              )
-            }
-            min="0"
-          />
-
-          <NumberField
-            label="Minimum Nights"
-            value={form.min_stay_nights}
-            onChange={(value) =>
-              updateField(
-                'min_stay_nights',
-                value
-              )
-            }
-            min="1"
-          />
-
-          <NumberField
-            label="Maximum Nights"
-            value={form.max_stay_nights}
-            onChange={(value) =>
-              updateField(
-                'max_stay_nights',
-                value
-              )
-            }
-            min="1"
-          />
-
-          <NumberField
-            label="Late Checkout / Hour ₹"
-            value={
-              form.late_checkout_hourly_fee
-            }
-            onChange={(value) =>
-              updateField(
-                'late_checkout_hourly_fee',
-                value
-              )
-            }
-            min="0"
-          />
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>CHECK-IN</span>
-            <h3>Arrival & Departure</h3>
-          </div>
-        </div>
-
-        <div className="nosPropGrid2">
-          <label className="nosPropField">
-            <span>Check-in Time</span>
-
-            <input
-              type="time"
-              value={form.check_in_time || ''}
-              onChange={(event) =>
-                updateField(
-                  'check_in_time',
-                  event.target.value
-                )
-              }
-            />
-          </label>
-
-          <label className="nosPropField">
-            <span>Check-out Time</span>
-
-            <input
-              type="time"
-              value={form.check_out_time || ''}
-              onChange={(event) =>
-                updateField(
-                  'check_out_time',
-                  event.target.value
-                )
-              }
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>FACILITIES</span>
-            <h3>Property Facilities</h3>
-          </div>
-        </div>
-
-        <div className="nosPropSwitchGrid">
-          <SwitchField
-            label="Wi-Fi Available"
-            checked={form.wifi_available}
-            onChange={(value) =>
-              updateField(
-                'wifi_available',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="TV Available"
-            checked={form.tv_available}
-            onChange={(value) =>
-              updateField(
-                'tv_available',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Fridge Available"
-            checked={form.fridge_available}
-            onChange={(value) =>
-              updateField(
-                'fridge_available',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Washing Machine"
-            checked={
-              form.washing_machine_available
-            }
-            onChange={(value) =>
-              updateField(
-                'washing_machine_available',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Air Conditioning"
-            checked={form.ac_available}
-            onChange={(value) =>
-              updateField(
-                'ac_available',
-                value
-              )
-            }
-          />
-        </div>
-
-        <div className="nosPropGrid2 nosPropTopGap">
-          {form.ac_available && (
-            <NumberField
-              label="Number of ACs"
-              value={form.ac_count}
-              onChange={(value) =>
-                updateField(
-                  'ac_count',
-                  value
-                )
-              }
-              min="0"
-            />
-          )}
-
-          <NumberField
-            label="Water Heaters"
-            value={form.water_heater_count}
-            onChange={(value) =>
-              updateField(
-                'water_heater_count',
-                value
-              )
-            }
-            min="0"
-          />
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>AMENITIES</span>
-            <h3>Amenities</h3>
-          </div>
-        </div>
-
-        <div className="nosPropOptionGrid">
-          {amenityOptions.map((item) => (
-            <CheckOption
-              key={item}
-              label={item}
-              checked={
-                form.amenities?.includes(item)
-              }
-              onChange={() =>
-                toggleArrayItem(
-                  'amenities',
-                  item
-                )
-              }
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>KITCHEN</span>
-            <h3>Kitchen Features</h3>
-          </div>
-        </div>
-
-        <div className="nosPropOptionGrid">
-          {kitchenOptions.map((item) => (
-            <CheckOption
-              key={item}
-              label={item}
-              checked={
-                form.kitchen_features?.includes(
-                  item
-                )
-              }
-              onChange={() =>
-                toggleArrayItem(
-                  'kitchen_features',
-                  item
-                )
-              }
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>POLICIES</span>
-            <h3>Guest Policies</h3>
-          </div>
-        </div>
-
-        <div className="nosPropSwitchGrid">
-          <SwitchField
-            label="Pets Allowed"
-            checked={form.pets_allowed}
-            onChange={(value) =>
-              updateField(
-                'pets_allowed',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Parties Allowed"
-            checked={form.parties_allowed}
-            onChange={(value) =>
-              updateField(
-                'parties_allowed',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Couples Allowed"
-            checked={form.couples_allowed}
-            onChange={(value) =>
-              updateField(
-                'couples_allowed',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Alcohol Allowed"
-            checked={form.alcohol_allowed}
-            onChange={(value) =>
-              updateField(
-                'alcohol_allowed',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Smoking Allowed"
-            checked={form.smoking_allowed}
-            onChange={(value) =>
-              updateField(
-                'smoking_allowed',
-                value
-              )
-            }
-          />
-
-          <SwitchField
-            label="Quiet Hours"
-            checked={
-              form.quiet_hours_enabled
-            }
-            onChange={(value) =>
-              updateField(
-                'quiet_hours_enabled',
-                value
-              )
-            }
-          />
-        </div>
-
-        {form.quiet_hours_enabled && (
-          <div className="nosPropGrid2 nosPropTopGap">
-            <label className="nosPropField">
-              <span>Quiet Hours Start</span>
-
-              <input
-                type="time"
-                value={
-                  form.quiet_hours_start || ''
-                }
-                onChange={(event) =>
-                  updateField(
-                    'quiet_hours_start',
-                    event.target.value
-                  )
-                }
-              />
-            </label>
-
-            <label className="nosPropField">
-              <span>Quiet Hours End</span>
-
-              <input
-                type="time"
-                value={
-                  form.quiet_hours_end || ''
-                }
-                onChange={(event) =>
-                  updateField(
-                    'quiet_hours_end',
-                    event.target.value
-                  )
-                }
-              />
-            </label>
-          </div>
-        )}
-
-        <div className="nosPropGrid2 nosPropTopGap">
-          <label className="nosPropField nosPropFull">
-            <span>House Rules</span>
-
-            <textarea
-              rows="6"
-              value={form.house_rules_text || ''}
-              onChange={(event) =>
-                updateField(
-                  'house_rules_text',
-                  event.target.value
-                )
-              }
-              placeholder={'Enter one rule per line.\nExample:\nNo loud music after 10 PM\nGovernment ID required'}
-            />
-          </label>
-
-          <label className="nosPropField nosPropFull">
-            <span>Direction Instructions</span>
-
-            <textarea
-              rows="4"
-              value={
-                form.direction_instructions ||
-                ''
-              }
-              onChange={(event) =>
-                updateField(
-                  'direction_instructions',
-                  event.target.value
-                )
-              }
-              placeholder="Directions or landmark instructions"
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="nosPropFormCard">
-        <div className="nosPropSectionHeading">
-          <div>
-            <span>DYNAMIC PRICING</span>
-            <h3>Automatic Markups</h3>
-          </div>
-        </div>
-
-        <SwitchField
-          label="Enable Dynamic Pricing"
-          checked={
-            form.dynamic_pricing_enabled
-          }
-          onChange={(value) =>
-            updateField(
-              'dynamic_pricing_enabled',
-              value
-            )
-          }
-        />
-
-        {form.dynamic_pricing_enabled && (
-          <div className="nosPropGrid4 nosPropTopGap">
-            <NumberField
-              label="Weekend Markup %"
-              value={
-                form.weekend_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'weekend_markup_percent',
-                  value
-                )
-              }
-              min="0"
-            />
-
-            <NumberField
-              label="Long Weekend %"
-              value={
-                form.long_weekend_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'long_weekend_markup_percent',
-                  value
-                )
-              }
-              min="0"
-            />
-
-            <NumberField
-              label="Festival Markup %"
-              value={
-                form.festival_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'festival_markup_percent',
-                  value
-                )
-              }
-              min="0"
-            />
-
-            <NumberField
-              label="Season Markup %"
-              value={
-                form.season_markup_percent
-              }
-              onChange={(value) =>
-                updateField(
-                  'season_markup_percent',
-                  value
-                )
-              }
-              min="0"
-            />
-          </div>
-        )}
-      </section>
-
-      {isEditing && (
-        <section className="nosPropFormCard">
-          <div className="nosPropSectionHeading">
-            <div>
-              <span>MODERATION</span>
-              <h3>Current Review Status</h3>
-            </div>
-          </div>
-
-          <div className="nosPropReadonlyGrid">
-            <div>
-              <span>Status</span>
-
-              <strong>
-                {getStatusLabel(
-                  form.moderation_status
-                )}
-              </strong>
-            </div>
-
-            <div>
-              <span>Guest Visibility</span>
-
-              <strong>
-                {form.is_active
-                  ? 'Live'
-                  : 'Offline'}
-              </strong>
-            </div>
-          </div>
-
-          <p className="nosPropModerationHelp">
-            Guest visibility is controlled by
-            the Super Admin moderation workflow.
-            Approving a property makes it live.
-            Requesting changes or declining it
-            keeps it offline.
-          </p>
-        </section>
-      )}
-
-      <div className="nosPropFormActions">
-        <button
-          type="submit"
-          disabled={saving}
-          className="nosPropPrimaryButton"
-        >
-          {saving
-            ? 'Saving...'
-            : isEditing
-              ? 'Save Property Details'
-              : 'Create Property'}
-        </button>
+function TagSection({ title, items }) {
+  return (
+    <section className="nosapDetailSection">
+      <h2>{title}</h2>
+
+      <div className="nosapTags">
+        {items.map((item, index) => (
+          <span key={`${item}-${index}`}>{item}</span>
+        ))}
       </div>
-    </form>
+    </section>
   );
 }
 
-function NumberField({
-  label,
-  value,
-  onChange,
-  min,
-}) {
-  return (
-    <label className="nosPropField">
-      <span>{label}</span>
-
-      <input
-        type="number"
-        min={min}
-        value={
-          value === null ||
-          value === undefined
-            ? ''
-            : value
-        }
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-      />
-    </label>
-  );
-}
-
-function SwitchField({
-  label,
-  checked,
-  onChange,
-}) {
-  return (
-    <label className="nosPropSwitch">
-      <input
-        type="checkbox"
-        checked={Boolean(checked)}
-        onChange={(event) =>
-          onChange(event.target.checked)
-        }
-      />
-
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function CheckOption({
-  label,
-  checked,
-  onChange,
-}) {
-  return (
-    <label
-      className={
-        checked
-          ? 'nosPropCheckOption nosPropCheckOptionSelected'
-          : 'nosPropCheckOption'
-      }
-    >
-      <input
-        type="checkbox"
-        checked={Boolean(checked)}
-        onChange={onChange}
-      />
-
-      <span>{label}</span>
-    </label>
-  );
-}
-
-
-/* =====================================================
-   PAGE STYLES
-===================================================== */
-
-function PageStyles() {
+function Styles() {
   return (
     <style jsx global>{`
       * {
         box-sizing: border-box;
       }
 
-      .nosPropPage {
+      body {
+        margin: 0;
+      }
+
+      .nosapPage {
         min-height: 100vh;
         background: #f5f6f8;
         color: #111827;
       }
 
-      .nosPropHeader {
-        min-height: 76px;
-        background: #ffffff;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 24px;
-        padding: 14px 32px;
-      }
-
-      .nosPropBrandArea {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-      }
-
-      .nosPropBrand {
-        font-size: 21px;
-        font-weight: 900;
-        letter-spacing: -0.4px;
-      }
-
-      .nosPropMuted {
-        color: #6b7280;
-        font-size: 12px;
-      }
-
-      .nosPropHeaderRight {
-        display: flex;
-        align-items: center;
-        gap: 18px;
-      }
-
-      .nosPropProfile {
-        display: flex;
-        flex-direction: column;
-        text-align: right;
-        gap: 2px;
-      }
-
-      .nosPropProfile strong {
-        font-size: 14px;
-      }
-
-      .nosPropProfile span {
-        font-size: 11px;
-        color: #6b7280;
-      }
-
-      .nosPropLogoutButton,
-      .nosPropBackButton,
-      .nosPropMainTab,
-      .nosPropFilterButton,
-      .nosPropCardPrimary,
-      .nosPropCardSecondary,
-      .nosPropCardReview,
-      .nosPropPrimaryButton,
-      .nosPropApproveButton,
-      .nosPropChangesButton,
-      .nosPropDeclineButton,
-      .nosPropOfflineButton,
-      .nosPropManageTab {
-        font: inherit;
-        cursor: pointer;
-      }
-
-      .nosPropLogoutButton {
-        border: 1px solid #d1d5db;
-        background: #fff;
-        border-radius: 9px;
-        padding: 9px 14px;
-        font-weight: 700;
-      }
-
-      .nosPropContent {
+      .nosapContainer {
         width: min(1500px, calc(100% - 48px));
         margin: 0 auto;
         padding: 34px 0 70px;
       }
 
-      .nosPropPageHeading {
+      .nosapTitleRow {
         display: flex;
-        justify-content: space-between;
         align-items: flex-start;
-        gap: 20px;
-        margin-bottom: 22px;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
       }
 
-      .nosPropPageHeading h1 {
-        margin: 0 0 6px;
+      .nosapTitleRow h1,
+      .nosapPropertyHeader h1 {
+        margin: 4px 0 7px;
         font-size: 31px;
-        line-height: 1.1;
+        line-height: 1.15;
+        letter-spacing: -0.5px;
       }
 
-      .nosPropPageHeading p,
-      .nosPropEditorTitle p,
-      .nosPropManagerHeading p {
+      .nosapTitleRow p,
+      .nosapPropertyHeader p {
         margin: 0;
         color: #6b7280;
         line-height: 1.55;
       }
 
-      .nosPropMainTabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 24px;
-        border-bottom: 1px solid #e5e7eb;
-      }
-
-      .nosPropMainTab {
-        border: 0;
-        border-bottom: 3px solid transparent;
-        background: transparent;
-        padding: 12px 15px;
-        font-weight: 800;
+      .nosapEyebrow {
+        font-size: 10px;
+        letter-spacing: 0.9px;
+        font-weight: 900;
         color: #6b7280;
       }
 
-      .nosPropMainTabActive {
-        color: #111827;
-        border-bottom-color: #111827;
-      }
-
-      .nosPropStatsGrid {
+      .nosapStats {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 12px;
-        margin-bottom: 18px;
+        margin-bottom: 24px;
       }
 
-      .nosPropStatCard {
-        background: #fff;
+      .nosapStat {
+        appearance: none;
         border: 1px solid #e5e7eb;
+        background: #ffffff;
         border-radius: 14px;
         padding: 17px;
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
+        text-align: left;
+        cursor: pointer;
+        transition: 0.15s ease;
       }
 
-      .nosPropStatCard span {
-        color: #6b7280;
-        font-size: 12px;
-        font-weight: 800;
+      .nosapStat:hover {
+        border-color: #9ca3af;
+        transform: translateY(-1px);
       }
 
-      .nosPropStatCard strong {
-        font-size: 27px;
-      }
-
-      .nosPropStatAttention {
-        border-color: #f59e0b;
-        background: #fffbeb;
-      }
-
-      .nosPropFilterBar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 0 0 20px;
-      }
-
-      .nosPropFilterButton {
-        border: 1px solid #d1d5db;
-        background: #fff;
-        color: #374151;
-        border-radius: 999px;
-        padding: 9px 13px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 800;
-      }
-
-      .nosPropFilterButton span {
-        min-width: 23px;
-        height: 23px;
-        border-radius: 999px;
-        background: #f3f4f6;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+      .nosapStat span {
+        display: block;
         font-size: 11px;
+        font-weight: 800;
+        color: #6b7280;
+        line-height: 1.3;
       }
 
-      .nosPropFilterButtonActive {
-        background: #111827;
+      .nosapStat strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 27px;
+        color: #111827;
+      }
+
+      .nosapStatActive {
         border-color: #111827;
-        color: #fff;
+        background: #111827;
       }
 
-      .nosPropFilterButtonActive span {
-        background: rgba(255,255,255,.18);
+      .nosapStatActive span,
+      .nosapStatActive strong {
+        color: #ffffff;
       }
 
-      .nosPropListSection {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 18px;
-        padding: 22px;
-      }
-
-      .nosPropListHeading {
+      .nosapListHeading {
         display: flex;
+        align-items: flex-end;
         justify-content: space-between;
-        align-items: center;
-        margin-bottom: 18px;
+        gap: 20px;
+        margin-bottom: 15px;
       }
 
-      .nosPropListHeading h2 {
-        margin: 0 0 3px;
+      .nosapListHeading h2 {
+        margin: 0 0 4px;
         font-size: 20px;
       }
 
-      .nosPropListHeading p {
+      .nosapListHeading p {
         margin: 0;
         color: #6b7280;
         font-size: 13px;
       }
 
-      .nosPropPropertyGrid {
+      .nosapGrid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 17px;
       }
 
-      .nosPropPropertyCard {
+      .nosapCard {
+        background: #ffffff;
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
+        border-radius: 17px;
         padding: 20px;
-        background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
       }
 
-      .nosPropCardTop,
-      .nosPropManageTitleRow {
+      .nosapCardTop {
         display: flex;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 18px;
-        align-items: flex-start;
       }
 
-      .nosPropCardTitle h3 {
+      .nosapCardTop h3 {
         margin: 0 0 5px;
         font-size: 18px;
+        line-height: 1.3;
       }
 
-      .nosPropCardTitle p {
+      .nosapCardTop p {
         margin: 0;
         color: #6b7280;
         font-size: 13px;
       }
 
-      .nosPropStatusStack {
+      .nosapCardBadges,
+      .nosapHeaderBadges {
         display: flex;
         flex-direction: column;
         align-items: flex-end;
@@ -4748,101 +1486,107 @@ function PageStyles() {
         flex-shrink: 0;
       }
 
-      .nosPropModerationBadge,
-      .nosPropStatus {
+      .nosapBadge,
+      .nosapLiveBadge,
+      .nosapOfflineBadge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 999px;
         padding: 6px 10px;
-        font-size: 11px;
+        font-size: 10px;
+        line-height: 1;
         font-weight: 900;
         white-space: nowrap;
       }
 
-      .nosPropModerationDraft {
+      .nosapBadgeDraft {
         background: #f3f4f6;
         color: #4b5563;
       }
 
-      .nosPropModerationPending {
+      .nosapBadgePending {
         background: #fef3c7;
         color: #92400e;
       }
 
-      .nosPropModerationChanges {
+      .nosapBadgeChanges {
         background: #ffedd5;
         color: #9a3412;
       }
 
-      .nosPropModerationApproved {
+      .nosapBadgeApproved {
         background: #dcfce7;
         color: #166534;
       }
 
-      .nosPropModerationDeclined {
+      .nosapBadgeDeclined {
         background: #fee2e2;
         color: #991b1b;
       }
 
-      .nosPropStatusActive {
+      .nosapLiveBadge {
         background: #dcfce7;
         color: #166534;
       }
 
-      .nosPropStatusInactive {
+      .nosapOfflineBadge {
         background: #f3f4f6;
         color: #6b7280;
       }
 
-      .nosPropHostBox {
-        margin-top: 16px;
-        padding: 12px 14px;
-        border-radius: 11px;
-        background: #f9fafb;
+      .nosapHost {
         display: flex;
         flex-direction: column;
         gap: 3px;
+        margin-top: 15px;
+        padding: 12px 13px;
+        border: 1px solid #f0f1f3;
+        border-radius: 11px;
+        background: #f9fafb;
       }
 
-      .nosPropHostBox span,
-      .nosPropReviewSummary span,
-      .nosPropSmallTitle,
-      .nosPropSectionHeading span,
-      .nosPropModerationHeading span,
-      .nosPropModerationNotes > span,
-      .nosPropReadonlyGrid span {
+      .nosapHost span,
+      .nosapSummary span,
+      .nosapDetail span,
+      .nosapNoteField > span {
         font-size: 10px;
-        letter-spacing: .7px;
-        color: #6b7280;
         font-weight: 900;
+        letter-spacing: 0.6px;
+        color: #6b7280;
+        text-transform: uppercase;
       }
 
-      .nosPropHostBox strong {
+      .nosapHost strong {
         font-size: 14px;
       }
 
-      .nosPropHostBox small {
+      .nosapHost small {
         color: #6b7280;
+        font-size: 11px;
       }
 
-      .nosPropPrice {
-        font-size: 24px;
+      .nosapPrice {
+        margin-top: 16px;
+        font-size: 25px;
         font-weight: 900;
-        margin-top: 17px;
       }
 
-      .nosPropPrice span {
-        font-size: 12px;
-        font-weight: 600;
+      .nosapPrice small {
+        margin-left: 5px;
         color: #6b7280;
+        font-size: 11px;
+        font-weight: 600;
       }
 
-      .nosPropCardInfo {
+      .nosapMiniGrid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
-        margin-top: 15px;
+        margin-top: 14px;
       }
 
-      .nosPropCardInfo > div {
+      .nosapMiniGrid > div {
         border: 1px solid #e5e7eb;
         border-radius: 10px;
         padding: 10px;
@@ -4851,659 +1595,507 @@ function PageStyles() {
         gap: 2px;
       }
 
-      .nosPropCardInfo strong {
+      .nosapMiniGrid strong {
         font-size: 16px;
       }
 
-      .nosPropCardInfo span {
+      .nosapMiniGrid span {
         color: #6b7280;
         font-size: 10px;
       }
 
-      .nosPropMetaRows {
+      .nosapCardMeta {
         margin-top: 14px;
-        border-top: 1px solid #f0f0f0;
         padding-top: 12px;
+        border-top: 1px solid #f0f0f0;
         display: grid;
         gap: 8px;
       }
 
-      .nosPropMetaRows > div {
+      .nosapCardMeta > div {
         display: flex;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 15px;
         font-size: 12px;
       }
 
-      .nosPropMetaRows span {
+      .nosapCardMeta span {
         color: #6b7280;
       }
 
-      .nosPropMetaRows strong {
+      .nosapCardMeta strong {
         text-align: right;
+        font-weight: 700;
       }
 
-      .nosPropReviewAlert {
+      .nosapPendingNotice {
         margin-top: 14px;
         border: 1px solid #f59e0b;
         background: #fffbeb;
         color: #92400e;
-        padding: 10px 12px;
         border-radius: 10px;
+        padding: 10px 12px;
         font-size: 12px;
         font-weight: 900;
       }
 
-      .nosPropCardNote {
-        margin-top: 14px;
-        background: #fff7ed;
-        border: 1px solid #fed7aa;
-        padding: 11px;
-        border-radius: 10px;
+      .nosapSmallNote {
         display: flex;
         flex-direction: column;
         gap: 4px;
+        margin-top: 14px;
+        border: 1px solid #fed7aa;
+        background: #fff7ed;
+        color: #9a3412;
+        border-radius: 10px;
+        padding: 11px 12px;
         font-size: 12px;
       }
 
-      .nosPropCardActions {
-        margin-top: 17px;
+      .nosapCardActions {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+        margin-top: 17px;
       }
 
-      .nosPropCardPrimary,
-      .nosPropCardSecondary,
-      .nosPropCardReview {
+      .nosapPrimary,
+      .nosapSecondary,
+      .nosapReviewButton,
+      .nosapApprove,
+      .nosapChanges,
+      .nosapDecline {
+        appearance: none;
         border-radius: 9px;
-        padding: 9px 12px;
+        padding: 10px 13px;
+        font: inherit;
         font-size: 12px;
         font-weight: 800;
+        cursor: pointer;
         text-decoration: none;
       }
 
-      .nosPropCardPrimary {
+      .nosapPrimary {
         border: 1px solid #111827;
         background: #111827;
-        color: #fff;
+        color: #ffffff;
       }
 
-      .nosPropCardReview {
-        border: 1px solid #d97706;
-        background: #d97706;
-        color: #fff;
-      }
-
-      .nosPropCardSecondary {
+      .nosapSecondary {
         border: 1px solid #d1d5db;
-        background: #fff;
+        background: #ffffff;
         color: #374151;
       }
 
-      .nosPropCardLink {
-        display: inline-flex;
-        align-items: center;
+      .nosapReviewButton {
+        border: 1px solid #d97706;
+        background: #d97706;
+        color: #ffffff;
       }
 
-      .nosPropEditor {
+      .nosapApprove {
+        border: 1px solid #15803d;
+        background: #15803d;
+        color: #ffffff;
+      }
+
+      .nosapChanges {
+        border: 1px solid #d97706;
+        background: #d97706;
+        color: #ffffff;
+      }
+
+      .nosapDecline {
+        border: 1px solid #b91c1c;
+        background: #b91c1c;
+        color: #ffffff;
+      }
+
+      .nosapPrimary:disabled,
+      .nosapSecondary:disabled,
+      .nosapReviewButton:disabled,
+      .nosapApprove:disabled,
+      .nosapChanges:disabled,
+      .nosapDecline:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .nosapLoading,
+      .nosapEmpty {
         width: 100%;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 40px 25px;
+        text-align: center;
       }
 
-      .nosPropBackButton {
+      .nosapLoading {
+        width: min(900px, calc(100% - 40px));
+        margin: 60px auto;
+      }
+
+      .nosapLoading h2,
+      .nosapEmpty h3 {
+        margin: 0 0 7px;
+      }
+
+      .nosapLoading p,
+      .nosapEmpty p {
+        margin: 0 0 15px;
+        color: #6b7280;
+      }
+
+      .nosapBack {
+        appearance: none;
         border: 0;
         background: transparent;
-        padding: 0;
         color: #4b5563;
+        padding: 0;
+        margin-bottom: 19px;
+        font-size: 13px;
         font-weight: 800;
-        margin-bottom: 17px;
+        cursor: pointer;
       }
 
-      .nosPropEditorTitle {
-        margin-bottom: 20px;
-      }
-
-      .nosPropEditorTitle h2,
-      .nosPropManageTitleRow h2 {
-        margin: 0 0 5px;
-        font-size: 25px;
-      }
-
-      .nosPropManageHeader {
+      .nosapPropertyHeader {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 20px;
+        gap: 24px;
         margin-bottom: 18px;
       }
 
-      .nosPropManageLeft {
-        flex: 1;
-      }
-
-      .nosPropManageTitleRow p {
-        margin: 0;
-        color: #6b7280;
-      }
-
-      .nosPropPreviewTop,
-      .nosPropPrimaryLink {
-        text-decoration: none;
-        border-radius: 9px;
-        padding: 10px 14px;
-        background: #111827;
-        color: #fff;
-        font-size: 12px;
-        font-weight: 800;
-      }
-
-      .nosPropReviewSummary {
+      .nosapSummaryGrid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
-        margin-bottom: 17px;
-      }
-
-      .nosPropReviewSummary > div {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-
-      .nosPropReviewSummary strong {
-        font-size: 13px;
-      }
-
-      .nosPropReviewSummary small {
-        color: #6b7280;
-      }
-
-      .nosPropModerationPanel {
-        border: 2px solid #f59e0b;
-        background: #fffbeb;
-        border-radius: 16px;
-        padding: 20px;
         margin-bottom: 18px;
       }
 
-      .nosPropModerationHeading h3 {
-        margin: 5px 0;
-        font-size: 20px;
+      .nosapSummary {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 14px;
+        min-width: 0;
       }
 
-      .nosPropModerationHeading p {
+      .nosapSummary strong {
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .nosapSummary small {
+        color: #6b7280;
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+
+      .nosapError,
+      .nosapSuccess {
+        border-radius: 11px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .nosapError {
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+      }
+
+      .nosapSuccess {
+        border: 1px solid #bbf7d0;
+        background: #f0fdf4;
+        color: #166534;
+      }
+
+      .nosapReviewPanel {
+        margin-bottom: 18px;
+        border: 2px solid #f59e0b;
+        border-radius: 16px;
+        background: #fffbeb;
+        padding: 21px;
+      }
+
+      .nosapReviewPanel h2 {
+        margin: 5px 0 5px;
+        font-size: 21px;
+      }
+
+      .nosapReviewPanel p {
         margin: 0;
         color: #6b7280;
+        line-height: 1.5;
       }
 
-      .nosPropModerationNotes {
+      .nosapNoteField {
         display: flex;
         flex-direction: column;
         gap: 7px;
         margin-top: 17px;
       }
 
-      .nosPropModerationNotes textarea {
+      .nosapNoteField textarea {
         width: 100%;
         resize: vertical;
         border: 1px solid #d1d5db;
         border-radius: 10px;
+        background: #ffffff;
+        color: #111827;
         padding: 12px;
         font: inherit;
-        background: #fff;
+        outline: none;
       }
 
-      .nosPropModerationActions {
+      .nosapNoteField textarea:focus {
+        border-color: #111827;
+        box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.07);
+      }
+
+      .nosapReviewActions {
         display: flex;
         flex-wrap: wrap;
         gap: 9px;
         margin-top: 14px;
       }
 
-      .nosPropApproveButton,
-      .nosPropChangesButton,
-      .nosPropDeclineButton,
-      .nosPropOfflineButton {
-        border-radius: 9px;
-        padding: 10px 15px;
-        font-weight: 900;
-      }
-
-      .nosPropApproveButton {
-        border: 1px solid #15803d;
-        background: #15803d;
-        color: #fff;
-      }
-
-      .nosPropChangesButton {
-        border: 1px solid #d97706;
-        background: #d97706;
-        color: #fff;
-      }
-
-      .nosPropDeclineButton {
-        border: 1px solid #b91c1c;
-        background: #b91c1c;
-        color: #fff;
-      }
-
-      .nosPropOfflineButton {
-        border: 1px solid #374151;
-        background: #fff;
-        color: #374151;
-        margin-top: 8px;
-      }
-
-      .nosPropModerationResult {
+      .nosapMessage {
+        margin-bottom: 18px;
         border-radius: 14px;
         padding: 16px;
-        margin-bottom: 18px;
       }
 
-      .nosPropModerationResult strong {
+      .nosapMessage strong {
         display: block;
         margin-bottom: 5px;
       }
 
-      .nosPropModerationResult p {
+      .nosapMessage p {
         margin: 0 0 5px;
+        line-height: 1.5;
       }
 
-      .nosPropModerationResult span {
+      .nosapMessage small {
         font-size: 12px;
       }
 
-      .nosPropModerationResultChanges {
+      .nosapMessageChanges {
         border: 1px solid #fdba74;
         background: #fff7ed;
         color: #9a3412;
       }
 
-      .nosPropModerationResultDeclined {
+      .nosapMessageDeclined {
         border: 1px solid #fca5a5;
         background: #fef2f2;
         color: #991b1b;
       }
 
-      .nosPropModerationResultApproved {
+      .nosapMessageApproved {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
         border: 1px solid #86efac;
         background: #f0fdf4;
         color: #166534;
       }
 
-      .nosPropManageTabsWrap {
-        border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 18px;
-      }
-
-      .nosPropManageTabs {
+      .nosapTabs {
         display: flex;
-        gap: 5px;
+        gap: 4px;
         overflow-x: auto;
+        margin-bottom: 18px;
+        border-bottom: 1px solid #e5e7eb;
       }
 
-      .nosPropManageTab {
+      .nosapTabs button {
+        appearance: none;
         border: 0;
         border-bottom: 3px solid transparent;
         background: transparent;
         color: #6b7280;
         padding: 12px 14px;
+        font: inherit;
+        font-size: 13px;
         font-weight: 800;
+        cursor: pointer;
         white-space: nowrap;
       }
 
-      .nosPropManageTabActive {
+      .nosapTabs button.active {
         color: #111827;
         border-bottom-color: #111827;
       }
 
-      .nosPropForm {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .nosPropFormCard,
-      .nosPropManagerPanel {
-        background: #fff;
+      .nosapManager,
+      .nosapDetailSection {
+        background: #ffffff;
         border: 1px solid #e5e7eb;
         border-radius: 16px;
-        padding: 22px;
+        padding: 21px;
+        margin-bottom: 16px;
       }
 
-      .nosPropSectionHeading {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: flex-start;
-        border-bottom: 1px solid #f0f0f0;
-        padding-bottom: 13px;
-        margin-bottom: 17px;
+      .nosapManagerHeading {
+        margin-bottom: 18px;
       }
 
-      .nosPropSectionHeading h3,
-      .nosPropManagerHeading h3 {
-        margin: 4px 0 0;
+      .nosapManagerHeading h2,
+      .nosapDetailSection h2 {
+        margin: 0 0 5px;
         font-size: 18px;
       }
 
-      .nosPropGrid2 {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 15px;
+      .nosapManagerHeading p {
+        margin: 0;
+        color: #6b7280;
       }
 
-      .nosPropGrid4 {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 15px;
-      }
-
-      .nosPropFull {
-        grid-column: 1 / -1;
-      }
-
-      .nosPropField {
+      .nosapDetails {
         display: flex;
         flex-direction: column;
-        gap: 7px;
-        min-width: 0;
+        gap: 0;
       }
 
-      .nosPropField > span {
-        font-size: 12px;
-        font-weight: 800;
-        color: #374151;
-      }
-
-      .nosPropField input,
-      .nosPropField select,
-      .nosPropField textarea {
-        width: 100%;
-        border: 1px solid #d1d5db;
-        border-radius: 9px;
-        background: #fff;
-        color: #111827;
-        padding: 11px 12px;
-        font: inherit;
-        outline: none;
-      }
-
-      .nosPropField textarea {
-        resize: vertical;
-      }
-
-      .nosPropField input:focus,
-      .nosPropField select:focus,
-      .nosPropField textarea:focus,
-      .nosPropModerationNotes textarea:focus {
-        border-color: #111827;
-        box-shadow: 0 0 0 2px rgba(17,24,39,.08);
-      }
-
-      .nosPropSwitchGrid {
+      .nosapDetailGrid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-      }
-
-      .nosPropSwitch {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 11px 12px;
-        cursor: pointer;
-        background: #fafafa;
-        font-size: 13px;
-        font-weight: 700;
-      }
-
-      .nosPropSwitch input,
-      .nosPropCheckOption input {
-        width: 17px;
-        height: 17px;
-        accent-color: #111827;
-      }
-
-      .nosPropOptionGrid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 9px;
-      }
-
-      .nosPropCheckOption {
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 10px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 700;
-        background: #fff;
-      }
-
-      .nosPropCheckOptionSelected {
-        border-color: #111827;
-        background: #f9fafb;
-      }
-
-      .nosPropTopGap {
         margin-top: 15px;
       }
 
-      .nosPropReadonlyGrid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .nosPropReadonlyGrid > div {
-        background: #f9fafb;
+      .nosapDetail {
         border: 1px solid #e5e7eb;
         border-radius: 10px;
-        padding: 13px;
+        background: #f9fafb;
+        padding: 12px;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 5px;
       }
 
-      .nosPropModerationHelp {
-        color: #6b7280;
-        line-height: 1.55;
-        font-size: 12px;
-        margin: 14px 0 0;
-      }
-
-      .nosPropFormActions {
-        display: flex;
-        justify-content: flex-end;
-        padding: 3px 0 15px;
-      }
-
-      .nosPropPrimaryButton {
-        border: 1px solid #111827;
-        background: #111827;
-        color: #fff;
-        border-radius: 9px;
-        padding: 11px 18px;
-        font-weight: 900;
-      }
-
-      .nosPropPrimaryButton:disabled,
-      .nosPropApproveButton:disabled,
-      .nosPropChangesButton:disabled,
-      .nosPropDeclineButton:disabled,
-      .nosPropOfflineButton:disabled {
-        opacity: .55;
-        cursor: not-allowed;
-      }
-
-      .nosPropError,
-      .nosPropSuccess {
-        border-radius: 10px;
-        padding: 12px 14px;
+      .nosapDetail strong,
+      .nosapDetail a {
+        color: #111827;
         font-size: 13px;
         font-weight: 700;
-        margin-bottom: 14px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
       }
 
-      .nosPropError {
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-        color: #991b1b;
+      .nosapDetail a {
+        color: #1d4ed8;
       }
 
-      .nosPropSuccess {
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        color: #166534;
+      .nosapDetailWide {
+        grid-column: 1 / -1;
       }
 
-      .nosPropLoadingBox,
-      .nosPropEmptyState,
-      .nosPropLoginNotice {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 35px;
-        text-align: center;
+      .nosapTags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 15px;
       }
 
-      .nosPropLoadingBox {
-        width: min(1000px, calc(100% - 40px));
-        margin: 50px auto;
-      }
-
-      .nosPropEmptyState {
-        padding: 60px 20px;
-      }
-
-      .nosPropEmptyState h2,
-      .nosPropLoginNotice h2 {
-        margin: 8px 0 5px;
-      }
-
-      .nosPropEmptyState p,
-      .nosPropLoginNotice p {
-        color: #6b7280;
-        margin: 0 0 17px;
-      }
-
-      .nosPropEmptyIcon {
-        font-size: 36px;
-      }
-
-      .nosPropLoginNotice {
-        width: min(500px, calc(100% - 40px));
-        margin: 70px auto;
-      }
-
-      .nosPropManagerHeading {
-        margin-bottom: 18px;
+      .nosapTags span {
+        border: 1px solid #d1d5db;
+        background: #f9fafb;
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 700;
       }
 
       @media (max-width: 1200px) {
-        .nosPropStatsGrid {
+        .nosapStats {
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
-        .nosPropGrid4 {
+        .nosapDetailGrid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropOptionGrid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
         }
       }
 
-      @media (max-width: 900px) {
-        .nosPropPropertyGrid {
+      @media (max-width: 950px) {
+        .nosapGrid {
           grid-template-columns: 1fr;
         }
 
-        .nosPropReviewSummary {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropSwitchGrid {
+        .nosapSummaryGrid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 700px) {
-        .nosPropHeader {
-          padding: 13px 16px;
-        }
-
-        .nosPropMuted,
-        .nosPropProfile {
-          display: none;
-        }
-
-        .nosPropContent {
+        .nosapContainer {
           width: min(100% - 24px, 1500px);
-          padding-top: 22px;
+          padding: 24px 0 50px;
         }
 
-        .nosPropStatsGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nosPropGrid2,
-        .nosPropGrid4,
-        .nosPropSwitchGrid,
-        .nosPropOptionGrid,
-        .nosPropReadonlyGrid {
-          grid-template-columns: 1fr;
-        }
-
-        .nosPropFull {
-          grid-column: auto;
-        }
-
-        .nosPropReviewSummary {
-          grid-template-columns: 1fr 1fr;
-        }
-
-        .nosPropCardTop,
-        .nosPropManageTitleRow,
-        .nosPropManageHeader {
+        .nosapTitleRow,
+        .nosapPropertyHeader {
           flex-direction: column;
         }
 
-        .nosPropStatusStack {
-          align-items: flex-start;
+        .nosapHeaderBadges,
+        .nosapCardBadges {
           flex-direction: row;
           flex-wrap: wrap;
+          align-items: flex-start;
         }
 
-        .nosPropFormCard,
-        .nosPropManagerPanel,
-        .nosPropListSection {
-          padding: 16px;
+        .nosapStats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .nosPropModerationActions > button {
+        .nosapSummaryGrid,
+        .nosapDetailGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosapDetailWide {
+          grid-column: auto;
+        }
+
+        .nosapMessageApproved {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .nosapReviewActions button {
           width: 100%;
+        }
+
+        .nosapTitleRow h1,
+        .nosapPropertyHeader h1 {
+          font-size: 26px;
         }
       }
 
       @media (max-width: 450px) {
-        .nosPropStatsGrid,
-        .nosPropReviewSummary {
+        .nosapStats {
           grid-template-columns: 1fr;
         }
 
-        .nosPropCardInfo {
+        .nosapMiniGrid {
           grid-template-columns: 1fr 1fr;
+        }
+
+        .nosapCardTop {
+          flex-direction: column;
         }
       }
     `}</style>
