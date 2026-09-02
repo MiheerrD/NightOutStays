@@ -1,146 +1,287 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import {
+  useEffect,
+  useState,
+} from 'react';
+
+import Link from 'next/link';
+import {
+  usePathname,
+} from 'next/navigation';
+
+import {
+  createClient,
+} from '@supabase/supabase-js';
+
+const supabase = createClient(
+  'https://gxwemplbykjxhezefykh.supabase.co',
+  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
+);
+
+const links = [
+  {
+    href: '/admin/bookings',
+    label: 'Bookings',
+  },
+  {
+    href: '/admin/properties',
+    label: 'Properties',
+  },
+  {
+    href: '/admin/calendar',
+    label: 'Calendar',
+  },
+  {
+    href: '/admin/messages',
+    label: 'Messages',
+  },
+  {
+    href: '/admin/notifications',
+    label: 'Notifications',
+  },
+  {
+    href: '/admin/reports',
+    label: 'Reports',
+  },
+];
 
 export default function AdminNav() {
-  const pathname = usePathname();
+  const pathname =
+    usePathname();
 
-  const items = [
-    {
-      label: 'Bookings',
-      href: '/admin/bookings',
-    },
-    {
-      label: 'Properties',
-      href: '/admin/properties',
-    },
-    {
-      label: 'Calendar',
-      href: '/admin/calendar',
-    },
-    {
-      label: 'Messages',
-      href: '/admin/messages',
-    },
-    {
-      label: 'Notifications',
-      href: '/admin/notifications',
-    },
-    {
-      label: 'Reports',
-      href: '/admin/reports',
-    },
-  ];
+  const [
+    checking,
+    setChecking,
+  ] = useState(true);
+
+  const [
+    isAdmin,
+    setIsAdmin,
+  ] = useState(false);
+
+  useEffect(() => {
+    checkAdminAccess();
+
+    const {
+      data: authListener,
+    } =
+      supabase.auth.onAuthStateChange(
+        () => {
+          checkAdminAccess();
+        }
+      );
+
+    return () => {
+      authListener
+        ?.subscription
+        ?.unsubscribe();
+    };
+  }, []);
+
+  async function checkAdminAccess() {
+    setChecking(true);
+
+    try {
+      const {
+        data: {
+          session,
+        },
+      } =
+        await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const user =
+        session.user;
+
+      /*
+        IMPORTANT
+
+        This checks for an admin role
+        stored in Supabase user metadata.
+
+        Supported examples:
+
+        role: "admin"
+
+        OR
+
+        user_role: "admin"
+
+        OR
+
+        is_admin: true
+      */
+
+      const metadata = {
+        ...(user.user_metadata ||
+          {}),
+        ...(user.app_metadata ||
+          {}),
+      };
+
+      const role =
+        String(
+          metadata.role ||
+            metadata.user_role ||
+            ''
+        )
+          .trim()
+          .toLowerCase();
+
+      const adminFlag =
+        metadata.is_admin ===
+          true ||
+        metadata.admin ===
+          true;
+
+      const allowed =
+        role ===
+          'admin' ||
+        adminFlag;
+
+      setIsAdmin(
+        allowed
+      );
+    } catch (error) {
+      console.error(
+        'Admin navigation access check:',
+        error
+      );
+
+      setIsAdmin(false);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /*
+    While checking authentication,
+    show nothing.
+
+    This prevents the admin menu from
+    flashing briefly for guests.
+  */
+  if (checking) {
+    return null;
+  }
+
+  /*
+    Guest / normal user:
+
+    Do NOT render any admin menu.
+  */
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
-    <>
-      <nav className="adminNav">
-        {items.map((item) => {
-          const active =
-            pathname === item.href ||
-            pathname.startsWith(
-              item.href + '/'
+    <nav
+      style={
+        styles.nav
+      }
+    >
+      <div
+        style={
+          styles.inner
+        }
+      >
+        {links.map(
+          (link) => {
+            const active =
+              pathname ===
+                link.href ||
+              pathname?.startsWith(
+                `${link.href}/`
+              );
+
+            return (
+              <Link
+                key={
+                  link.href
+                }
+                href={
+                  link.href
+                }
+                style={{
+                  ...styles.link,
+
+                  ...(active
+                    ? styles.activeLink
+                    : {}),
+                }}
+              >
+                {
+                  link.label
+                }
+              </Link>
             );
-
-          return (
-            <a
-              key={item.href}
-              href={item.href}
-              className={
-                active
-                  ? 'adminNavLink active'
-                  : 'adminNavLink'
-              }
-            >
-              {item.label}
-            </a>
-          );
-        })}
-      </nav>
-
-      <style jsx>{`
-        .adminNav {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-          min-width: 0;
-        }
-
-        .adminNavLink {
-          min-height: 42px;
-
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-
-          padding: 0 14px;
-
-          border-radius: 999px;
-
-          text-decoration: none;
-
-          color: #0b3f82;
-
-          font-size: 14px;
-          font-weight: 700;
-
-          white-space: nowrap;
-
-          transition:
-            background 0.2s ease,
-            color 0.2s ease;
-        }
-
-        .adminNavLink.active {
-          background: #0b3f82;
-          color: #ffffff;
-        }
-
-        @media (max-width: 900px) {
-          .adminNav {
-            width: 100%;
-
-            flex-wrap: nowrap;
-
-            overflow-x: auto;
-
-            padding: 4px 0 7px;
-
-            -webkit-overflow-scrolling: touch;
-
-            scrollbar-width: none;
           }
-
-          .adminNav::-webkit-scrollbar {
-            display: none;
-          }
-
-          .adminNavLink {
-            flex: 0 0 auto;
-
-            min-height: 44px;
-
-            padding: 0 15px;
-
-            font-size: 13px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .adminNav {
-            gap: 5px;
-          }
-
-          .adminNavLink {
-            min-height: 44px;
-
-            padding: 0 13px;
-
-            font-size: 12px;
-          }
-        }
-      `}</style>
-    </>
+        )}
+      </div>
+    </nav>
   );
 }
+
+const styles = {
+  nav: {
+    width: '100%',
+    background:
+      '#ffffff',
+    borderBottom:
+      '1px solid #e4e7ec',
+    position:
+      'sticky',
+    top: 0,
+    zIndex: 100,
+    overflow:
+      'hidden',
+  },
+
+  inner: {
+    display:
+      'flex',
+    alignItems:
+      'center',
+    gap: 8,
+    width: '100%',
+    overflowX:
+      'auto',
+    padding:
+      '10px 14px',
+    boxSizing:
+      'border-box',
+    WebkitOverflowScrolling:
+      'touch',
+  },
+
+  link: {
+    flex:
+      '0 0 auto',
+    textDecoration:
+      'none',
+    color:
+      '#174f91',
+    fontWeight:
+      700,
+    fontSize:
+      14,
+    padding:
+      '10px 14px',
+    borderRadius:
+      999,
+    whiteSpace:
+      'nowrap',
+  },
+
+  activeLink: {
+    background:
+      '#174f91',
+    color:
+      '#ffffff',
+  },
+};

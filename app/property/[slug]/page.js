@@ -29,31 +29,42 @@ const supabase = createClient(
 function money(value) {
   return `₹${Number(
     value || 0
-  ).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  ).toLocaleString(
+    'en-IN',
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }
+  )}`;
 }
 
 function roundMoney(value) {
   return (
     Math.round(
-      Number(value || 0) * 100
+      Number(value || 0) *
+        100
     ) / 100
   );
 }
 
 function todayString() {
-  const now = new Date();
+  const now =
+    new Date();
 
   return [
     now.getFullYear(),
     String(
       now.getMonth() + 1
-    ).padStart(2, '0'),
+    ).padStart(
+      2,
+      '0'
+    ),
     String(
       now.getDate()
-    ).padStart(2, '0'),
+    ).padStart(
+      2,
+      '0'
+    ),
   ].join('-');
 }
 
@@ -65,9 +76,10 @@ function addDays(
     return '';
   }
 
-  const date = new Date(
-    `${dateString}T12:00:00`
-  );
+  const date =
+    new Date(
+      `${dateString}T12:00:00`
+    );
 
   date.setDate(
     date.getDate() +
@@ -78,10 +90,16 @@ function addDays(
     date.getFullYear(),
     String(
       date.getMonth() + 1
-    ).padStart(2, '0'),
+    ).padStart(
+      2,
+      '0'
+    ),
     String(
       date.getDate()
-    ).padStart(2, '0'),
+    ).padStart(
+      2,
+      '0'
+    ),
   ].join('-');
 }
 
@@ -110,24 +128,34 @@ function getStayDates(
 
   const dates = [];
 
-  let current = new Date(
-    `${checkIn}T12:00:00`
-  );
+  let current =
+    new Date(
+      `${checkIn}T12:00:00`
+    );
 
-  const end = new Date(
-    `${checkOut}T12:00:00`
-  );
+  const end =
+    new Date(
+      `${checkOut}T12:00:00`
+    );
 
-  while (current < end) {
+  while (
+    current < end
+  ) {
     dates.push(
       [
         current.getFullYear(),
         String(
           current.getMonth() + 1
-        ).padStart(2, '0'),
+        ).padStart(
+          2,
+          '0'
+        ),
         String(
           current.getDate()
-        ).padStart(2, '0'),
+        ).padStart(
+          2,
+          '0'
+        ),
       ].join('-')
     );
 
@@ -168,68 +196,13 @@ function cleanPhone(
   );
 }
 
-function formatTime(value) {
+function formatDateTime(
+  value
+) {
   if (!value) {
     return '—';
   }
 
-  const [
-    hour,
-    minute,
-  ] = String(value)
-    .slice(0, 5)
-    .split(':');
-
-  const date = new Date();
-
-  date.setHours(
-    Number(hour)
-  );
-
-  date.setMinutes(
-    Number(minute)
-  );
-
-  return date.toLocaleTimeString(
-    'en-IN',
-    {
-      hour: 'numeric',
-      minute: '2-digit',
-    }
-  );
-}
-
-/*
-  Host gets 24 hours from
-  booking request creation
-  to approve or decline.
-*/
-function getHostResponseDeadline(
-  booking
-) {
-  if (!booking?.created_at) {
-    return null;
-  }
-
-  const createdAt = new Date(
-    booking.created_at
-  );
-
-  if (
-    Number.isNaN(
-      createdAt.getTime()
-    )
-  ) {
-    return null;
-  }
-
-  return new Date(
-    createdAt.getTime() +
-      24 * 60 * 60 * 1000
-  );
-}
-
-function formatDateTime(value) {
   const date =
     value instanceof Date
       ? value
@@ -246,13 +219,55 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat(
     'en-IN',
     {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
+      day:
+        '2-digit',
+
+      month:
+        'short',
+
+      year:
+        'numeric',
+
+      hour:
+        'numeric',
+
+      minute:
+        '2-digit',
     }
-  ).format(date);
+  ).format(
+    date
+  );
+}
+
+function getHostResponseDeadline(
+  booking
+) {
+  if (
+    !booking?.created_at
+  ) {
+    return null;
+  }
+
+  const createdAt =
+    new Date(
+      booking.created_at
+    );
+
+  if (
+    Number.isNaN(
+      createdAt.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return new Date(
+    createdAt.getTime() +
+      24 *
+        60 *
+        60 *
+        1000
+  );
 }
 
 /* =========================
@@ -275,7 +290,8 @@ function offerEligibleForBooking(
   }
 
   if (
-    offer.is_active === false
+    offer.is_active ===
+    false
   ) {
     return false;
   }
@@ -303,8 +319,11 @@ function offerEligibleForBooking(
     );
 
   if (
-    category === 'monthly' ||
-    title.includes('monthly')
+    category ===
+      'monthly' ||
+    title.includes(
+      'monthly'
+    )
   ) {
     requiredNights =
       Math.max(
@@ -312,8 +331,11 @@ function offerEligibleForBooking(
         20
       );
   } else if (
-    category === 'fortnightly' ||
-    title.includes('fortnight')
+    category ===
+      'fortnightly' ||
+    title.includes(
+      'fortnight'
+    )
   ) {
     requiredNights =
       Math.max(
@@ -321,8 +343,11 @@ function offerEligibleForBooking(
         12
       );
   } else if (
-    category === 'weekly' ||
-    title.includes('weekly')
+    category ===
+      'weekly' ||
+    title.includes(
+      'weekly'
+    )
   ) {
     requiredNights =
       Math.max(
@@ -396,7 +421,8 @@ function offerEligibleForBooking(
   }
 
   return (
-    eligibleDates.length > 0
+    eligibleDates.length >
+    0
   );
 }
 
@@ -411,7 +437,9 @@ function buildFinalPricing({
   checkOut,
   property,
 }) {
-  if (!basePricing?.valid) {
+  if (
+    !basePricing?.valid
+  ) {
     return {
       valid: false,
     };
@@ -435,11 +463,14 @@ function buildFinalPricing({
           ) => ({
             date:
               item.date ||
-              stayDates[index],
+              stayDates[
+                index
+              ],
 
             rate:
               Number(
-                item.rate || 0
+                item.rate ||
+                  0
               ),
           })
         )
@@ -502,13 +533,17 @@ function buildFinalPricing({
       return true;
     };
 
-  let discountAmount = 0;
+  let discountAmount =
+    0;
 
   let discountedNights =
     rawBreakdown.map(
       (item) => ({
         ...item,
-        discount: 0,
+
+        discount:
+          0,
+
         discountedRate:
           Number(
             item.rate
@@ -532,7 +567,8 @@ function buildFinalPricing({
         )
         .filter(
           (index) =>
-            index !== null
+            index !==
+            null
         );
 
     const eligibleAmount =
@@ -545,13 +581,15 @@ function buildFinalPricing({
           Number(
             discountedNights[
               index
-            ].rate || 0
+            ].rate ||
+              0
           ),
         0
       );
 
     if (
-      eligibleAmount > 0
+      eligibleAmount >
+      0
     ) {
       if (
         offer.discount_type ===
@@ -563,7 +601,8 @@ function buildFinalPricing({
               Number(
                 discountedNights[
                   index
-                ].rate || 0
+                ].rate ||
+                  0
               );
 
             const discount =
@@ -606,7 +645,8 @@ function buildFinalPricing({
             eligibleAmount
           );
 
-        let allocated = 0;
+        let allocated =
+          0;
 
         eligibleIndexes.forEach(
           (
@@ -617,7 +657,8 @@ function buildFinalPricing({
               Number(
                 discountedNights[
                   index
-                ].rate || 0
+                ].rate ||
+                  0
               );
 
             let share;
@@ -684,7 +725,8 @@ function buildFinalPricing({
         ) =>
           sum +
           Number(
-            item.rate || 0
+            item.rate ||
+              0
           ),
         0
       )
@@ -733,12 +775,16 @@ function buildFinalPricing({
     );
 
   const shareBasis =
-    discountedStaySubtotal > 0
+    discountedStaySubtotal >
+    0
       ? discountedStaySubtotal
       : discountedNights.length;
 
-  let allocatedShared = 0;
-  let totalGST = 0;
+  let allocatedShared =
+    0;
+
+  let totalGST =
+    0;
 
   const nightlyTaxBreakdown =
     discountedNights.map(
@@ -746,10 +792,12 @@ function buildFinalPricing({
         item,
         index
       ) => {
-        let sharedPart = 0;
+        let sharedPart =
+          0;
 
         if (
-          sharedCharges > 0
+          sharedCharges >
+          0
         ) {
           if (
             index ===
@@ -815,7 +863,8 @@ function buildFinalPricing({
               100
           );
 
-        totalGST += gst;
+        totalGST +=
+          gst;
 
         return {
           date:
@@ -865,19 +914,21 @@ function buildFinalPricing({
         securityDeposit
     );
 
-  const uniqueGstRates = [
-    ...new Set(
-      nightlyTaxBreakdown.map(
-        (item) =>
-          item.gstRate
-      )
-    ),
-  ];
+  const uniqueGstRates =
+    [
+      ...new Set(
+        nightlyTaxBreakdown.map(
+          (item) =>
+            item.gstRate
+        )
+      ),
+    ];
 
   return {
     ...basePricing,
 
-    valid: true,
+    valid:
+      true,
 
     staySubtotal,
 
@@ -934,151 +985,205 @@ export default function PropertyPage() {
   const [
     property,
     setProperty,
-  ] = useState(null);
+  ] = useState(
+    null
+  );
 
   const [
     photos,
     setPhotos,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     pricingRules,
     setPricingRules,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     rateOverrides,
     setRateOverrides,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     propertyOffers,
     setPropertyOffers,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     blockedDates,
     setBlockedDates,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     existingBookings,
     setExistingBookings,
-  ] = useState([]);
+  ] = useState(
+    []
+  );
 
   const [
     session,
     setSession,
-  ] = useState(null);
+  ] = useState(
+    null
+  );
 
   const [
     guestProfile,
     setGuestProfile,
-  ] = useState(null);
+  ] = useState(
+    null
+  );
 
   const [
     authChecking,
     setAuthChecking,
-  ] = useState(true);
+  ] = useState(
+    true
+  );
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] = useState(
+    true
+  );
 
   const [
     pageError,
     setPageError,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     activePhoto,
     setActivePhoto,
-  ] = useState(0);
+  ] = useState(
+    0
+  );
 
   const [
     checkIn,
     setCheckIn,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     checkOut,
     setCheckOut,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     guestCount,
     setGuestCount,
-  ] = useState(1);
+  ] = useState(
+    1
+  );
 
   const [
     selectedOfferId,
     setSelectedOfferId,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     guestName,
     setGuestName,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     guestPhone,
     setGuestPhone,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     guestEmail,
     setGuestEmail,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     guestMessage,
     setGuestMessage,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     bookingLoading,
     setBookingLoading,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
 
   const [
     bookingError,
     setBookingError,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   const [
     bookingSuccess,
     setBookingSuccess,
-  ] = useState(null);
+  ] = useState(
+    null
+  );
 
-  /*
-    Existing request for same
-    guest/property/overlapping
-    dates.
-
-    This is what prevents
-    duplicate booking rows and
-    duplicate chat threads.
-  */
   const [
     duplicateBooking,
     setDuplicateBooking,
-  ] = useState(null);
+  ] = useState(
+    null
+  );
+
+  const [
+    duplicateInfo,
+    setDuplicateInfo,
+  ] = useState(
+    null
+  );
 
   const [
     checkingDuplicate,
     setCheckingDuplicate,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
 
   const [
     reminderLoading,
     setReminderLoading,
-  ] = useState(false);
+  ] = useState(
+    false
+  );
 
   const [
     reminderSuccess,
     setReminderSuccess,
-  ] = useState('');
+  ] = useState(
+    ''
+  );
 
   useEffect(
     () => {
@@ -1093,14 +1198,24 @@ export default function PropertyPage() {
         loadProperty();
       }
     },
-    [slug]
+    [
+      slug,
+    ]
   );
 
   /*
-    Whenever guest/property/dates
-    change, check whether the guest
-    already has a request covering
-    these dates.
+    Secure duplicate checking.
+
+    IMPORTANT:
+
+    We no longer query bookings
+    directly from the browser.
+
+    The browser calls:
+    /api/bookings/check-existing
+
+    That API performs the lookup
+    server-side.
   */
   useEffect(
     () => {
@@ -1109,21 +1224,37 @@ export default function PropertyPage() {
         !guestProfile?.id ||
         !checkIn ||
         !checkOut ||
-        checkOut <= checkIn
+        checkOut <=
+          checkIn
       ) {
         setDuplicateBooking(
+          null
+        );
+
+        setDuplicateInfo(
           null
         );
 
         return;
       }
 
-      checkForExistingRequest(
-        guestProfile.id,
-        property.id,
-        checkIn,
-        checkOut
-      );
+      const timer =
+        setTimeout(
+          () => {
+            checkForExistingRequest(
+              guestProfile.id,
+              property.id,
+              checkIn,
+              checkOut
+            );
+          },
+          250
+        );
+
+      return () =>
+        clearTimeout(
+          timer
+        );
     },
     [
       property?.id,
@@ -1134,7 +1265,9 @@ export default function PropertyPage() {
   );
 
   async function checkGuestLogin() {
-    setAuthChecking(true);
+    setAuthChecking(
+      true
+    );
 
     try {
       const {
@@ -1158,7 +1291,8 @@ export default function PropertyPage() {
       const email =
         String(
           currentSession.user
-            .email || ''
+            .email ||
+            ''
         )
           .trim()
           .toLowerCase();
@@ -1167,20 +1301,19 @@ export default function PropertyPage() {
         return;
       }
 
-      /*
-        Prefer user_id because
-        guest auth is now linked
-        directly to guests.
-      */
       const {
         data:
           guestByUserId,
         error:
-          guestByUserIdError,
+          userGuestError,
       } =
         await supabase
-          .from('guests')
-          .select('*')
+          .from(
+            'guests'
+          )
+          .select(
+            '*'
+          )
           .eq(
             'user_id',
             currentSession.user.id
@@ -1188,10 +1321,10 @@ export default function PropertyPage() {
           .maybeSingle();
 
       if (
-        guestByUserIdError
+        userGuestError
       ) {
         console.warn(
-          guestByUserIdError
+          userGuestError
         );
       }
 
@@ -1199,19 +1332,20 @@ export default function PropertyPage() {
         guestByUserId ||
         null;
 
-      /*
-        Compatibility fallback for
-        any older guest record that
-        has not yet been linked.
-      */
       if (!guest) {
         const {
           data:
             guestRows,
+          error:
+            guestEmailError,
         } =
           await supabase
-            .from('guests')
-            .select('*')
+            .from(
+              'guests'
+            )
+            .select(
+              '*'
+            )
             .eq(
               'email',
               email
@@ -1223,7 +1357,17 @@ export default function PropertyPage() {
                   true,
               }
             )
-            .limit(1);
+            .limit(
+              1
+            );
+
+        if (
+          guestEmailError
+        ) {
+          console.warn(
+            guestEmailError
+          );
+        }
 
         guest =
           guestRows?.[0] ||
@@ -1268,6 +1412,13 @@ export default function PropertyPage() {
           email
         );
       }
+    } catch (
+      error
+    ) {
+      console.error(
+        'Guest login check:',
+        error
+      );
     } finally {
       setAuthChecking(
         false
@@ -1276,8 +1427,13 @@ export default function PropertyPage() {
   }
 
   async function loadProperty() {
-    setLoading(true);
-    setPageError('');
+    setLoading(
+      true
+    );
+
+    setPageError(
+      ''
+    );
 
     try {
       const {
@@ -1287,8 +1443,12 @@ export default function PropertyPage() {
           propertyError,
       } =
         await supabase
-          .from('properties')
-          .select('*')
+          .from(
+            'properties'
+          )
+          .select(
+            '*'
+          )
           .eq(
             'slug',
             slug
@@ -1335,7 +1495,9 @@ export default function PropertyPage() {
             .from(
               'property_photos'
             )
-            .select('*')
+            .select(
+              '*'
+            )
             .eq(
               'property_id',
               propertyData.id
@@ -1359,7 +1521,9 @@ export default function PropertyPage() {
             .from(
               'property_offers'
             )
-            .select('*')
+            .select(
+              '*'
+            )
             .eq(
               'property_id',
               propertyData.id
@@ -1373,7 +1537,9 @@ export default function PropertyPage() {
             .from(
               'pricing_rules'
             )
-            .select('*')
+            .select(
+              '*'
+            )
             .eq(
               'property_id',
               propertyData.id
@@ -1387,7 +1553,9 @@ export default function PropertyPage() {
             .from(
               'property_rate_overrides'
             )
-            .select('*')
+            .select(
+              '*'
+            )
             .eq(
               'property_id',
               propertyData.id
@@ -1410,11 +1578,14 @@ export default function PropertyPage() {
             ),
 
           /*
-            Inventory is blocked only
-            by successful paid booking.
+            Only successfully-paid
+            NightOutStays bookings
+            block inventory.
           */
           supabase
-            .from('bookings')
+            .from(
+              'bookings'
+            )
             .select(
               'check_in, check_out, booking_status, payment_status'
             )
@@ -1427,6 +1598,54 @@ export default function PropertyPage() {
               'paid'
             ),
         ]);
+
+      if (
+        photoResult.error
+      ) {
+        console.warn(
+          photoResult.error
+        );
+      }
+
+      if (
+        offerResult.error
+      ) {
+        console.warn(
+          offerResult.error
+        );
+      }
+
+      if (
+        pricingResult.error
+      ) {
+        console.warn(
+          pricingResult.error
+        );
+      }
+
+      if (
+        overrideResult.error
+      ) {
+        console.warn(
+          overrideResult.error
+        );
+      }
+
+      if (
+        blockedResult.error
+      ) {
+        console.warn(
+          blockedResult.error
+        );
+      }
+
+      if (
+        bookingResult.error
+      ) {
+        console.warn(
+          bookingResult.error
+        );
+      }
 
       setPhotos(
         (
@@ -1492,13 +1711,16 @@ export default function PropertyPage() {
           })
         )
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         error
       );
 
       setPageError(
-        error.message
+        error.message ||
+          'Unable to load property.'
       );
     } finally {
       setLoading(
@@ -1568,7 +1790,8 @@ export default function PropertyPage() {
           (offer) =>
             offer.id ===
             selectedOfferId
-        ) || null,
+        ) ||
+        null,
       [
         availableOffers,
         selectedOfferId,
@@ -1584,7 +1807,8 @@ export default function PropertyPage() {
           !checkOut
         ) {
           return {
-            valid: false,
+            valid:
+              false,
           };
         }
 
@@ -1607,24 +1831,32 @@ export default function PropertyPage() {
 
               rateOverrides,
 
-              gstRate: 0,
+              gstRate:
+                0,
             });
 
           return buildFinalPricing({
             basePricing,
+
             offer:
               selectedOffer,
+
             checkIn,
+
             checkOut,
+
             property,
           });
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             error
           );
 
           return {
-            valid: false,
+            valid:
+              false,
 
             error:
               error.message ||
@@ -1710,19 +1942,12 @@ export default function PropertyPage() {
   }
 
   /*
-    ==================================================
-    DUPLICATE REQUEST PROTECTION
-    ==================================================
+    ================================
+    SECURE EXISTING REQUEST CHECK
+    ================================
 
-    Same guest + same property +
-    overlapping stay dates cannot
-    create multiple active booking
-    requests.
-
-    We intentionally look at all
-    non-cancelled records for the
-    guest/property and perform the
-    overlap test here.
+    No direct browser query to
+    bookings is used here.
   */
   async function checkForExistingRequest(
     guestId,
@@ -1740,6 +1965,10 @@ export default function PropertyPage() {
         null
       );
 
+      setDuplicateInfo(
+        null
+      );
+
       return null;
     }
 
@@ -1748,104 +1977,103 @@ export default function PropertyPage() {
     );
 
     try {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from('bookings')
-          .select(`
-            id,
-            booking_code,
-            property_id,
-            guest_id,
-            check_in,
-            check_out,
-            booking_status,
-            payment_status,
-            host_decision,
-            host_decided_at,
-            created_at,
-            updated_at,
-            offer_status
-          `)
-          .eq(
-            'guest_id',
-            guestId
-          )
-          .eq(
-            'property_id',
-            propertyId
-          )
-          .order(
-            'created_at',
-            {
-              ascending:
-                false,
-            }
-          );
+      const response =
+        await fetch(
+          '/api/bookings/check-existing',
+          {
+            method:
+              'POST',
 
-      if (error) {
-        throw error;
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+
+            body:
+              JSON.stringify({
+                guestId,
+                propertyId,
+                checkIn:
+                  requestedCheckIn,
+                checkOut:
+                  requestedCheckOut,
+              }),
+          }
+        );
+
+      let result = null;
+
+      try {
+        result =
+          await response.json();
+      } catch {
+        result =
+          null;
       }
 
-      const matching =
-        (data || []).find(
-          (booking) => {
-            const status =
-              String(
-                booking.booking_status ||
-                  ''
-              ).toLowerCase();
+      if (
+        !response.ok ||
+        !result?.success
+      ) {
+        throw new Error(
+          result?.error ||
+          'Unable to verify your existing booking requests.'
+        );
+      }
 
-            /*
-              Cancelled or expired
-              requests may be replaced
-              with a new request.
+      if (
+        result.exists &&
+        result.booking
+      ) {
+        setDuplicateBooking(
+          result.booking
+        );
 
-              Declined requests remain
-              closed and are not treated
-              as an active duplicate.
-            */
-            if (
-              status ===
-                'cancelled' ||
-              status ===
-                'declined' ||
-              status ===
-                'completed'
-            ) {
-              return false;
-            }
+        setDuplicateInfo({
+          hostResponseDeadline:
+            result.hostResponseDeadline ||
+            null,
 
-            return rangesOverlap(
-              requestedCheckIn,
-              requestedCheckOut,
-              booking.check_in,
-              booking.check_out
-            );
-          }
-        ) || null;
+          hostResponseExpired:
+            Boolean(
+              result.hostResponseExpired
+            ),
+
+          canRemindHost:
+            Boolean(
+              result.canRemindHost
+            ),
+        });
+
+        return result.booking;
+      }
 
       setDuplicateBooking(
-        matching
+        null
       );
 
-      return matching;
-    } catch (error) {
+      setDuplicateInfo(
+        null
+      );
+
+      return null;
+    } catch (
+      error
+    ) {
       console.error(
-        'Duplicate booking check:',
+        'Secure duplicate check:',
         error
       );
 
-      /*
-        Do not silently create another
-        request when duplicate checking
-        itself fails.
-      */
-      throw new Error(
-        'Unable to verify your existing booking requests. Please try again.'
+      setDuplicateBooking(
+        null
       );
+
+      setDuplicateInfo(
+        null
+      );
+
+      throw error;
     } finally {
       setCheckingDuplicate(
         false
@@ -1864,12 +2092,14 @@ export default function PropertyPage() {
 
     const name =
       String(
-        guestName || ''
+        guestName ||
+          ''
       ).trim();
 
     const email =
       String(
-        guestEmail || ''
+        guestEmail ||
+          ''
       )
         .trim()
         .toLowerCase();
@@ -1886,7 +2116,8 @@ export default function PropertyPage() {
     }
 
     if (
-      phone.length < 10
+      phone.length <
+      10
     ) {
       throw new Error(
         'Please enter a valid mobile number.'
@@ -1906,9 +2137,6 @@ export default function PropertyPage() {
     let guest =
       guestProfile;
 
-    /*
-      Always prefer auth user_id.
-    */
     if (!guest?.id) {
       const {
         data:
@@ -1917,8 +2145,12 @@ export default function PropertyPage() {
           userGuestError,
       } =
         await supabase
-          .from('guests')
-          .select('*')
+          .from(
+            'guests'
+          )
+          .select(
+            '*'
+          )
           .eq(
             'user_id',
             session.user.id
@@ -1936,9 +2168,6 @@ export default function PropertyPage() {
         null;
     }
 
-    /*
-      Fallback for old profile.
-    */
     if (!guest?.id) {
       const {
         data:
@@ -1946,8 +2175,12 @@ export default function PropertyPage() {
         error,
       } =
         await supabase
-          .from('guests')
-          .select('*')
+          .from(
+            'guests'
+          )
+          .select(
+            '*'
+          )
           .eq(
             'email',
             email
@@ -1959,7 +2192,9 @@ export default function PropertyPage() {
                 true,
             }
           )
-          .limit(1);
+          .limit(
+            1
+          );
 
       if (error) {
         throw error;
@@ -1977,7 +2212,9 @@ export default function PropertyPage() {
         error,
       } =
         await supabase
-          .from('guests')
+          .from(
+            'guests'
+          )
           .update({
             full_name:
               name,
@@ -1986,11 +2223,6 @@ export default function PropertyPage() {
 
             email,
 
-            /*
-              Make sure an older guest
-              profile is linked to the
-              logged-in auth account.
-            */
             user_id:
               session.user.id,
           })
@@ -1998,7 +2230,9 @@ export default function PropertyPage() {
             'id',
             guest.id
           )
-          .select('*')
+          .select(
+            '*'
+          )
           .single();
 
       if (error) {
@@ -2018,7 +2252,9 @@ export default function PropertyPage() {
       error,
     } =
       await supabase
-        .from('guests')
+        .from(
+          'guests'
+        )
         .insert({
           user_id:
             session.user.id,
@@ -2030,7 +2266,9 @@ export default function PropertyPage() {
 
           email,
         })
-        .select('*')
+        .select(
+          '*'
+        )
         .single();
 
     if (error) {
@@ -2045,21 +2283,29 @@ export default function PropertyPage() {
   }
 
   /*
-    ==================================================
+    ================================
     REMIND HOST
-    ==================================================
+    ================================
 
-    This does NOT create another
-    booking.
+    Adds a message to the SAME
+    booking conversation.
 
-    It adds a normal message to the
-    SAME booking conversation.
+    No new booking is created.
   */
   async function remindHost() {
     if (
-      !duplicateBooking?.id ||
+      !duplicateBooking?.id
+    ) {
+      return;
+    }
+
+    if (
       !guestProfile?.id
     ) {
+      setBookingError(
+        'Guest profile is not available.'
+      );
+
       return;
     }
 
@@ -2082,24 +2328,18 @@ export default function PropertyPage() {
         'pending'
     ) {
       setBookingError(
-        'The host has already responded to this booking request. Please continue from Messages.'
+        'The host has already responded. Please continue from Messages.'
       );
 
       return;
     }
 
-    const deadline =
-      getHostResponseDeadline(
-        duplicateBooking
-      );
-
     if (
-      deadline &&
-      deadline.getTime() <=
-        Date.now()
+      duplicateInfo
+        ?.hostResponseExpired
     ) {
       setBookingError(
-        'The host response period has expired. This request must be closed before a new request can be submitted.'
+        'The host response period has expired. Please wait for this request to close before creating a new request.'
       );
 
       return;
@@ -2109,15 +2349,15 @@ export default function PropertyPage() {
       true
     );
 
-    setReminderSuccess('');
-    setBookingError('');
+    setReminderSuccess(
+      ''
+    );
+
+    setBookingError(
+      ''
+    );
 
     try {
-      /*
-        Avoid accidental rapid duplicate
-        reminders. Check the latest
-        messages first.
-      */
       const {
         data:
           latestMessages,
@@ -2142,9 +2382,13 @@ export default function PropertyPage() {
                 false,
             }
           )
-          .limit(1);
+          .limit(
+            1
+          );
 
-      if (latestError) {
+      if (
+        latestError
+      ) {
         throw latestError;
       }
 
@@ -2156,7 +2400,8 @@ export default function PropertyPage() {
         latest.sender_type ===
           'guest' &&
         String(
-          latest.message || ''
+          latest.message ||
+            ''
         ).includes(
           'Reminder: Please respond to my booking request.'
         )
@@ -2166,15 +2411,15 @@ export default function PropertyPage() {
             latest.created_at
           ).getTime();
 
-        /*
-          Keep reminders sensible:
-          one reminder at most every
-          60 minutes.
-        */
         if (
+          Number.isFinite(
+            lastTime
+          ) &&
           Date.now() -
             lastTime <
-          60 * 60 * 1000
+            60 *
+              60 *
+              1000
         ) {
           throw new Error(
             'A reminder was already sent recently. Please allow the host some time to respond.'
@@ -2212,14 +2457,18 @@ export default function PropertyPage() {
               false,
           });
 
-      if (reminderError) {
+      if (
+        reminderError
+      ) {
         throw reminderError;
       }
 
       setReminderSuccess(
         'Reminder sent to host in the existing conversation.'
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         error
       );
@@ -2240,11 +2489,21 @@ export default function PropertyPage() {
   ) {
     event.preventDefault();
 
-    setBookingError('');
-    setBookingSuccess(null);
-    setReminderSuccess('');
+    setBookingError(
+      ''
+    );
 
-    if (authChecking) {
+    setBookingSuccess(
+      null
+    );
+
+    setReminderSuccess(
+      ''
+    );
+
+    if (
+      authChecking
+    ) {
       return;
     }
 
@@ -2252,6 +2511,7 @@ export default function PropertyPage() {
       !session?.user
     ) {
       redirectToLogin();
+
       return;
     }
 
@@ -2268,7 +2528,8 @@ export default function PropertyPage() {
     if (
       cleanPhone(
         guestPhone
-      ).length < 10
+      ).length <
+      10
     ) {
       setBookingError(
         'Valid mobile number is required.'
@@ -2341,15 +2602,10 @@ export default function PropertyPage() {
         await ensureGuestProfile();
 
       /*
-        CRITICAL:
+        CRITICAL DUPLICATE CHECK:
 
-        Re-check duplicates immediately
-        before INSERT.
-
-        We do not rely only on the UI
-        check because the guest could
-        click quickly or have another
-        browser tab open.
+        Re-check immediately before
+        inserting a new booking.
       */
       const existingRequest =
         await checkForExistingRequest(
@@ -2366,23 +2622,8 @@ export default function PropertyPage() {
           existingRequest
         );
 
-        const hostDecision =
-          String(
-            existingRequest.host_decision ||
-              'pending'
-          ).toLowerCase();
-
-        if (
-          hostDecision ===
-          'pending'
-        ) {
-          throw new Error(
-            'You already have an active request for this property and these dates. Please use Remind Host instead of creating another request.'
-          );
-        }
-
         throw new Error(
-          'You already have a booking request for this property and these dates. Please continue from the existing conversation.'
+          'You already have a booking request for this property and overlapping dates. Please continue from the existing request.'
         );
       }
 
@@ -2532,11 +2773,15 @@ export default function PropertyPage() {
           createdBookingError,
       } =
         await supabase
-          .from('bookings')
+          .from(
+            'bookings'
+          )
           .insert(
             bookingPayload
           )
-          .select('*')
+          .select(
+            '*'
+          )
           .single();
 
       if (
@@ -2579,23 +2824,22 @@ export default function PropertyPage() {
               false,
           });
 
-      if (messageError) {
+      if (
+        messageError
+      ) {
         console.warn(
           messageError
         );
       }
 
-      /*
-        Add a system message so both
-        sides clearly understand the
-        host's response deadline.
-      */
       const hostDeadline =
         getHostResponseDeadline(
           createdBooking
         );
 
-      if (hostDeadline) {
+      if (
+        hostDeadline
+      ) {
         const {
           error:
             deadlineMessageError,
@@ -2643,8 +2887,25 @@ export default function PropertyPage() {
         createdBooking
       );
 
-      setGuestMessage('');
-    } catch (error) {
+      setDuplicateInfo({
+        hostResponseDeadline:
+          hostDeadline
+            ? hostDeadline.toISOString()
+            : null,
+
+        hostResponseExpired:
+          false,
+
+        canRemindHost:
+          true,
+      });
+
+      setGuestMessage(
+        ''
+      );
+    } catch (
+      error
+    ) {
       console.error(
         error
       );
@@ -2725,7 +2986,12 @@ export default function PropertyPage() {
     ).toLowerCase();
 
   const duplicateDeadline =
-    duplicateBooking
+    duplicateInfo
+      ?.hostResponseDeadline
+      ? new Date(
+          duplicateInfo.hostResponseDeadline
+        )
+      : duplicateBooking
       ? getHostResponseDeadline(
           duplicateBooking
         )
@@ -2738,11 +3004,8 @@ export default function PropertyPage() {
         'pending' &&
       duplicateBookingStatus ===
         'pending' &&
-      (
-        !duplicateDeadline ||
-        duplicateDeadline.getTime() >
-          Date.now()
-      )
+      !duplicateInfo
+        ?.hostResponseExpired
     );
 
   return (
@@ -2818,7 +3081,9 @@ export default function PropertyPage() {
         >
           <div>
             <h1>
-              {property.name}
+              {
+                property.name
+              }
             </h1>
 
             <div
@@ -3055,9 +3320,25 @@ export default function PropertyPage() {
                         event.target.value
                       );
 
-                      setBookingError('');
-                      setBookingSuccess(null);
-                      setReminderSuccess('');
+                      setBookingError(
+                        ''
+                      );
+
+                      setBookingSuccess(
+                        null
+                      );
+
+                      setReminderSuccess(
+                        ''
+                      );
+
+                      setDuplicateBooking(
+                        null
+                      );
+
+                      setDuplicateInfo(
+                        null
+                      );
                     }}
                     style={
                       styles.input
@@ -3092,9 +3373,25 @@ export default function PropertyPage() {
                         event.target.value
                       );
 
-                      setBookingError('');
-                      setBookingSuccess(null);
-                      setReminderSuccess('');
+                      setBookingError(
+                        ''
+                      );
+
+                      setBookingSuccess(
+                        null
+                      );
+
+                      setReminderSuccess(
+                        ''
+                      );
+
+                      setDuplicateBooking(
+                        null
+                      );
+
+                      setDuplicateInfo(
+                        null
+                      );
                     }}
                     style={
                       styles.input
@@ -3102,7 +3399,6 @@ export default function PropertyPage() {
                   />
                 </label>
               </div>
-
               <label
                 style={
                   styles.label
@@ -3123,8 +3419,13 @@ export default function PropertyPage() {
                       )
                     );
 
-                    setBookingError('');
-                    setBookingSuccess(null);
+                    setBookingError(
+                      ''
+                    );
+
+                    setBookingSuccess(
+                      null
+                    );
                   }}
                   style={
                     styles.input
@@ -3213,7 +3514,7 @@ export default function PropertyPage() {
                     styles.checkingBox
                   }
                 >
-                  Checking your existing requests...
+                  Checking your existing booking requests...
                 </div>
               )}
 
@@ -3224,7 +3525,7 @@ export default function PropertyPage() {
                   }
                 >
                   <strong>
-                    You already have a request for these dates.
+                    You already have a booking request for these dates.
                   </strong>
 
                   {duplicateBooking.booking_code && (
@@ -3241,19 +3542,28 @@ export default function PropertyPage() {
                   {duplicateHostDecision ===
                     'pending' ? (
                     <>
-                      <div>
-                        Waiting for host response.
-                      </div>
-
-                      {duplicateDeadline && (
+                      {duplicateInfo
+                        ?.hostResponseExpired ? (
                         <div>
-                          Host response deadline:{' '}
-                          <strong>
-                            {formatDateTime(
-                              duplicateDeadline
-                            )}
-                          </strong>
+                          The host response period has expired. This request will need to close before a new request can be created.
                         </div>
+                      ) : (
+                        <>
+                          <div>
+                            Waiting for host response.
+                          </div>
+
+                          {duplicateDeadline && (
+                            <div>
+                              Host response deadline:{' '}
+                              <strong>
+                                {formatDateTime(
+                                  duplicateDeadline
+                                )}
+                              </strong>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       <div
@@ -3350,8 +3660,13 @@ export default function PropertyPage() {
                             event.target.value
                           );
 
-                          setBookingError('');
-                          setBookingSuccess(null);
+                          setBookingError(
+                            ''
+                          );
+
+                          setBookingSuccess(
+                            null
+                          );
                         }}
                         style={
                           styles.input
@@ -3615,6 +3930,7 @@ export default function PropertyPage() {
                   </div>
                 </div>
               )}
+
               <label
                 style={
                   styles.label
@@ -3634,7 +3950,9 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError('');
+                    setBookingError(
+                      ''
+                    );
                   }}
                   required
                   autoComplete="name"
@@ -3664,7 +3982,9 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError('');
+                    setBookingError(
+                      ''
+                    );
                   }}
                   required
                   autoComplete="tel"
@@ -3694,7 +4014,9 @@ export default function PropertyPage() {
                       event.target.value
                     );
 
-                    setBookingError('');
+                    setBookingError(
+                      ''
+                    );
                   }}
                   required
                   autoComplete="email"
@@ -3800,17 +4122,6 @@ export default function PropertyPage() {
                   </div>
                 )}
 
-              {/*
-                IMPORTANT:
-
-                Once an existing active
-                request is detected we do
-                not allow another submit.
-
-                The guest gets Remind Host
-                / Messages instead.
-              */}
-
               {!duplicateBooking && (
                 <button
                   type="submit"
@@ -3872,10 +4183,6 @@ export default function PropertyPage() {
   );
 }
 
-/* =========================
-   SMALL COMPONENTS
-========================= */
-
 function Section({
   title,
   children,
@@ -3930,10 +4237,6 @@ function PriceRow({
     </div>
   );
 }
-
-/* =========================
-   STYLES
-========================= */
 
 const styles = {
   page: {
