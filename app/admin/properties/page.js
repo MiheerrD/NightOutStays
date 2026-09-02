@@ -3492,3 +3492,2020 @@ function PageStyles() {
     `}</style>
   );
 }
+      onSubmit={onSubmit}
+      className="nosPropForm"
+    >
+      {errorMessage && (
+        <div className="nosPropError">
+          {errorMessage}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="nosPropSuccess">
+          {successMessage}
+        </div>
+      )}
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>PROPERTY INFORMATION</span>
+            <h3>Basic Details</h3>
+          </div>
+        </div>
+
+        <div className="nosPropGrid2">
+          <label className="nosPropField">
+            <span>Property Name</span>
+
+            <input
+              value={form.name}
+              onChange={(event) =>
+                updateField(
+                  'name',
+                  event.target.value
+                )
+              }
+              placeholder="Example: Cozy 2BHK Apartment"
+              required
+            />
+          </label>
+
+          <label className="nosPropField">
+            <span>Property Type</span>
+
+            <select
+              value={form.property_type || ''}
+              onChange={(event) =>
+                updateField(
+                  'property_type',
+                  event.target.value
+                )
+              }
+            >
+              <option value="">
+                Select Property Type
+              </option>
+
+              <option value="Apartment">
+                Apartment
+              </option>
+
+              <option value="Villa">
+                Villa
+              </option>
+
+              <option value="Bungalow">
+                Bungalow
+              </option>
+
+              <option value="Studio">
+                Studio
+              </option>
+
+              <option value="Condo">
+                Condo
+              </option>
+
+              <option value="Farmhouse">
+                Farmhouse
+              </option>
+
+              <option value="Cottage">
+                Cottage
+              </option>
+
+              <option value="Row House">
+                Row House
+              </option>
+
+              <option value="Guest House">
+                Guest House
+              </option>
+
+              <option value="Service Apartment">
+                Service Apartment
+              </option>
+            </select>
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Short Description</span>
+
+            <input
+              value={form.short_description || ''}
+              onChange={(event) =>
+                updateField(
+                  'short_description',
+                  event.target.value
+                )
+              }
+              placeholder="Short description for cards and search results"
+            />
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Full Description</span>
+
+            <textarea
+              rows="6"
+              value={form.description || ''}
+              onChange={(event) =>
+                updateField(
+                  'description',
+                  event.target.value
+                )
+              }
+              placeholder="Describe the property, experience and important information."
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>LOCATION</span>
+            <h3>Property Location</h3>
+          </div>
+        </div>
+
+        <div className="nosPropGrid2">
+          <label className="nosPropField">
+            <span>City</span>
+
+            <input
+              value={form.city || ''}
+              onChange={(event) =>
+                updateField(
+                  'city',
+                  event.target.value
+                )
+              }
+              placeholder="Pune"
+            />
+          </label>
+
+          <label className="nosPropField">
+            <span>Area</span>
+
+            <input
+              value={form.area || ''}
+              onChange={(event) =>
+                updateField(
+                  'area',
+                  event.target.value
+                )
+              }
+              placeholder="Bavdhan"
+            />
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Display Location</span>
+
+            <input
+              value={form.location_name || ''}
+              onChange={(event) =>
+                updateField(
+                  'location_name',
+                  event.target.value
+                )
+              }
+              placeholder="Bavdhan, Pune"
+              required
+            />
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Full Address</span>
+
+            <textarea
+              rows="3"
+              value={form.address || ''}
+              onChange={(event) =>
+                updateField(
+                  'address',
+                  event.target.value
+                )
+              }
+              placeholder="Complete property address"
+            />
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Google Maps URL</span>
+
+            <input
+              value={form.google_maps_url || ''}
+              onChange={(event) =>
+                updateField(
+                  'google_maps_url',
+                  event.target.value
+                )
+              }
+              placeholder="Google Maps location link"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>CAPACITY</span>
+            <h3>Rooms, Beds & Guests</h3>
+          </div>
+        </div>
+
+        <div className="nosPropGrid4">
+          <NumberField
+            label="Bedrooms"
+            value={form.bedrooms}
+            onChange={(value) =>
+              updateField('bedrooms', value)
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Bathrooms"
+            value={form.bathrooms}
+            onChange={(value) =>
+              updateField('bathrooms', value)
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Queen Beds"
+            value={form.queen_bed_count}
+            onChange={(value) =>
+              updateField(
+                'queen_bed_count',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Single Beds"
+            value={form.single_bed_count}
+            onChange={(value) =>
+              updateField(
+                'single_bed_count',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Sofa Cum Beds"
+            value={form.sofa_cum_bed_count}
+            onChange={(value) =>
+              updateField(
+                'sofa_cum_bed_count',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Minimum Guests"
+            value={form.min_guests}
+            onChange={(value) =>
+              updateField(
+                'min_guests',
+                value
+              )
+            }
+            min="1"
+          />
+
+          <NumberField
+            label="Guests Included"
+            value={form.included_guests}
+            onChange={(value) =>
+              updateField(
+                'included_guests',
+                value
+              )
+            }
+            min="1"
+          />
+
+          <NumberField
+            label="Maximum Guests"
+            value={form.max_guests}
+            onChange={(value) =>
+              updateField(
+                'max_guests',
+                value
+              )
+            }
+            min="1"
+          />
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>PRICING</span>
+            <h3>Base Pricing</h3>
+          </div>
+        </div>
+
+        <div className="nosPropGrid4">
+          <NumberField
+            label="Base Nightly Rate ₹"
+            value={form.base_price}
+            onChange={(value) =>
+              updateField(
+                'base_price',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Extra Guest Fee ₹"
+            value={form.extra_guest_fee}
+            onChange={(value) =>
+              updateField(
+                'extra_guest_fee',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Cleaning Fee ₹"
+            value={form.cleaning_fee}
+            onChange={(value) =>
+              updateField(
+                'cleaning_fee',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Security Deposit ₹"
+            value={form.security_deposit}
+            onChange={(value) =>
+              updateField(
+                'security_deposit',
+                value
+              )
+            }
+            min="0"
+          />
+
+          <NumberField
+            label="Minimum Nights"
+            value={form.min_stay_nights}
+            onChange={(value) =>
+              updateField(
+                'min_stay_nights',
+                value
+              )
+            }
+            min="1"
+          />
+
+          <NumberField
+            label="Maximum Nights"
+            value={form.max_stay_nights}
+            onChange={(value) =>
+              updateField(
+                'max_stay_nights',
+                value
+              )
+            }
+            min="1"
+          />
+
+          <NumberField
+            label="Late Checkout / Hour ₹"
+            value={
+              form.late_checkout_hourly_fee
+            }
+            onChange={(value) =>
+              updateField(
+                'late_checkout_hourly_fee',
+                value
+              )
+            }
+            min="0"
+          />
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>CHECK-IN</span>
+            <h3>Arrival & Departure</h3>
+          </div>
+        </div>
+
+        <div className="nosPropGrid2">
+          <label className="nosPropField">
+            <span>Check-in Time</span>
+
+            <input
+              type="time"
+              value={form.check_in_time || ''}
+              onChange={(event) =>
+                updateField(
+                  'check_in_time',
+                  event.target.value
+                )
+              }
+            />
+          </label>
+
+          <label className="nosPropField">
+            <span>Check-out Time</span>
+
+            <input
+              type="time"
+              value={form.check_out_time || ''}
+              onChange={(event) =>
+                updateField(
+                  'check_out_time',
+                  event.target.value
+                )
+              }
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>FACILITIES</span>
+            <h3>Property Facilities</h3>
+          </div>
+        </div>
+
+        <div className="nosPropSwitchGrid">
+          <SwitchField
+            label="Wi-Fi Available"
+            checked={form.wifi_available}
+            onChange={(value) =>
+              updateField(
+                'wifi_available',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="TV Available"
+            checked={form.tv_available}
+            onChange={(value) =>
+              updateField(
+                'tv_available',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Fridge Available"
+            checked={form.fridge_available}
+            onChange={(value) =>
+              updateField(
+                'fridge_available',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Washing Machine"
+            checked={
+              form.washing_machine_available
+            }
+            onChange={(value) =>
+              updateField(
+                'washing_machine_available',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Air Conditioning"
+            checked={form.ac_available}
+            onChange={(value) =>
+              updateField(
+                'ac_available',
+                value
+              )
+            }
+          />
+        </div>
+
+        <div className="nosPropGrid2 nosPropTopGap">
+          {form.ac_available && (
+            <NumberField
+              label="Number of ACs"
+              value={form.ac_count}
+              onChange={(value) =>
+                updateField(
+                  'ac_count',
+                  value
+                )
+              }
+              min="0"
+            />
+          )}
+
+          <NumberField
+            label="Water Heaters"
+            value={form.water_heater_count}
+            onChange={(value) =>
+              updateField(
+                'water_heater_count',
+                value
+              )
+            }
+            min="0"
+          />
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>AMENITIES</span>
+            <h3>Amenities</h3>
+          </div>
+        </div>
+
+        <div className="nosPropOptionGrid">
+          {amenityOptions.map((item) => (
+            <CheckOption
+              key={item}
+              label={item}
+              checked={
+                form.amenities?.includes(item)
+              }
+              onChange={() =>
+                toggleArrayItem(
+                  'amenities',
+                  item
+                )
+              }
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>KITCHEN</span>
+            <h3>Kitchen Features</h3>
+          </div>
+        </div>
+
+        <div className="nosPropOptionGrid">
+          {kitchenOptions.map((item) => (
+            <CheckOption
+              key={item}
+              label={item}
+              checked={
+                form.kitchen_features?.includes(
+                  item
+                )
+              }
+              onChange={() =>
+                toggleArrayItem(
+                  'kitchen_features',
+                  item
+                )
+              }
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>POLICIES</span>
+            <h3>Guest Policies</h3>
+          </div>
+        </div>
+
+        <div className="nosPropSwitchGrid">
+          <SwitchField
+            label="Pets Allowed"
+            checked={form.pets_allowed}
+            onChange={(value) =>
+              updateField(
+                'pets_allowed',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Parties Allowed"
+            checked={form.parties_allowed}
+            onChange={(value) =>
+              updateField(
+                'parties_allowed',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Couples Allowed"
+            checked={form.couples_allowed}
+            onChange={(value) =>
+              updateField(
+                'couples_allowed',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Alcohol Allowed"
+            checked={form.alcohol_allowed}
+            onChange={(value) =>
+              updateField(
+                'alcohol_allowed',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Smoking Allowed"
+            checked={form.smoking_allowed}
+            onChange={(value) =>
+              updateField(
+                'smoking_allowed',
+                value
+              )
+            }
+          />
+
+          <SwitchField
+            label="Quiet Hours"
+            checked={
+              form.quiet_hours_enabled
+            }
+            onChange={(value) =>
+              updateField(
+                'quiet_hours_enabled',
+                value
+              )
+            }
+          />
+        </div>
+
+        {form.quiet_hours_enabled && (
+          <div className="nosPropGrid2 nosPropTopGap">
+            <label className="nosPropField">
+              <span>Quiet Hours Start</span>
+
+              <input
+                type="time"
+                value={
+                  form.quiet_hours_start || ''
+                }
+                onChange={(event) =>
+                  updateField(
+                    'quiet_hours_start',
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+
+            <label className="nosPropField">
+              <span>Quiet Hours End</span>
+
+              <input
+                type="time"
+                value={
+                  form.quiet_hours_end || ''
+                }
+                onChange={(event) =>
+                  updateField(
+                    'quiet_hours_end',
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="nosPropGrid2 nosPropTopGap">
+          <label className="nosPropField nosPropFull">
+            <span>House Rules</span>
+
+            <textarea
+              rows="6"
+              value={form.house_rules_text || ''}
+              onChange={(event) =>
+                updateField(
+                  'house_rules_text',
+                  event.target.value
+                )
+              }
+              placeholder={'Enter one rule per line.\nExample:\nNo loud music after 10 PM\nGovernment ID required'}
+            />
+          </label>
+
+          <label className="nosPropField nosPropFull">
+            <span>Direction Instructions</span>
+
+            <textarea
+              rows="4"
+              value={
+                form.direction_instructions ||
+                ''
+              }
+              onChange={(event) =>
+                updateField(
+                  'direction_instructions',
+                  event.target.value
+                )
+              }
+              placeholder="Directions or landmark instructions"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="nosPropFormCard">
+        <div className="nosPropSectionHeading">
+          <div>
+            <span>DYNAMIC PRICING</span>
+            <h3>Automatic Markups</h3>
+          </div>
+        </div>
+
+        <SwitchField
+          label="Enable Dynamic Pricing"
+          checked={
+            form.dynamic_pricing_enabled
+          }
+          onChange={(value) =>
+            updateField(
+              'dynamic_pricing_enabled',
+              value
+            )
+          }
+        />
+
+        {form.dynamic_pricing_enabled && (
+          <div className="nosPropGrid4 nosPropTopGap">
+            <NumberField
+              label="Weekend Markup %"
+              value={
+                form.weekend_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'weekend_markup_percent',
+                  value
+                )
+              }
+              min="0"
+            />
+
+            <NumberField
+              label="Long Weekend %"
+              value={
+                form.long_weekend_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'long_weekend_markup_percent',
+                  value
+                )
+              }
+              min="0"
+            />
+
+            <NumberField
+              label="Festival Markup %"
+              value={
+                form.festival_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'festival_markup_percent',
+                  value
+                )
+              }
+              min="0"
+            />
+
+            <NumberField
+              label="Season Markup %"
+              value={
+                form.season_markup_percent
+              }
+              onChange={(value) =>
+                updateField(
+                  'season_markup_percent',
+                  value
+                )
+              }
+              min="0"
+            />
+          </div>
+        )}
+      </section>
+
+      {isEditing && (
+        <section className="nosPropFormCard">
+          <div className="nosPropSectionHeading">
+            <div>
+              <span>MODERATION</span>
+              <h3>Current Review Status</h3>
+            </div>
+          </div>
+
+          <div className="nosPropReadonlyGrid">
+            <div>
+              <span>Status</span>
+
+              <strong>
+                {getStatusLabel(
+                  form.moderation_status
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Guest Visibility</span>
+
+              <strong>
+                {form.is_active
+                  ? 'Live'
+                  : 'Offline'}
+              </strong>
+            </div>
+          </div>
+
+          <p className="nosPropModerationHelp">
+            Guest visibility is controlled by
+            the Super Admin moderation workflow.
+            Approving a property makes it live.
+            Requesting changes or declining it
+            keeps it offline.
+          </p>
+        </section>
+      )}
+
+      <div className="nosPropFormActions">
+        <button
+          type="submit"
+          disabled={saving}
+          className="nosPropPrimaryButton"
+        >
+          {saving
+            ? 'Saving...'
+            : isEditing
+              ? 'Save Property Details'
+              : 'Create Property'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  min,
+}) {
+  return (
+    <label className="nosPropField">
+      <span>{label}</span>
+
+      <input
+        type="number"
+        min={min}
+        value={
+          value === null ||
+          value === undefined
+            ? ''
+            : value
+        }
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+      />
+    </label>
+  );
+}
+
+function SwitchField({
+  label,
+  checked,
+  onChange,
+}) {
+  return (
+    <label className="nosPropSwitch">
+      <input
+        type="checkbox"
+        checked={Boolean(checked)}
+        onChange={(event) =>
+          onChange(event.target.checked)
+        }
+      />
+
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function CheckOption({
+  label,
+  checked,
+  onChange,
+}) {
+  return (
+    <label
+      className={
+        checked
+          ? 'nosPropCheckOption nosPropCheckOptionSelected'
+          : 'nosPropCheckOption'
+      }
+    >
+      <input
+        type="checkbox"
+        checked={Boolean(checked)}
+        onChange={onChange}
+      />
+
+      <span>{label}</span>
+    </label>
+  );
+}
+
+
+/* =====================================================
+   PAGE STYLES
+===================================================== */
+
+function PageStyles() {
+  return (
+    <style jsx global>{`
+      * {
+        box-sizing: border-box;
+      }
+
+      .nosPropPage {
+        min-height: 100vh;
+        background: #f5f6f8;
+        color: #111827;
+      }
+
+      .nosPropHeader {
+        min-height: 76px;
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 14px 32px;
+      }
+
+      .nosPropBrandArea {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .nosPropBrand {
+        font-size: 21px;
+        font-weight: 900;
+        letter-spacing: -0.4px;
+      }
+
+      .nosPropMuted {
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .nosPropHeaderRight {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .nosPropProfile {
+        display: flex;
+        flex-direction: column;
+        text-align: right;
+        gap: 2px;
+      }
+
+      .nosPropProfile strong {
+        font-size: 14px;
+      }
+
+      .nosPropProfile span {
+        font-size: 11px;
+        color: #6b7280;
+      }
+
+      .nosPropLogoutButton,
+      .nosPropBackButton,
+      .nosPropMainTab,
+      .nosPropFilterButton,
+      .nosPropCardPrimary,
+      .nosPropCardSecondary,
+      .nosPropCardReview,
+      .nosPropPrimaryButton,
+      .nosPropApproveButton,
+      .nosPropChangesButton,
+      .nosPropDeclineButton,
+      .nosPropOfflineButton,
+      .nosPropManageTab {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .nosPropLogoutButton {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        border-radius: 9px;
+        padding: 9px 14px;
+        font-weight: 700;
+      }
+
+      .nosPropContent {
+        width: min(1500px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 34px 0 70px;
+      }
+
+      .nosPropPageHeading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        margin-bottom: 22px;
+      }
+
+      .nosPropPageHeading h1 {
+        margin: 0 0 6px;
+        font-size: 31px;
+        line-height: 1.1;
+      }
+
+      .nosPropPageHeading p,
+      .nosPropEditorTitle p,
+      .nosPropManagerHeading p {
+        margin: 0;
+        color: #6b7280;
+        line-height: 1.55;
+      }
+
+      .nosPropMainTabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .nosPropMainTab {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        padding: 12px 15px;
+        font-weight: 800;
+        color: #6b7280;
+      }
+
+      .nosPropMainTabActive {
+        color: #111827;
+        border-bottom-color: #111827;
+      }
+
+      .nosPropStatsGrid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropStatCard {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 17px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .nosPropStatCard span {
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nosPropStatCard strong {
+        font-size: 27px;
+      }
+
+      .nosPropStatAttention {
+        border-color: #f59e0b;
+        background: #fffbeb;
+      }
+
+      .nosPropFilterBar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0 0 20px;
+      }
+
+      .nosPropFilterButton {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+        border-radius: 999px;
+        padding: 9px 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .nosPropFilterButton span {
+        min-width: 23px;
+        height: 23px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+      }
+
+      .nosPropFilterButtonActive {
+        background: #111827;
+        border-color: #111827;
+        color: #fff;
+      }
+
+      .nosPropFilterButtonActive span {
+        background: rgba(255,255,255,.18);
+      }
+
+      .nosPropListSection {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        padding: 22px;
+      }
+
+      .nosPropListHeading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .nosPropListHeading h2 {
+        margin: 0 0 3px;
+        font-size: 20px;
+      }
+
+      .nosPropListHeading p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+      }
+
+      .nosPropPropertyGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .nosPropPropertyCard {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 20px;
+        background: #fff;
+      }
+
+      .nosPropCardTop,
+      .nosPropManageTitleRow {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+      }
+
+      .nosPropCardTitle h3 {
+        margin: 0 0 5px;
+        font-size: 18px;
+      }
+
+      .nosPropCardTitle p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 13px;
+      }
+
+      .nosPropStatusStack {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .nosPropModerationBadge,
+      .nosPropStatus {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .nosPropModerationDraft {
+        background: #f3f4f6;
+        color: #4b5563;
+      }
+
+      .nosPropModerationPending {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .nosPropModerationChanges {
+        background: #ffedd5;
+        color: #9a3412;
+      }
+
+      .nosPropModerationApproved {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .nosPropModerationDeclined {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .nosPropStatusActive {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .nosPropStatusInactive {
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+
+      .nosPropHostBox {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 11px;
+        background: #f9fafb;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .nosPropHostBox span,
+      .nosPropReviewSummary span,
+      .nosPropSmallTitle,
+      .nosPropSectionHeading span,
+      .nosPropModerationHeading span,
+      .nosPropModerationNotes > span,
+      .nosPropReadonlyGrid span {
+        font-size: 10px;
+        letter-spacing: .7px;
+        color: #6b7280;
+        font-weight: 900;
+      }
+
+      .nosPropHostBox strong {
+        font-size: 14px;
+      }
+
+      .nosPropHostBox small {
+        color: #6b7280;
+      }
+
+      .nosPropPrice {
+        font-size: 24px;
+        font-weight: 900;
+        margin-top: 17px;
+      }
+
+      .nosPropPrice span {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+      }
+
+      .nosPropCardInfo {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 15px;
+      }
+
+      .nosPropCardInfo > div {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nosPropCardInfo strong {
+        font-size: 16px;
+      }
+
+      .nosPropCardInfo span {
+        color: #6b7280;
+        font-size: 10px;
+      }
+
+      .nosPropMetaRows {
+        margin-top: 14px;
+        border-top: 1px solid #f0f0f0;
+        padding-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .nosPropMetaRows > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        font-size: 12px;
+      }
+
+      .nosPropMetaRows span {
+        color: #6b7280;
+      }
+
+      .nosPropMetaRows strong {
+        text-align: right;
+      }
+
+      .nosPropReviewAlert {
+        margin-top: 14px;
+        border: 1px solid #f59e0b;
+        background: #fffbeb;
+        color: #92400e;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .nosPropCardNote {
+        margin-top: 14px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        padding: 11px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+      }
+
+      .nosPropCardActions {
+        margin-top: 17px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .nosPropCardPrimary,
+      .nosPropCardSecondary,
+      .nosPropCardReview {
+        border-radius: 9px;
+        padding: 9px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .nosPropCardPrimary {
+        border: 1px solid #111827;
+        background: #111827;
+        color: #fff;
+      }
+
+      .nosPropCardReview {
+        border: 1px solid #d97706;
+        background: #d97706;
+        color: #fff;
+      }
+
+      .nosPropCardSecondary {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+      }
+
+      .nosPropCardLink {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .nosPropEditor {
+        width: 100%;
+      }
+
+      .nosPropBackButton {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #4b5563;
+        font-weight: 800;
+        margin-bottom: 17px;
+      }
+
+      .nosPropEditorTitle {
+        margin-bottom: 20px;
+      }
+
+      .nosPropEditorTitle h2,
+      .nosPropManageTitleRow h2 {
+        margin: 0 0 5px;
+        font-size: 25px;
+      }
+
+      .nosPropManageHeader {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropManageLeft {
+        flex: 1;
+      }
+
+      .nosPropManageTitleRow p {
+        margin: 0;
+        color: #6b7280;
+      }
+
+      .nosPropPreviewTop,
+      .nosPropPrimaryLink {
+        text-decoration: none;
+        border-radius: 9px;
+        padding: 10px 14px;
+        background: #111827;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nosPropReviewSummary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 17px;
+      }
+
+      .nosPropReviewSummary > div {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .nosPropReviewSummary strong {
+        font-size: 13px;
+      }
+
+      .nosPropReviewSummary small {
+        color: #6b7280;
+      }
+
+      .nosPropModerationPanel {
+        border: 2px solid #f59e0b;
+        background: #fffbeb;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropModerationHeading h3 {
+        margin: 5px 0;
+        font-size: 20px;
+      }
+
+      .nosPropModerationHeading p {
+        margin: 0;
+        color: #6b7280;
+      }
+
+      .nosPropModerationNotes {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin-top: 17px;
+      }
+
+      .nosPropModerationNotes textarea {
+        width: 100%;
+        resize: vertical;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 12px;
+        font: inherit;
+        background: #fff;
+      }
+
+      .nosPropModerationActions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 14px;
+      }
+
+      .nosPropApproveButton,
+      .nosPropChangesButton,
+      .nosPropDeclineButton,
+      .nosPropOfflineButton {
+        border-radius: 9px;
+        padding: 10px 15px;
+        font-weight: 900;
+      }
+
+      .nosPropApproveButton {
+        border: 1px solid #15803d;
+        background: #15803d;
+        color: #fff;
+      }
+
+      .nosPropChangesButton {
+        border: 1px solid #d97706;
+        background: #d97706;
+        color: #fff;
+      }
+
+      .nosPropDeclineButton {
+        border: 1px solid #b91c1c;
+        background: #b91c1c;
+        color: #fff;
+      }
+
+      .nosPropOfflineButton {
+        border: 1px solid #374151;
+        background: #fff;
+        color: #374151;
+        margin-top: 8px;
+      }
+
+      .nosPropModerationResult {
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .nosPropModerationResult strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .nosPropModerationResult p {
+        margin: 0 0 5px;
+      }
+
+      .nosPropModerationResult span {
+        font-size: 12px;
+      }
+
+      .nosPropModerationResultChanges {
+        border: 1px solid #fdba74;
+        background: #fff7ed;
+        color: #9a3412;
+      }
+
+      .nosPropModerationResultDeclined {
+        border: 1px solid #fca5a5;
+        background: #fef2f2;
+        color: #991b1b;
+      }
+
+      .nosPropModerationResultApproved {
+        border: 1px solid #86efac;
+        background: #f0fdf4;
+        color: #166534;
+      }
+
+      .nosPropManageTabsWrap {
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 18px;
+      }
+
+      .nosPropManageTabs {
+        display: flex;
+        gap: 5px;
+        overflow-x: auto;
+      }
+
+      .nosPropManageTab {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        color: #6b7280;
+        padding: 12px 14px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .nosPropManageTabActive {
+        color: #111827;
+        border-bottom-color: #111827;
+      }
+
+      .nosPropForm {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .nosPropFormCard,
+      .nosPropManagerPanel {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 22px;
+      }
+
+      .nosPropSectionHeading {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        border-bottom: 1px solid #f0f0f0;
+        padding-bottom: 13px;
+        margin-bottom: 17px;
+      }
+
+      .nosPropSectionHeading h3,
+      .nosPropManagerHeading h3 {
+        margin: 4px 0 0;
+        font-size: 18px;
+      }
+
+      .nosPropGrid2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 15px;
+      }
+
+      .nosPropGrid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 15px;
+      }
+
+      .nosPropFull {
+        grid-column: 1 / -1;
+      }
+
+      .nosPropField {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      .nosPropField > span {
+        font-size: 12px;
+        font-weight: 800;
+        color: #374151;
+      }
+
+      .nosPropField input,
+      .nosPropField select,
+      .nosPropField textarea {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 9px;
+        background: #fff;
+        color: #111827;
+        padding: 11px 12px;
+        font: inherit;
+        outline: none;
+      }
+
+      .nosPropField textarea {
+        resize: vertical;
+      }
+
+      .nosPropField input:focus,
+      .nosPropField select:focus,
+      .nosPropField textarea:focus,
+      .nosPropModerationNotes textarea:focus {
+        border-color: #111827;
+        box-shadow: 0 0 0 2px rgba(17,24,39,.08);
+      }
+
+      .nosPropSwitchGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .nosPropSwitch {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 11px 12px;
+        cursor: pointer;
+        background: #fafafa;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .nosPropSwitch input,
+      .nosPropCheckOption input {
+        width: 17px;
+        height: 17px;
+        accent-color: #111827;
+      }
+
+      .nosPropOptionGrid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 9px;
+      }
+
+      .nosPropCheckOption {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        background: #fff;
+      }
+
+      .nosPropCheckOptionSelected {
+        border-color: #111827;
+        background: #f9fafb;
+      }
+
+      .nosPropTopGap {
+        margin-top: 15px;
+      }
+
+      .nosPropReadonlyGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .nosPropReadonlyGrid > div {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .nosPropModerationHelp {
+        color: #6b7280;
+        line-height: 1.55;
+        font-size: 12px;
+        margin: 14px 0 0;
+      }
+
+      .nosPropFormActions {
+        display: flex;
+        justify-content: flex-end;
+        padding: 3px 0 15px;
+      }
+
+      .nosPropPrimaryButton {
+        border: 1px solid #111827;
+        background: #111827;
+        color: #fff;
+        border-radius: 9px;
+        padding: 11px 18px;
+        font-weight: 900;
+      }
+
+      .nosPropPrimaryButton:disabled,
+      .nosPropApproveButton:disabled,
+      .nosPropChangesButton:disabled,
+      .nosPropDeclineButton:disabled,
+      .nosPropOfflineButton:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+      }
+
+      .nosPropError,
+      .nosPropSuccess {
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 14px;
+      }
+
+      .nosPropError {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+      }
+
+      .nosPropSuccess {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+      }
+
+      .nosPropLoadingBox,
+      .nosPropEmptyState,
+      .nosPropLoginNotice {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 35px;
+        text-align: center;
+      }
+
+      .nosPropLoadingBox {
+        width: min(1000px, calc(100% - 40px));
+        margin: 50px auto;
+      }
+
+      .nosPropEmptyState {
+        padding: 60px 20px;
+      }
+
+      .nosPropEmptyState h2,
+      .nosPropLoginNotice h2 {
+        margin: 8px 0 5px;
+      }
+
+      .nosPropEmptyState p,
+      .nosPropLoginNotice p {
+        color: #6b7280;
+        margin: 0 0 17px;
+      }
+
+      .nosPropEmptyIcon {
+        font-size: 36px;
+      }
+
+      .nosPropLoginNotice {
+        width: min(500px, calc(100% - 40px));
+        margin: 70px auto;
+      }
+
+      .nosPropManagerHeading {
+        margin-bottom: 18px;
+      }
+
+      @media (max-width: 1200px) {
+        .nosPropStatsGrid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .nosPropGrid4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropOptionGrid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .nosPropPropertyGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropReviewSummary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropSwitchGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 700px) {
+        .nosPropHeader {
+          padding: 13px 16px;
+        }
+
+        .nosPropMuted,
+        .nosPropProfile {
+          display: none;
+        }
+
+        .nosPropContent {
+          width: min(100% - 24px, 1500px);
+          padding-top: 22px;
+        }
+
+        .nosPropStatsGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nosPropGrid2,
+        .nosPropGrid4,
+        .nosPropSwitchGrid,
+        .nosPropOptionGrid,
+        .nosPropReadonlyGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropFull {
+          grid-column: auto;
+        }
+
+        .nosPropReviewSummary {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .nosPropCardTop,
+        .nosPropManageTitleRow,
+        .nosPropManageHeader {
+          flex-direction: column;
+        }
+
+        .nosPropStatusStack {
+          align-items: flex-start;
+          flex-direction: row;
+          flex-wrap: wrap;
+        }
+
+        .nosPropFormCard,
+        .nosPropManagerPanel,
+        .nosPropListSection {
+          padding: 16px;
+        }
+
+        .nosPropModerationActions > button {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 450px) {
+        .nosPropStatsGrid,
+        .nosPropReviewSummary {
+          grid-template-columns: 1fr;
+        }
+
+        .nosPropCardInfo {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    `}</style>
+  );
+}
