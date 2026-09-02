@@ -13,12 +13,36 @@ const supabase = createClient(
 );
 
 const FILTERS = [
-  { key: 'all', label: 'All Properties' },
-  { key: 'pending_review', label: 'Pending Review' },
-  { key: 'live', label: 'Live' },
-  { key: 'changes_requested', label: 'Changes Requested' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'declined', label: 'Declined' },
+  {
+    key: 'all',
+    label: 'All Properties',
+    icon: '▦',
+  },
+  {
+    key: 'pending_review',
+    label: 'Pending Review',
+    icon: '⌛',
+  },
+  {
+    key: 'live',
+    label: 'Live',
+    icon: '✓',
+  },
+  {
+    key: 'changes_requested',
+    label: 'Changes Requested',
+    icon: '•••',
+  },
+  {
+    key: 'draft',
+    label: 'Draft',
+    icon: '✎',
+  },
+  {
+    key: 'declined',
+    label: 'Declined',
+    icon: '×',
+  },
 ];
 
 function money(value) {
@@ -55,21 +79,21 @@ function statusLabel(status) {
 
 function statusClass(status) {
   const map = {
-    draft: 'nosapBadgeDraft',
-    pending_review: 'nosapBadgePending',
-    changes_requested: 'nosapBadgeChanges',
-    approved: 'nosapBadgeApproved',
-    declined: 'nosapBadgeDeclined',
+    draft: 'draft',
+    pending_review: 'pending',
+    changes_requested: 'changes',
+    approved: 'approved',
+    declined: 'declined',
   };
 
-  return map[status] || 'nosapBadgeDraft';
+  return map[status] || 'draft';
 }
 
 function hostName(property) {
   return (
     property?._host?.business_name ||
     property?._host?.full_name ||
-    (property?.host_id ? 'Host' : 'No Host Assigned')
+    'Host Not Assigned'
   );
 }
 
@@ -81,7 +105,7 @@ export default function AdminPropertiesPage() {
   const [selected, setSelected] = useState(null);
 
   const [filter, setFilter] = useState('all');
-  const [tab, setTab] = useState('review');
+  const [tab, setTab] = useState('details');
 
   const [reviewNote, setReviewNote] = useState('');
 
@@ -106,7 +130,9 @@ export default function AdminPropertiesPage() {
         error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        throw sessionError;
+      }
 
       if (!currentSession) {
         window.location.replace('/login');
@@ -120,18 +146,22 @@ export default function AdminPropertiesPage() {
         error: adminError,
       } = await supabase
         .from('admin_profiles')
-        .select('user_id, full_name, role, is_active')
+        .select(
+          'user_id, full_name, role, is_active'
+        )
         .eq('user_id', currentSession.user.id)
         .eq('is_active', true)
         .single();
 
       if (adminError || !adminData) {
-        throw new Error('Active Admin account not found.');
+        throw new Error(
+          'Active Super Admin account not found.'
+        );
       }
 
       if (adminData.role !== 'super_admin') {
         throw new Error(
-          'Only the Super Admin can access Property Moderation.'
+          'Only Super Admin can access this page.'
         );
       }
 
@@ -140,7 +170,11 @@ export default function AdminPropertiesPage() {
       await loadProperties();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Unable to open Property Management.');
+
+      setError(
+        err.message ||
+          'Unable to open property management.'
+      );
     } finally {
       setChecking(false);
     }
@@ -148,6 +182,7 @@ export default function AdminPropertiesPage() {
 
   async function loadProperties() {
     setLoading(true);
+    setError('');
 
     try {
       const {
@@ -156,14 +191,22 @@ export default function AdminPropertiesPage() {
       } = await supabase
         .from('properties')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', {
+          ascending: false,
+        });
 
-      if (propertyError) throw propertyError;
+      if (propertyError) {
+        throw propertyError;
+      }
 
       const rows = propertyRows || [];
 
       const hostIds = [
-        ...new Set(rows.map((item) => item.host_id).filter(Boolean)),
+        ...new Set(
+          rows
+            .map((property) => property.host_id)
+            .filter(Boolean)
+        ),
       ];
 
       const hostMap = {};
@@ -175,11 +218,23 @@ export default function AdminPropertiesPage() {
         } = await supabase
           .from('host_profiles')
           .select(
-            'id, user_id, full_name, business_name, phone, email, city, state, status'
+            `
+              id,
+              user_id,
+              full_name,
+              business_name,
+              phone,
+              email,
+              city,
+              state,
+              status
+            `
           )
           .in('id', hostIds);
 
-        if (hostError) throw hostError;
+        if (hostError) {
+          throw hostError;
+        }
 
         (hostRows || []).forEach((host) => {
           hostMap[host.id] = host;
@@ -188,34 +243,52 @@ export default function AdminPropertiesPage() {
 
       const enriched = rows.map((property) => ({
         ...property,
-        moderation_status: property.moderation_status || 'draft',
-        _host: property.host_id ? hostMap[property.host_id] || null : null,
+
+        moderation_status:
+          property.moderation_status ||
+          'draft',
+
+        _host:
+          hostMap[property.host_id] ||
+          null,
       }));
 
       setProperties(enriched);
 
       if (selected?.id) {
-        const refreshed = enriched.find(
-          (property) => property.id === selected.id
-        );
+        const updatedSelected =
+          enriched.find(
+            (property) =>
+              property.id === selected.id
+          );
 
-        if (refreshed) {
-          setSelected(refreshed);
-          setReviewNote(refreshed.moderation_notes || '');
+        if (updatedSelected) {
+          setSelected(updatedSelected);
         }
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Unable to load properties.');
+
+      setError(
+        err.message ||
+          'Unable to load properties.'
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  function openProperty(property, nextTab = 'review') {
+  function openProperty(
+    property,
+    nextTab = 'details'
+  ) {
     setSelected(property);
     setTab(nextTab);
-    setReviewNote(property.moderation_notes || '');
+
+    setReviewNote(
+      property.moderation_notes || ''
+    );
+
     setError('');
     setSuccess('');
 
@@ -227,7 +300,7 @@ export default function AdminPropertiesPage() {
 
   function closeProperty() {
     setSelected(null);
-    setTab('review');
+    setTab('details');
     setReviewNote('');
     setError('');
     setSuccess('');
@@ -238,8 +311,13 @@ export default function AdminPropertiesPage() {
     });
   }
 
-  async function updateModeration(action) {
-    if (!selected?.id || !session?.user?.id) return;
+  async function moderateProperty(action) {
+    if (
+      !selected?.id ||
+      !session?.user?.id
+    ) {
+      return;
+    }
 
     setError('');
     setSuccess('');
@@ -247,68 +325,112 @@ export default function AdminPropertiesPage() {
     const note = reviewNote.trim();
 
     if (
-      (action === 'changes_requested' || action === 'declined') &&
+      action === 'changes_requested' &&
       !note
     ) {
       setError(
-        action === 'changes_requested'
-          ? 'Please enter the changes required for the Host.'
-          : 'Please enter the reason for declining this property.'
+        'Please enter the changes required before requesting changes.'
       );
       return;
     }
 
-    let confirmation = '';
-
-    if (action === 'approved') {
-      confirmation =
-        'Approve this property and make it live for guests?';
+    if (
+      action === 'declined' &&
+      !note
+    ) {
+      setError(
+        'Please enter the reason for declining the property.'
+      );
+      return;
     }
 
-    if (action === 'changes_requested') {
-      confirmation =
-        'Return this property to the Host for the requested changes?';
+    let confirmationMessage = '';
+
+    if (action === 'approved') {
+      confirmationMessage =
+        'Approve this property and make it live?';
+    }
+
+    if (
+      action === 'changes_requested'
+    ) {
+      confirmationMessage =
+        'Send this property back to the Host for changes?';
     }
 
     if (action === 'declined') {
-      confirmation =
-        'Decline this property? It will remain offline.';
+      confirmationMessage =
+        'Decline this property?';
     }
 
-    if (!window.confirm(confirmation)) return;
+    if (
+      !window.confirm(
+        confirmationMessage
+      )
+    ) {
+      return;
+    }
 
     setWorking(true);
 
     try {
-      const now = new Date().toISOString();
+      const now =
+        new Date().toISOString();
 
-      let payload;
+      let payload = {};
 
       if (action === 'approved') {
         payload = {
-          moderation_status: 'approved',
+          moderation_status:
+            'approved',
+
           moderation_notes: null,
+
           is_active: true,
+
           reviewed_at: now,
-          reviewed_by: session.user.id,
+
+          reviewed_by:
+            session.user.id,
+
           updated_at: now,
         };
-      } else if (action === 'changes_requested') {
+      }
+
+      if (
+        action === 'changes_requested'
+      ) {
         payload = {
-          moderation_status: 'changes_requested',
+          moderation_status:
+            'changes_requested',
+
           moderation_notes: note,
+
           is_active: false,
+
           reviewed_at: now,
-          reviewed_by: session.user.id,
+
+          reviewed_by:
+            session.user.id,
+
           updated_at: now,
         };
-      } else {
+      }
+
+      if (action === 'declined') {
         payload = {
-          moderation_status: 'declined',
+          moderation_status:
+            'declined',
+
           moderation_notes: note,
+
           is_active: false,
+
           reviewed_at: now,
-          reviewed_by: session.user.id,
+
+          reviewed_by:
+            session.user.id,
+
           updated_at: now,
         };
       }
@@ -323,46 +445,80 @@ export default function AdminPropertiesPage() {
         .select('*')
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
 
-      const updated = {
-        ...selected,
+      setSelected((previous) => ({
+        ...previous,
         ...data,
-      };
+      }));
 
-      setSelected(updated);
-      setReviewNote(data.moderation_notes || '');
-
-      setSuccess(
-        action === 'approved'
-          ? 'Property approved and made live successfully.'
-          : action === 'changes_requested'
-            ? 'Changes requested successfully. The Host can now edit and resubmit the property.'
-            : 'Property declined successfully.'
+      setReviewNote(
+        data.moderation_notes || ''
       );
+
+      if (action === 'approved') {
+        setSuccess(
+          'Property approved and made live successfully.'
+        );
+      }
+
+      if (
+        action ===
+        'changes_requested'
+      ) {
+        setSuccess(
+          'Changes requested. The Host can edit and resubmit the property.'
+        );
+      }
+
+      if (action === 'declined') {
+        setSuccess(
+          'Property declined successfully.'
+        );
+      }
 
       await loadProperties();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Unable to update property moderation.');
+
+      setError(
+        err.message ||
+          'Unable to update moderation status.'
+      );
     } finally {
       setWorking(false);
     }
   }
 
-  async function setLiveState(makeLive) {
-    if (!selected?.id) return;
-
-    if (selected.moderation_status !== 'approved') {
-      setError('Only an approved property can be made live.');
+  async function changeLiveState(
+    makeLive
+  ) {
+    if (!selected?.id) {
       return;
     }
 
-    const message = makeLive
-      ? 'Make this approved property live?'
-      : 'Take this property offline?';
+    if (
+      selected.moderation_status !==
+      'approved'
+    ) {
+      setError(
+        'Only approved properties can be made live.'
+      );
+      return;
+    }
 
-    if (!window.confirm(message)) return;
+    const confirmed =
+      window.confirm(
+        makeLive
+          ? 'Make this approved property live?'
+          : 'Take this property offline?'
+      );
+
+    if (!confirmed) {
+      return;
+    }
 
     setWorking(true);
     setError('');
@@ -376,13 +532,17 @@ export default function AdminPropertiesPage() {
         .from('properties')
         .update({
           is_active: makeLive,
-          updated_at: new Date().toISOString(),
+
+          updated_at:
+            new Date().toISOString(),
         })
         .eq('id', selected.id)
         .select('*')
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        throw updateError;
+      }
 
       setSelected((previous) => ({
         ...previous,
@@ -392,13 +552,17 @@ export default function AdminPropertiesPage() {
       setSuccess(
         makeLive
           ? 'Property is now live.'
-          : 'Property has been taken offline.'
+          : 'Property is now offline.'
       );
 
       await loadProperties();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Unable to update property visibility.');
+
+      setError(
+        err.message ||
+          'Unable to update property visibility.'
+      );
     } finally {
       setWorking(false);
     }
@@ -408,53 +572,72 @@ export default function AdminPropertiesPage() {
     return {
       all: properties.length,
 
-      pending_review: properties.filter(
-        (property) => property.moderation_status === 'pending_review'
-      ).length,
+      pending_review:
+        properties.filter(
+          (property) =>
+            property.moderation_status ===
+            'pending_review'
+        ).length,
 
-      live: properties.filter(
-        (property) =>
-          property.moderation_status === 'approved' &&
-          property.is_active === true
-      ).length,
+      live:
+        properties.filter(
+          (property) =>
+            property.moderation_status ===
+              'approved' &&
+            property.is_active === true
+        ).length,
 
-      changes_requested: properties.filter(
-        (property) =>
-          property.moderation_status === 'changes_requested'
-      ).length,
+      changes_requested:
+        properties.filter(
+          (property) =>
+            property.moderation_status ===
+            'changes_requested'
+        ).length,
 
-      draft: properties.filter(
-        (property) => property.moderation_status === 'draft'
-      ).length,
+      draft:
+        properties.filter(
+          (property) =>
+            property.moderation_status ===
+            'draft'
+        ).length,
 
-      declined: properties.filter(
-        (property) => property.moderation_status === 'declined'
-      ).length,
+      declined:
+        properties.filter(
+          (property) =>
+            property.moderation_status ===
+            'declined'
+        ).length,
     };
   }, [properties]);
 
-  const filteredProperties = useMemo(() => {
-    if (filter === 'all') return properties;
+  const filteredProperties =
+    useMemo(() => {
+      if (filter === 'all') {
+        return properties;
+      }
 
-    if (filter === 'live') {
+      if (filter === 'live') {
+        return properties.filter(
+          (property) =>
+            property.moderation_status ===
+              'approved' &&
+            property.is_active
+        );
+      }
+
       return properties.filter(
         (property) =>
-          property.moderation_status === 'approved' &&
-          property.is_active === true
+          property.moderation_status ===
+          filter
       );
-    }
-
-    return properties.filter(
-      (property) => property.moderation_status === filter
-    );
-  }, [properties, filter]);
+    }, [properties, filter]);
 
   if (checking) {
     return (
       <>
-        <main className="nosapPage">
-          <div className="nosapLoading">
-            Loading Super Admin Property Management...
+        <main className="nosPropertiesPage">
+          <div className="nosLoading">
+            Loading Property Management...
           </div>
         </main>
 
@@ -466,14 +649,14 @@ export default function AdminPropertiesPage() {
   if (!admin) {
     return (
       <>
-        <main className="nosapPage">
-          <div className="nosapLoading">
+        <main className="nosPropertiesPage">
+          <div className="nosLoading">
             <h2>Access Denied</h2>
-            <p>{error || 'Super Admin access is required.'}</p>
 
-            <a href="/login" className="nosapPrimary">
-              Go to Login
-            </a>
+            <p>
+              {error ||
+                'Super Admin access is required.'}
+            </p>
           </div>
         </main>
 
@@ -485,53 +668,64 @@ export default function AdminPropertiesPage() {
   if (selected) {
     return (
       <>
-        <main className="nosapPage">
-          <div className="nosapContainer">
+        <main className="nosPropertiesPage">
+          <div className="nosContainer">
             <button
               type="button"
-              className="nosapBack"
+              className="nosBack"
               onClick={closeProperty}
             >
               ← Back to Properties
             </button>
 
-            <div className="nosapPropertyHeader">
+            <div className="nosPropertyTitle">
               <div>
-                <div className="nosapEyebrow">
+                <div className="nosEyebrow">
                   SUPER ADMIN PROPERTY MANAGEMENT
                 </div>
 
-                <h1>{selected.name}</h1>
+                <h1>
+                  {selected.name}
+                </h1>
 
                 <p>
-                  {selected.area || selected.location_name || 'Location'}
-                  {selected.city ? `, ${selected.city}` : ''}
+                  {selected.area ||
+                    selected.location_name ||
+                    'Location not available'}
+
+                  {selected.city
+                    ? `, ${selected.city}`
+                    : ''}
                 </p>
               </div>
 
-              <div className="nosapHeaderBadges">
+              <div className="nosStatusStack">
                 <span
-                  className={`nosapBadge ${statusClass(
+                  className={`nosStatusBadge ${statusClass(
                     selected.moderation_status
                   )}`}
                 >
-                  {statusLabel(selected.moderation_status)}
+                  {statusLabel(
+                    selected.moderation_status
+                  )}
                 </span>
 
                 <span
                   className={
                     selected.is_active
-                      ? 'nosapLiveBadge'
-                      : 'nosapOfflineBadge'
+                      ? 'nosLiveBadge'
+                      : 'nosOfflineBadge'
                   }
                 >
-                  {selected.is_active ? 'LIVE' : 'OFFLINE'}
+                  {selected.is_active
+                    ? 'LIVE'
+                    : 'OFFLINE'}
                 </span>
               </div>
             </div>
 
-            <div className="nosapSummaryGrid">
-              <Summary
+            <div className="nosSummaryGrid">
+              <SummaryCard
                 label="Host"
                 value={hostName(selected)}
                 sub={
@@ -541,70 +735,100 @@ export default function AdminPropertiesPage() {
                 }
               />
 
-              <Summary
+              <SummaryCard
                 label="Nightly Rate"
-                value={`₹${money(selected.base_price)}`}
+                value={`₹${money(
+                  selected.base_price
+                )}`}
               />
 
-              <Summary
+              <SummaryCard
                 label="Submitted"
                 value={formatDate(
                   selected.submitted_for_review_at
                 )}
               />
 
-              <Summary
+              <SummaryCard
                 label="Reviewed"
-                value={formatDate(selected.reviewed_at)}
+                value={formatDate(
+                  selected.reviewed_at
+                )}
               />
             </div>
 
-            {error && <div className="nosapError">{error}</div>}
-            {success && <div className="nosapSuccess">{success}</div>}
+            {error && (
+              <div className="nosError">
+                {error}
+              </div>
+            )}
 
-            {selected.moderation_status === 'pending_review' && (
-              <section className="nosapReviewPanel">
-                <div>
-                  <div className="nosapEyebrow">PROPERTY REVIEW</div>
-                  <h2>Review Host Submission</h2>
+            {success && (
+              <div className="nosSuccess">
+                {success}
+              </div>
+            )}
 
-                  <p>
-                    Check the property information and photos before
-                    approving the listing.
-                  </p>
+            {selected.moderation_status !==
+              'approved' && (
+              <section className="nosModerationPanel">
+                <div className="nosModerationHeading">
+                  <div>
+                    <div className="nosEyebrow">
+                      SUPER ADMIN REVIEW
+                    </div>
+
+                    <h2>
+                      Review Property
+                    </h2>
+
+                    <p>
+                      Verify the property details
+                      and photos before publishing
+                      it on NightOutStays.
+                    </p>
+                  </div>
                 </div>
 
-                <label className="nosapNoteField">
-                  <span>Notes to Host</span>
+                <label className="nosReviewNote">
+                  <span>
+                    Review Note to Host
+                  </span>
 
                   <textarea
-                    rows="4"
+                    rows="3"
                     value={reviewNote}
                     onChange={(event) =>
-                      setReviewNote(event.target.value)
+                      setReviewNote(
+                        event.target.value
+                      )
                     }
-                    placeholder="Required when requesting changes or declining."
+                    placeholder="Write notes here when requesting changes or declining."
                   />
                 </label>
 
-                <div className="nosapReviewActions">
+                <div className="nosModerationActions">
                   <button
                     type="button"
-                    className="nosapApprove"
+                    className="nosApproveButton"
                     disabled={working}
-                    onClick={() => updateModeration('approved')}
+                    onClick={() =>
+                      moderateProperty(
+                        'approved'
+                      )
+                    }
                   >
-                    {working
-                      ? 'Processing...'
-                      : 'Approve & Make Live'}
+                    ✓ Approve & Make Live
                   </button>
 
                   <button
                     type="button"
-                    className="nosapChanges"
+                    className="nosChangesButton"
                     disabled={working}
                     onClick={() =>
-                      updateModeration('changes_requested')
+                      moderateProperty(
+                        'changes_requested'
+                      )
                     }
                   >
                     Request Changes
@@ -612,9 +836,13 @@ export default function AdminPropertiesPage() {
 
                   <button
                     type="button"
-                    className="nosapDecline"
+                    className="nosDeclineButton"
                     disabled={working}
-                    onClick={() => updateModeration('declined')}
+                    onClick={() =>
+                      moderateProperty(
+                        'declined'
+                      )
+                    }
                   >
                     Decline Property
                   </button>
@@ -622,144 +850,202 @@ export default function AdminPropertiesPage() {
               </section>
             )}
 
-            {selected.moderation_status === 'changes_requested' && (
-              <section className="nosapMessage nosapMessageChanges">
-                <strong>Changes Requested</strong>
-
-                <p>
-                  {selected.moderation_notes ||
-                    'No moderation note available.'}
-                </p>
-
-                <small>
-                  The Host can edit this property and submit it again
-                  for review.
-                </small>
-              </section>
-            )}
-
-            {selected.moderation_status === 'declined' && (
-              <section className="nosapMessage nosapMessageDeclined">
-                <strong>Property Declined</strong>
-
-                <p>
-                  {selected.moderation_notes ||
-                    'No decline reason available.'}
-                </p>
-              </section>
-            )}
-
-            {selected.moderation_status === 'approved' && (
-              <section className="nosapMessage nosapMessageApproved">
+            {selected.moderation_status ===
+              'approved' && (
+              <section className="nosApprovedPanel">
                 <div>
-                  <strong>Property Approved</strong>
+                  <strong>
+                    ✓ Property Approved
+                  </strong>
 
                   <p>
                     {selected.is_active
-                      ? 'This property is approved and visible to guests.'
+                      ? 'This property is currently live and visible to guests.'
                       : 'This property is approved but currently offline.'}
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  disabled={working}
                   className={
                     selected.is_active
-                      ? 'nosapSecondary'
-                      : 'nosapApprove'
+                      ? 'nosOfflineButton'
+                      : 'nosApproveButton'
                   }
-                  onClick={() => setLiveState(!selected.is_active)}
+                  disabled={working}
+                  onClick={() =>
+                    changeLiveState(
+                      !selected.is_active
+                    )
+                  }
                 >
                   {selected.is_active
-                    ? 'Take Property Offline'
-                    : 'Make Property Live'}
+                    ? 'Take Offline'
+                    : 'Make Live'}
                 </button>
               </section>
             )}
 
-            <nav className="nosapTabs">
+            {selected.moderation_status ===
+              'changes_requested' &&
+              selected.moderation_notes && (
+                <div className="nosChangesNote">
+                  <strong>
+                    Changes Requested
+                  </strong>
+
+                  <p>
+                    {
+                      selected.moderation_notes
+                    }
+                  </p>
+                </div>
+              )}
+
+            {selected.moderation_status ===
+              'declined' &&
+              selected.moderation_notes && (
+                <div className="nosDeclinedNote">
+                  <strong>
+                    Decline Reason
+                  </strong>
+
+                  <p>
+                    {
+                      selected.moderation_notes
+                    }
+                  </p>
+                </div>
+              )}
+
+            <div className="nosTabs">
               <button
                 type="button"
-                className={tab === 'review' ? 'active' : ''}
-                onClick={() => setTab('review')}
+                className={
+                  tab === 'details'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  setTab('details')
+                }
               >
                 Property Details
               </button>
 
               <button
                 type="button"
-                className={tab === 'photos' ? 'active' : ''}
-                onClick={() => setTab('photos')}
+                className={
+                  tab === 'photos'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  setTab('photos')
+                }
               >
                 Photos
               </button>
 
               <button
                 type="button"
-                className={tab === 'offers' ? 'active' : ''}
-                onClick={() => setTab('offers')}
+                className={
+                  tab === 'offers'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  setTab('offers')
+                }
               >
                 Pricing & Offers
               </button>
 
               <button
                 type="button"
-                className={tab === 'calendar' ? 'active' : ''}
-                onClick={() => setTab('calendar')}
+                className={
+                  tab === 'calendar'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  setTab('calendar')
+                }
               >
                 Calendar
               </button>
-            </nav>
+            </div>
 
-            {tab === 'review' && (
-              <PropertyDetails property={selected} />
+            {tab === 'details' && (
+              <PropertyDetails
+                property={selected}
+              />
             )}
 
             {tab === 'photos' && (
-              <section className="nosapManager">
-                <div className="nosapManagerHeading">
-                  <h2>Property Photos</h2>
-                  <p>Review and manage the property photos.</p>
-                </div>
+              <div className="nosManagerPanel">
+                <h2>
+                  Property Photos
+                </h2>
+
+                <p>
+                  Review and manage property
+                  photos.
+                </p>
 
                 <PropertyPhotoManager
-                  propertyId={selected.id}
-                  propertyName={selected.name}
+                  propertyId={
+                    selected.id
+                  }
+                  propertyName={
+                    selected.name
+                  }
                 />
-              </section>
+              </div>
             )}
 
             {tab === 'offers' && (
-              <section className="nosapManager">
-                <div className="nosapManagerHeading">
-                  <h2>Pricing & Offers</h2>
-                  <p>
-                    Manage pricing and offers for this property.
-                  </p>
-                </div>
+              <div className="nosManagerPanel">
+                <h2>
+                  Pricing & Offers
+                </h2>
+
+                <p>
+                  Review pricing and offers for
+                  this property.
+                </p>
 
                 <PropertyDiscountManager
-                  propertyId={selected.id}
-                  propertyName={selected.name}
+                  propertyId={
+                    selected.id
+                  }
+                  propertyName={
+                    selected.name
+                  }
                 />
-              </section>
+              </div>
             )}
 
             {tab === 'calendar' && (
-              <section className="nosapManager">
-                <div className="nosapManagerHeading">
-                  <h2>Property Calendar</h2>
-                  <p>
-                    Manage availability and date-wise pricing.
-                  </p>
-                </div>
+              <div className="nosManagerPanel">
+                <h2>
+                  Property Calendar
+                </h2>
+
+                <p>
+                  Manage availability and
+                  date-wise pricing.
+                </p>
 
                 <PropertyCalendarManager
-                  propertyId={selected.id}
-                  propertyName={selected.name}
+                  propertyId={
+                    selected.id
+                  }
+                  propertyName={
+                    selected.name
+                  }
                 />
-              </section>
+              </div>
             )}
           </div>
         </main>
@@ -771,85 +1057,123 @@ export default function AdminPropertiesPage() {
 
   return (
     <>
-      <main className="nosapPage">
-        <div className="nosapContainer">
-          <div className="nosapTitleRow">
+      <main className="nosPropertiesPage">
+        <div className="nosContainer">
+          <div className="nosPageHeader">
             <div>
-              <div className="nosapEyebrow">
+              <div className="nosEyebrow">
                 SUPER ADMIN
               </div>
 
-              <h1>Property Management</h1>
+              <h1>
+                Property Management
+              </h1>
 
               <p>
-                Review Host properties and control which listings
-                become live on NightOutStays.
+                Review Host properties and
+                control which listings become
+                live on NightOutStays.
               </p>
             </div>
 
             <button
               type="button"
-              className="nosapSecondary"
-              onClick={loadProperties}
+              className="nosRefreshButton"
               disabled={loading}
+              onClick={loadProperties}
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              ↻{' '}
+              {loading
+                ? 'Refreshing...'
+                : 'Refresh'}
             </button>
           </div>
 
-          {error && <div className="nosapError">{error}</div>}
+          {error && (
+            <div className="nosError">
+              {error}
+            </div>
+          )}
 
-          <div className="nosapStats">
+          <div className="nosStatsGrid">
             {FILTERS.map((item) => (
               <button
-                type="button"
                 key={item.key}
+                type="button"
                 className={
                   filter === item.key
-                    ? 'nosapStat nosapStatActive'
-                    : 'nosapStat'
+                    ? 'nosStatCard active'
+                    : 'nosStatCard'
                 }
-                onClick={() => setFilter(item.key)}
+                onClick={() =>
+                  setFilter(item.key)
+                }
               >
-                <span>{item.label}</span>
-                <strong>{counts[item.key]}</strong>
+                <div>
+                  <span>
+                    {item.label}
+                  </span>
+
+                  <strong>
+                    {counts[item.key]}
+                  </strong>
+                </div>
+
+                <div className="nosStatIcon">
+                  {item.icon}
+                </div>
               </button>
             ))}
           </div>
 
-          <div className="nosapListHeading">
-            <div>
-              <h2>
-                {FILTERS.find((item) => item.key === filter)?.label}
-              </h2>
+          <div className="nosListHeading">
+            <h2>
+              {
+                FILTERS.find(
+                  (item) =>
+                    item.key === filter
+                )?.label
+              }
+            </h2>
 
-              <p>
-                {filteredProperties.length}{' '}
-                {filteredProperties.length === 1
-                  ? 'property'
-                  : 'properties'}
-              </p>
-            </div>
+            <p>
+              {
+                filteredProperties.length
+              }{' '}
+              {filteredProperties.length ===
+              1
+                ? 'property'
+                : 'properties'}
+            </p>
           </div>
 
           {loading ? (
-            <div className="nosapLoading">
+            <div className="nosEmptyState">
               Loading properties...
             </div>
-          ) : filteredProperties.length === 0 ? (
-            <div className="nosapEmpty">
-              <h3>No properties found</h3>
-              <p>There are no properties in this category.</p>
+          ) : filteredProperties.length ===
+            0 ? (
+            <div className="nosEmptyState">
+              <h3>
+                No properties found
+              </h3>
+
+              <p>
+                There are currently no
+                properties in this category.
+              </p>
             </div>
           ) : (
-            <div className="nosapGrid">
-              {filteredProperties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property}
-                  onOpen={openProperty}
-                />
-              ))}
+            <div className="nosPropertyGrid">
+              {filteredProperties.map(
+                (property) => (
+                  <PropertyCard
+                    key={property.id}
+                    property={property}
+                    onOpen={openProperty}
+                  />
+                )
+              )}
             </div>
           )}
         </div>
@@ -860,20 +1184,33 @@ export default function AdminPropertiesPage() {
   );
 }
 
-function Summary({ label, value, sub }) {
+function SummaryCard({
+  label,
+  value,
+  sub,
+}) {
   return (
-    <div className="nosapSummary">
+    <div className="nosSummaryCard">
       <span>{label}</span>
-      <strong>{value || '—'}</strong>
-      {sub ? <small>{sub}</small> : null}
+
+      <strong>
+        {value || '—'}
+      </strong>
+
+      {sub && (
+        <small>{sub}</small>
+      )}
     </div>
   );
 }
 
-function PropertyCard({ property, onOpen }) {
+function PropertyCard({
+  property,
+  onOpen,
+}) {
   return (
-    <article className="nosapCard">
-      <div className="nosapCardTop">
+    <article className="nosPropertyCard">
+      <div className="nosPropertyCardHeader">
         <div>
           <h3>{property.name}</h3>
 
@@ -881,130 +1218,151 @@ function PropertyCard({ property, onOpen }) {
             {property.area ||
               property.location_name ||
               'Location not added'}
-            {property.city ? `, ${property.city}` : ''}
+
+            {property.city
+              ? `, ${property.city}`
+              : ''}
           </p>
         </div>
 
-        <div className="nosapCardBadges">
+        <div className="nosPropertyBadges">
           <span
-            className={`nosapBadge ${statusClass(
+            className={`nosStatusBadge ${statusClass(
               property.moderation_status
             )}`}
           >
-            {statusLabel(property.moderation_status)}
+            {statusLabel(
+              property.moderation_status
+            )}
           </span>
 
           <span
             className={
               property.is_active
-                ? 'nosapLiveBadge'
-                : 'nosapOfflineBadge'
+                ? 'nosLiveBadge'
+                : 'nosOfflineBadge'
             }
           >
-            {property.is_active ? 'LIVE' : 'OFFLINE'}
+            {property.is_active
+              ? 'LIVE'
+              : 'OFFLINE'}
           </span>
         </div>
       </div>
 
-      <div className="nosapHost">
+      <div className="nosHostBox">
         <span>HOST</span>
-        <strong>{hostName(property)}</strong>
 
-        {property._host?.city && (
-          <small>
-            {property._host.city}
-            {property._host.state
-              ? `, ${property._host.state}`
-              : ''}
-          </small>
-        )}
+        <strong>
+          {hostName(property)}
+        </strong>
+
+        <small>
+          {property._host?.city || ''}
+
+          {property._host?.state
+            ? `${
+                property._host?.city
+                  ? ', '
+                  : ''
+              }${property._host.state}`
+            : ''}
+        </small>
       </div>
 
-      <div className="nosapPrice">
+      <div className="nosRate">
         ₹{money(property.base_price)}
-        <small>/ night</small>
+
+        <span>/ night</span>
       </div>
 
-      <div className="nosapMiniGrid">
-        <div>
-          <strong>{property.bedrooms || 0}</strong>
-          <span>Bedrooms</span>
-        </div>
+      <div className="nosFeatureGrid">
+        <MiniDetail
+          value={property.bedrooms || 0}
+          label="Bedrooms"
+        />
 
-        <div>
-          <strong>{property.bathrooms || 0}</strong>
-          <span>Bathrooms</span>
-        </div>
+        <MiniDetail
+          value={
+            property.bathrooms || 0
+          }
+          label="Bathrooms"
+        />
 
-        <div>
-          <strong>{property.max_guests || 0}</strong>
-          <span>Guests</span>
-        </div>
+        <MiniDetail
+          value={
+            property.max_guests || 0
+          }
+          label="Guests"
+        />
       </div>
 
-      <div className="nosapCardMeta">
+      <div className="nosPropertyMeta">
         <div>
-          <span>Property Type</span>
-          <strong>{property.property_type || '—'}</strong>
+          <span>
+            Property Type
+          </span>
+
+          <strong>
+            {property.property_type ||
+              '—'}
+          </strong>
         </div>
 
         <div>
           <span>Submitted</span>
+
           <strong>
-            {formatDate(property.submitted_for_review_at)}
+            {formatDate(
+              property.submitted_for_review_at
+            )}
           </strong>
         </div>
       </div>
 
-      {property.moderation_status === 'pending_review' && (
-        <div className="nosapPendingNotice">
-          Awaiting Super Admin Review
-        </div>
-      )}
-
-      {property.moderation_status === 'changes_requested' &&
-        property.moderation_notes && (
-          <div className="nosapSmallNote">
-            <strong>Changes requested</strong>
-            <span>{property.moderation_notes}</span>
-          </div>
-        )}
-
-      <div className="nosapCardActions">
+      <div className="nosCardActions">
         <button
           type="button"
-          className={
-            property.moderation_status === 'pending_review'
-              ? 'nosapReviewButton'
-              : 'nosapPrimary'
+          className="nosManageButton"
+          onClick={() =>
+            onOpen(
+              property,
+              'details'
+            )
           }
-          onClick={() => onOpen(property, 'review')}
         >
-          {property.moderation_status === 'pending_review'
+          {property.moderation_status ===
+          'pending_review'
             ? 'Review Property'
             : 'Manage Property'}
         </button>
 
         <button
           type="button"
-          className="nosapSecondary"
-          onClick={() => onOpen(property, 'photos')}
+          onClick={() =>
+            onOpen(property, 'photos')
+          }
         >
           Photos
         </button>
 
         <button
           type="button"
-          className="nosapSecondary"
-          onClick={() => onOpen(property, 'offers')}
+          onClick={() =>
+            onOpen(property, 'offers')
+          }
         >
           Offers
         </button>
 
         <button
           type="button"
-          className="nosapSecondary"
-          onClick={() => onOpen(property, 'calendar')}
+          onClick={() =>
+            onOpen(
+              property,
+              'calendar'
+            )
+          }
         >
           Calendar
         </button>
@@ -1013,57 +1371,105 @@ function PropertyCard({ property, onOpen }) {
   );
 }
 
-function PropertyDetails({ property }) {
-  const houseRules = Array.isArray(property.house_rules)
-    ? property.house_rules
-    : [];
+function MiniDetail({
+  value,
+  label,
+}) {
+  return (
+    <div className="nosMiniDetail">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
 
-  const amenities = Array.isArray(property.amenities)
-    ? property.amenities
-    : [];
+function PropertyDetails({
+  property,
+}) {
+  const amenities =
+    Array.isArray(
+      property.amenities
+    )
+      ? property.amenities
+      : [];
 
-  const kitchen = Array.isArray(property.kitchen_features)
-    ? property.kitchen_features
-    : [];
+  const kitchen =
+    Array.isArray(
+      property.kitchen_features
+    )
+      ? property.kitchen_features
+      : [];
+
+  const houseRules =
+    Array.isArray(
+      property.house_rules
+    )
+      ? property.house_rules
+      : [];
 
   return (
-    <div className="nosapDetails">
+    <div>
       <DetailSection title="Property Information">
-        <Detail label="Property Name" value={property.name} />
+        <Detail
+          label="Property Name"
+          value={property.name}
+        />
+
         <Detail
           label="Property Type"
           value={property.property_type}
         />
-        <Detail label="City" value={property.city} />
-        <Detail label="Area" value={property.area} />
+
+        <Detail
+          label="City"
+          value={property.city}
+        />
+
+        <Detail
+          label="Area"
+          value={property.area}
+        />
+
         <Detail
           label="Display Location"
-          value={property.location_name}
+          value={
+            property.location_name
+          }
         />
+
         <Detail
           label="Nightly Rate"
-          value={`₹${money(property.base_price)}`}
+          value={`₹${money(
+            property.base_price
+          )}`}
         />
       </DetailSection>
 
       <DetailSection title="Description">
-        <DetailWide
+        <WideDetail
           label="Short Description"
-          value={property.short_description}
+          value={
+            property.short_description
+          }
         />
 
-        <DetailWide
+        <WideDetail
           label="Full Description"
           value={property.description}
         />
       </DetailSection>
 
       <DetailSection title="Address & Location">
-        <DetailWide label="Address" value={property.address} />
+        <WideDetail
+          label="Address"
+          value={property.address}
+        />
 
-        <DetailWide
+        <WideDetail
           label="Google Maps"
-          value={property.google_maps_url}
+          value={
+            property.google_maps_url
+          }
           link
         />
 
@@ -1079,179 +1485,283 @@ function PropertyDetails({ property }) {
       </DetailSection>
 
       <DetailSection title="Rooms & Guests">
-        <Detail label="Bedrooms" value={property.bedrooms} />
-        <Detail label="Bathrooms" value={property.bathrooms} />
+        <Detail
+          label="Bedrooms"
+          value={property.bedrooms}
+        />
+
+        <Detail
+          label="Bathrooms"
+          value={property.bathrooms}
+        />
+
         <Detail
           label="Minimum Guests"
           value={property.min_guests}
         />
+
         <Detail
           label="Guests Included"
-          value={property.included_guests}
+          value={
+            property.included_guests
+          }
         />
+
         <Detail
           label="Maximum Guests"
           value={property.max_guests}
         />
+
         <Detail
           label="Queen Beds"
-          value={property.queen_bed_count}
+          value={
+            property.queen_bed_count
+          }
         />
+
         <Detail
           label="Single Beds"
-          value={property.single_bed_count}
+          value={
+            property.single_bed_count
+          }
         />
+
         <Detail
           label="Sofa Cum Beds"
-          value={property.sofa_cum_bed_count}
+          value={
+            property.sofa_cum_bed_count
+          }
         />
       </DetailSection>
 
       <DetailSection title="Pricing">
         <Detail
           label="Base Rate"
-          value={`₹${money(property.base_price)}`}
+          value={`₹${money(
+            property.base_price
+          )}`}
         />
 
         <Detail
           label="Extra Guest Fee"
-          value={`₹${money(property.extra_guest_fee)}`}
+          value={`₹${money(
+            property.extra_guest_fee
+          )}`}
         />
 
         <Detail
           label="Cleaning Fee"
-          value={`₹${money(property.cleaning_fee)}`}
+          value={`₹${money(
+            property.cleaning_fee
+          )}`}
         />
 
         <Detail
           label="Security Deposit"
-          value={`₹${money(property.security_deposit)}`}
+          value={`₹${money(
+            property.security_deposit
+          )}`}
         />
 
         <Detail
           label="Minimum Nights"
-          value={property.min_stay_nights}
+          value={
+            property.min_stay_nights
+          }
         />
 
         <Detail
           label="Maximum Nights"
-          value={property.max_stay_nights}
+          value={
+            property.max_stay_nights
+          }
         />
 
         <Detail
           label="Late Checkout / Hour"
-          value={`₹${money(property.late_checkout_hourly_fee)}`}
+          value={`₹${money(
+            property.late_checkout_hourly_fee
+          )}`}
         />
       </DetailSection>
 
       <DetailSection title="Check-in & Check-out">
         <Detail
           label="Check-in"
-          value={property.check_in_time}
+          value={
+            property.check_in_time
+          }
         />
 
         <Detail
           label="Check-out"
-          value={property.check_out_time}
+          value={
+            property.check_out_time
+          }
         />
       </DetailSection>
 
       <DetailSection title="Facilities">
-        <BooleanDetail label="Wi-Fi" value={property.wifi_available} />
-        <BooleanDetail label="TV" value={property.tv_available} />
-        <BooleanDetail
+        <YesNo
+          label="Wi-Fi"
+          value={
+            property.wifi_available
+          }
+        />
+
+        <YesNo
+          label="TV"
+          value={
+            property.tv_available
+          }
+        />
+
+        <YesNo
           label="Fridge"
-          value={property.fridge_available}
+          value={
+            property.fridge_available
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Washing Machine"
-          value={property.washing_machine_available}
+          value={
+            property.washing_machine_available
+          }
         />
-        <BooleanDetail label="AC" value={property.ac_available} />
-        <Detail label="AC Count" value={property.ac_count} />
+
+        <YesNo
+          label="AC"
+          value={
+            property.ac_available
+          }
+        />
+
+        <Detail
+          label="AC Count"
+          value={property.ac_count}
+        />
+
         <Detail
           label="Water Heaters"
-          value={property.water_heater_count}
+          value={
+            property.water_heater_count
+          }
         />
       </DetailSection>
 
       <DetailSection title="Guest Policies">
-        <BooleanDetail
+        <YesNo
           label="Pets Allowed"
-          value={property.pets_allowed}
+          value={
+            property.pets_allowed
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Parties Allowed"
-          value={property.parties_allowed}
+          value={
+            property.parties_allowed
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Couples Allowed"
-          value={property.couples_allowed}
+          value={
+            property.couples_allowed
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Alcohol Allowed"
-          value={property.alcohol_allowed}
+          value={
+            property.alcohol_allowed
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Smoking Allowed"
-          value={property.smoking_allowed}
+          value={
+            property.smoking_allowed
+          }
         />
-        <BooleanDetail
+
+        <YesNo
           label="Quiet Hours"
-          value={property.quiet_hours_enabled}
+          value={
+            property.quiet_hours_enabled
+          }
         />
       </DetailSection>
 
       {amenities.length > 0 && (
-        <TagSection title="Amenities" items={amenities} />
+        <TagsSection
+          title="Amenities"
+          items={amenities}
+        />
       )}
 
       {kitchen.length > 0 && (
-        <TagSection title="Kitchen Features" items={kitchen} />
+        <TagsSection
+          title="Kitchen Features"
+          items={kitchen}
+        />
       )}
 
-      {houseRules.length > 0 && (
-        <TagSection title="House Rules" items={houseRules} />
+      {houseRules.length >
+        0 && (
+        <TagsSection
+          title="House Rules"
+          items={houseRules}
+        />
       )}
 
       <DetailSection title="Directions">
-        <DetailWide
+        <WideDetail
           label="Direction Instructions"
-          value={property.direction_instructions}
+          value={
+            property.direction_instructions
+          }
         />
       </DetailSection>
 
       <DetailSection title="Dynamic Pricing">
-        <BooleanDetail
+        <YesNo
           label="Dynamic Pricing"
-          value={property.dynamic_pricing_enabled}
+          value={
+            property.dynamic_pricing_enabled
+          }
         />
 
         <Detail
           label="Weekend Markup"
           value={`${Number(
-            property.weekend_markup_percent || 0
+            property.weekend_markup_percent ||
+              0
           )}%`}
         />
 
         <Detail
           label="Long Weekend"
           value={`${Number(
-            property.long_weekend_markup_percent || 0
+            property.long_weekend_markup_percent ||
+              0
           )}%`}
         />
 
         <Detail
           label="Festival"
           value={`${Number(
-            property.festival_markup_percent || 0
+            property.festival_markup_percent ||
+              0
           )}%`}
         />
 
         <Detail
           label="Season"
           value={`${Number(
-            property.season_markup_percent || 0
+            property.season_markup_percent ||
+              0
           )}%`}
         />
       </DetailSection>
@@ -1259,21 +1769,33 @@ function PropertyDetails({ property }) {
   );
 }
 
-function DetailSection({ title, children }) {
+function DetailSection({
+  title,
+  children,
+}) {
   return (
-    <section className="nosapDetailSection">
+    <section className="nosDetailSection">
       <h2>{title}</h2>
-      <div className="nosapDetailGrid">{children}</div>
+
+      <div className="nosDetailGrid">
+        {children}
+      </div>
     </section>
   );
 }
 
-function Detail({ label, value }) {
+function Detail({
+  label,
+  value,
+}) {
   return (
-    <div className="nosapDetail">
+    <div className="nosDetailBox">
       <span>{label}</span>
+
       <strong>
-        {value === null || value === undefined || value === ''
+        {value === null ||
+        value === undefined ||
+        value === ''
           ? '—'
           : String(value)}
       </strong>
@@ -1281,18 +1803,28 @@ function Detail({ label, value }) {
   );
 }
 
-function DetailWide({ label, value, link = false }) {
+function WideDetail({
+  label,
+  value,
+  link = false,
+}) {
   return (
-    <div className="nosapDetail nosapDetailWide">
+    <div className="nosDetailBox nosWideDetail">
       <span>{label}</span>
 
       {link && value ? (
-        <a href={value} target="_blank" rel="noreferrer">
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+        >
           Open Google Maps
         </a>
       ) : (
         <strong>
-          {value === null || value === undefined || value === ''
+          {value === null ||
+          value === undefined ||
+          value === ''
             ? '—'
             : String(value)}
         </strong>
@@ -1301,24 +1833,38 @@ function DetailWide({ label, value, link = false }) {
   );
 }
 
-function BooleanDetail({ label, value }) {
+function YesNo({
+  label,
+  value,
+}) {
   return (
     <Detail
       label={label}
-      value={value ? 'Yes' : 'No'}
+      value={
+        value ? 'Yes' : 'No'
+      }
     />
   );
 }
 
-function TagSection({ title, items }) {
+function TagsSection({
+  title,
+  items,
+}) {
   return (
-    <section className="nosapDetailSection">
+    <section className="nosDetailSection">
       <h2>{title}</h2>
 
-      <div className="nosapTags">
-        {items.map((item, index) => (
-          <span key={`${item}-${index}`}>{item}</span>
-        ))}
+      <div className="nosTags">
+        {items.map(
+          (item, index) => (
+            <span
+              key={`${item}-${index}`}
+            >
+              {item}
+            </span>
+          )
+        )}
       </div>
     </section>
   );
@@ -1333,769 +1879,746 @@ function Styles() {
 
       body {
         margin: 0;
+        background: #f7f9fc;
+        color: #101828;
       }
 
-      .nosapPage {
-        min-height: 100vh;
-        background: #f5f6f8;
-        color: #111827;
+      .nosPropertiesPage {
+        min-height: calc(100vh - 140px);
+        background:
+          radial-gradient(
+            circle at 15% 0%,
+            rgba(33, 93, 162, 0.04),
+            transparent 28%
+          ),
+          #f7f9fc;
       }
 
-      .nosapContainer {
-        width: min(1500px, calc(100% - 48px));
+      .nosContainer {
+        width: calc(100% - 64px);
+        max-width: 1500px;
         margin: 0 auto;
-        padding: 34px 0 70px;
+        padding: 34px 0 60px;
       }
 
-      .nosapTitleRow {
+      .nosPageHeader,
+      .nosPropertyTitle {
         display: flex;
-        align-items: flex-start;
         justify-content: space-between;
-        gap: 24px;
-        margin-bottom: 24px;
+        align-items: flex-start;
+        gap: 25px;
+        margin-bottom: 26px;
       }
 
-      .nosapTitleRow h1,
-      .nosapPropertyHeader h1 {
-        margin: 4px 0 7px;
-        font-size: 31px;
-        line-height: 1.15;
-        letter-spacing: -0.5px;
-      }
-
-      .nosapTitleRow p,
-      .nosapPropertyHeader p {
-        margin: 0;
-        color: #6b7280;
-        line-height: 1.55;
-      }
-
-      .nosapEyebrow {
-        font-size: 10px;
-        letter-spacing: 0.9px;
+      .nosEyebrow {
+        color: #667085;
+        font-size: 11px;
         font-weight: 900;
-        color: #6b7280;
+        letter-spacing: 1.1px;
+        margin-bottom: 8px;
       }
 
-      .nosapStats {
+      .nosPageHeader h1,
+      .nosPropertyTitle h1 {
+        margin: 0;
+        color: #101828;
+        font-size: 34px;
+        line-height: 1.15;
+        letter-spacing: -0.8px;
+      }
+
+      .nosPageHeader p,
+      .nosPropertyTitle p {
+        margin: 9px 0 0;
+        color: #5d6b82;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .nosRefreshButton {
+        border: 0;
+        border-radius: 10px;
+        background: #074b91;
+        color: white;
+        min-height: 46px;
+        padding: 0 21px;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .nosStatsGrid {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 12px;
-        margin-bottom: 24px;
+        grid-template-columns:
+          repeat(
+            6,
+            minmax(0, 1fr)
+          );
+        gap: 15px;
+        margin-bottom: 18px;
       }
 
-      .nosapStat {
-        appearance: none;
-        border: 1px solid #e5e7eb;
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 17px;
+      .nosStatCard {
+        min-height: 105px;
+        border: 1px solid #dce3ec;
+        border-radius: 15px;
+        background: white;
+        padding: 20px;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+
         text-align: left;
         cursor: pointer;
-        transition: 0.15s ease;
       }
 
-      .nosapStat:hover {
-        border-color: #9ca3af;
-        transform: translateY(-1px);
-      }
-
-      .nosapStat span {
-        display: block;
-        font-size: 11px;
+      .nosStatCard span {
+        color: #53647c;
+        font-size: 12px;
         font-weight: 800;
-        color: #6b7280;
-        line-height: 1.3;
       }
 
-      .nosapStat strong {
+      .nosStatCard strong {
         display: block;
-        margin-top: 7px;
+        margin-top: 13px;
+        color: #101828;
         font-size: 27px;
-        color: #111827;
       }
 
-      .nosapStatActive {
-        border-color: #111827;
-        background: #111827;
+      .nosStatIcon {
+        font-size: 31px;
+        color: #155ea9;
+        opacity: 0.95;
       }
 
-      .nosapStatActive span,
-      .nosapStatActive strong {
-        color: #ffffff;
+      .nosStatCard.active {
+        border-color: #071c3d;
+        background:
+          linear-gradient(
+            135deg,
+            #06172f,
+            #0a2750
+          );
       }
 
-      .nosapListHeading {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 20px;
-        margin-bottom: 15px;
+      .nosStatCard.active span,
+      .nosStatCard.active strong,
+      .nosStatCard.active .nosStatIcon {
+        color: white;
       }
 
-      .nosapListHeading h2 {
-        margin: 0 0 4px;
-        font-size: 20px;
+      .nosListHeading {
+        margin: 17px 0 12px;
       }
 
-      .nosapListHeading p {
+      .nosListHeading h2 {
         margin: 0;
-        color: #6b7280;
+        font-size: 22px;
+      }
+
+      .nosListHeading p {
+        margin: 4px 0 0;
+        color: #667085;
         font-size: 13px;
       }
 
-      .nosapGrid {
+      .nosPropertyGrid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 17px;
-      }
-
-      .nosapCard {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 17px;
-        padding: 20px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-      }
-
-      .nosapCardTop {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
+        grid-template-columns:
+          repeat(
+            2,
+            minmax(0, 1fr)
+          );
         gap: 18px;
       }
 
-      .nosapCardTop h3 {
-        margin: 0 0 5px;
-        font-size: 18px;
+      .nosPropertyCard {
+        border: 1px solid #dce3ec;
+        border-radius: 16px;
+        background: white;
+        padding: 22px;
+        box-shadow:
+          0 1px 2px
+          rgba(16, 24, 40, 0.02);
+      }
+
+      .nosPropertyCardHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+
+      .nosPropertyCardHeader h3 {
+        margin: 0;
+        color: #101828;
+        font-size: 19px;
         line-height: 1.3;
       }
 
-      .nosapCardTop p {
-        margin: 0;
-        color: #6b7280;
+      .nosPropertyCardHeader p {
+        margin: 6px 0 0;
+        color: #607087;
         font-size: 13px;
       }
 
-      .nosapCardBadges,
-      .nosapHeaderBadges {
+      .nosPropertyBadges,
+      .nosStatusStack {
         display: flex;
         flex-direction: column;
         align-items: flex-end;
         gap: 6px;
-        flex-shrink: 0;
       }
 
-      .nosapBadge,
-      .nosapLiveBadge,
-      .nosapOfflineBadge {
+      .nosStatusBadge,
+      .nosLiveBadge,
+      .nosOfflineBadge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        min-height: 23px;
         border-radius: 999px;
-        padding: 6px 10px;
+        padding: 0 10px;
+
         font-size: 10px;
-        line-height: 1;
         font-weight: 900;
         white-space: nowrap;
       }
 
-      .nosapBadgeDraft {
-        background: #f3f4f6;
-        color: #4b5563;
+      .nosStatusBadge.draft {
+        background: #f0f2f5;
+        color: #475467;
       }
 
-      .nosapBadgePending {
-        background: #fef3c7;
-        color: #92400e;
+      .nosStatusBadge.pending {
+        background: #fff3d6;
+        color: #9a5b00;
       }
 
-      .nosapBadgeChanges {
-        background: #ffedd5;
-        color: #9a3412;
+      .nosStatusBadge.changes {
+        background: #fff0e1;
+        color: #b54708;
       }
 
-      .nosapBadgeApproved {
-        background: #dcfce7;
-        color: #166534;
+      .nosStatusBadge.approved {
+        background: #e5f7eb;
+        color: #137333;
       }
 
-      .nosapBadgeDeclined {
-        background: #fee2e2;
-        color: #991b1b;
+      .nosStatusBadge.declined {
+        background: #fee9e7;
+        color: #b42318;
       }
 
-      .nosapLiveBadge {
-        background: #dcfce7;
-        color: #166534;
+      .nosLiveBadge {
+        background: #e5f7eb;
+        color: #137333;
       }
 
-      .nosapOfflineBadge {
-        background: #f3f4f6;
-        color: #6b7280;
+      .nosOfflineBadge {
+        background: #f2f4f7;
+        color: #667085;
       }
 
-      .nosapHost {
+      .nosHostBox {
+        margin-top: 19px;
+        border: 1px solid #e1e6ed;
+        border-radius: 11px;
+        background: #fafbfc;
+        padding: 13px 14px;
+
         display: flex;
         flex-direction: column;
         gap: 3px;
-        margin-top: 15px;
-        padding: 12px 13px;
-        border: 1px solid #f0f1f3;
-        border-radius: 11px;
-        background: #f9fafb;
       }
 
-      .nosapHost span,
-      .nosapSummary span,
-      .nosapDetail span,
-      .nosapNoteField > span {
+      .nosHostBox span,
+      .nosSummaryCard span,
+      .nosDetailBox span,
+      .nosReviewNote span {
+        color: #6a788d;
         font-size: 10px;
         font-weight: 900;
-        letter-spacing: 0.6px;
-        color: #6b7280;
+        letter-spacing: 0.7px;
         text-transform: uppercase;
       }
 
-      .nosapHost strong {
+      .nosHostBox strong {
         font-size: 14px;
       }
 
-      .nosapHost small {
-        color: #6b7280;
+      .nosHostBox small {
+        color: #5f6c7b;
         font-size: 11px;
       }
 
-      .nosapPrice {
-        margin-top: 16px;
-        font-size: 25px;
+      .nosRate {
+        margin: 17px 0;
+        color: #0d1117;
+        font-size: 26px;
         font-weight: 900;
       }
 
-      .nosapPrice small {
-        margin-left: 5px;
-        color: #6b7280;
-        font-size: 11px;
-        font-weight: 600;
+      .nosRate span {
+        margin-left: 4px;
+        color: #667085;
+        font-size: 12px;
+        font-weight: 500;
       }
 
-      .nosapMiniGrid {
+      .nosFeatureGrid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
-        margin-top: 14px;
+        grid-template-columns:
+          repeat(
+            3,
+            minmax(0, 1fr)
+          );
+        gap: 10px;
       }
 
-      .nosapMiniGrid > div {
-        border: 1px solid #e5e7eb;
+      .nosMiniDetail {
+        border: 1px solid #dce3ec;
         border-radius: 10px;
-        padding: 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+        padding: 11px 12px;
       }
 
-      .nosapMiniGrid strong {
-        font-size: 16px;
+      .nosMiniDetail strong {
+        display: block;
+        font-size: 17px;
       }
 
-      .nosapMiniGrid span {
-        color: #6b7280;
+      .nosMiniDetail span {
+        display: block;
+        margin-top: 2px;
+        color: #667085;
         font-size: 10px;
       }
 
-      .nosapCardMeta {
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid #f0f0f0;
+      .nosPropertyMeta {
+        border-top: 1px solid #e9edf2;
+        margin-top: 16px;
+        padding-top: 13px;
         display: grid;
         gap: 8px;
       }
 
-      .nosapCardMeta > div {
+      .nosPropertyMeta div {
         display: flex;
-        align-items: flex-start;
         justify-content: space-between;
         gap: 15px;
         font-size: 12px;
       }
 
-      .nosapCardMeta span {
-        color: #6b7280;
+      .nosPropertyMeta span {
+        color: #667085;
       }
 
-      .nosapCardMeta strong {
-        text-align: right;
-        font-weight: 700;
-      }
-
-      .nosapPendingNotice {
-        margin-top: 14px;
-        border: 1px solid #f59e0b;
-        background: #fffbeb;
-        color: #92400e;
-        border-radius: 10px;
-        padding: 10px 12px;
-        font-size: 12px;
-        font-weight: 900;
-      }
-
-      .nosapSmallNote {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-top: 14px;
-        border: 1px solid #fed7aa;
-        background: #fff7ed;
-        color: #9a3412;
-        border-radius: 10px;
-        padding: 11px 12px;
-        font-size: 12px;
-      }
-
-      .nosapCardActions {
+      .nosCardActions {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 9px;
         margin-top: 17px;
       }
 
-      .nosapPrimary,
-      .nosapSecondary,
-      .nosapReviewButton,
-      .nosapApprove,
-      .nosapChanges,
-      .nosapDecline {
-        appearance: none;
-        border-radius: 9px;
-        padding: 10px 13px;
-        font: inherit;
+      .nosCardActions button {
+        min-height: 39px;
+        padding: 0 15px;
+        border: 1px solid #d5dde7;
+        border-radius: 8px;
+        background: white;
+        color: #193351;
         font-size: 12px;
         font-weight: 800;
         cursor: pointer;
-        text-decoration: none;
       }
 
-      .nosapPrimary {
-        border: 1px solid #111827;
-        background: #111827;
-        color: #ffffff;
+      .nosCardActions .nosManageButton {
+        border-color: #071c3d;
+        background: #071c3d;
+        color: white;
       }
 
-      .nosapSecondary {
-        border: 1px solid #d1d5db;
-        background: #ffffff;
-        color: #374151;
-      }
-
-      .nosapReviewButton {
-        border: 1px solid #d97706;
-        background: #d97706;
-        color: #ffffff;
-      }
-
-      .nosapApprove {
-        border: 1px solid #15803d;
-        background: #15803d;
-        color: #ffffff;
-      }
-
-      .nosapChanges {
-        border: 1px solid #d97706;
-        background: #d97706;
-        color: #ffffff;
-      }
-
-      .nosapDecline {
-        border: 1px solid #b91c1c;
-        background: #b91c1c;
-        color: #ffffff;
-      }
-
-      .nosapPrimary:disabled,
-      .nosapSecondary:disabled,
-      .nosapReviewButton:disabled,
-      .nosapApprove:disabled,
-      .nosapChanges:disabled,
-      .nosapDecline:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-
-      .nosapLoading,
-      .nosapEmpty {
-        width: 100%;
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 40px 25px;
-        text-align: center;
-      }
-
-      .nosapLoading {
-        width: min(900px, calc(100% - 40px));
-        margin: 60px auto;
-      }
-
-      .nosapLoading h2,
-      .nosapEmpty h3 {
-        margin: 0 0 7px;
-      }
-
-      .nosapLoading p,
-      .nosapEmpty p {
-        margin: 0 0 15px;
-        color: #6b7280;
-      }
-
-      .nosapBack {
-        appearance: none;
+      .nosBack {
         border: 0;
-        background: transparent;
-        color: #4b5563;
         padding: 0;
-        margin-bottom: 19px;
+        margin-bottom: 18px;
+        background: transparent;
+        color: #3f5168;
         font-size: 13px;
         font-weight: 800;
         cursor: pointer;
       }
 
-      .nosapPropertyHeader {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 24px;
-        margin-bottom: 18px;
-      }
-
-      .nosapSummaryGrid {
+      .nosSummaryGrid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
+        grid-template-columns:
+          repeat(
+            4,
+            minmax(0, 1fr)
+          );
+        gap: 12px;
         margin-bottom: 18px;
       }
 
-      .nosapSummary {
+      .nosSummaryCard {
+        min-height: 75px;
+        border: 1px solid #dce3ec;
+        border-radius: 11px;
+        background: white;
+        padding: 14px;
+
         display: flex;
         flex-direction: column;
         gap: 5px;
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 14px;
-        min-width: 0;
       }
 
-      .nosapSummary strong {
+      .nosSummaryCard strong {
         font-size: 13px;
-        overflow-wrap: anywhere;
       }
 
-      .nosapSummary small {
-        color: #6b7280;
+      .nosSummaryCard small {
+        color: #667085;
         font-size: 11px;
-        overflow-wrap: anywhere;
       }
 
-      .nosapError,
-      .nosapSuccess {
-        border-radius: 11px;
-        padding: 12px 14px;
-        margin-bottom: 16px;
-        font-size: 13px;
-        font-weight: 700;
+      .nosModerationPanel {
+        position: sticky;
+        top: 155px;
+        z-index: 20;
+
+        border: 2px solid #0b5cab;
+        border-radius: 15px;
+        background: #f5f9ff;
+        padding: 19px;
+        margin-bottom: 20px;
+
+        box-shadow:
+          0 8px 25px
+          rgba(15, 70, 130, 0.08);
       }
 
-      .nosapError {
-        border: 1px solid #fecaca;
-        background: #fef2f2;
-        color: #991b1b;
-      }
-
-      .nosapSuccess {
-        border: 1px solid #bbf7d0;
-        background: #f0fdf4;
-        color: #166534;
-      }
-
-      .nosapReviewPanel {
-        margin-bottom: 18px;
-        border: 2px solid #f59e0b;
-        border-radius: 16px;
-        background: #fffbeb;
-        padding: 21px;
-      }
-
-      .nosapReviewPanel h2 {
-        margin: 5px 0 5px;
+      .nosModerationHeading h2 {
+        margin: 3px 0;
         font-size: 21px;
       }
 
-      .nosapReviewPanel p {
+      .nosModerationHeading p {
         margin: 0;
-        color: #6b7280;
-        line-height: 1.5;
+        color: #667085;
+        font-size: 13px;
       }
 
-      .nosapNoteField {
+      .nosReviewNote {
         display: flex;
         flex-direction: column;
         gap: 7px;
-        margin-top: 17px;
+        margin-top: 15px;
       }
 
-      .nosapNoteField textarea {
+      .nosReviewNote textarea {
         width: 100%;
-        resize: vertical;
-        border: 1px solid #d1d5db;
-        border-radius: 10px;
-        background: #ffffff;
-        color: #111827;
-        padding: 12px;
+        border: 1px solid #ccd6e2;
+        border-radius: 9px;
+        padding: 11px;
         font: inherit;
-        outline: none;
+        resize: vertical;
+        background: white;
       }
 
-      .nosapNoteField textarea:focus {
-        border-color: #111827;
-        box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.07);
-      }
-
-      .nosapReviewActions {
+      .nosModerationActions {
         display: flex;
         flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 13px;
+      }
+
+      .nosApproveButton,
+      .nosChangesButton,
+      .nosDeclineButton,
+      .nosOfflineButton {
+        min-height: 41px;
+        border-radius: 8px;
+        padding: 0 16px;
+        font-size: 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .nosApproveButton {
+        border: 1px solid #14803c;
+        background: #14803c;
+        color: white;
+      }
+
+      .nosChangesButton {
+        border: 1px solid #d97706;
+        background: #d97706;
+        color: white;
+      }
+
+      .nosDeclineButton,
+      .nosOfflineButton {
+        border: 1px solid #b42318;
+        background: #b42318;
+        color: white;
+      }
+
+      .nosApprovedPanel,
+      .nosChangesNote,
+      .nosDeclinedNote {
+        border-radius: 13px;
+        padding: 16px;
+        margin-bottom: 17px;
+      }
+
+      .nosApprovedPanel {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        border: 1px solid #a6e1b8;
+        background: #edf9f1;
+        color: #146c35;
+      }
+
+      .nosApprovedPanel p,
+      .nosChangesNote p,
+      .nosDeclinedNote p {
+        margin: 4px 0 0;
+      }
+
+      .nosChangesNote {
+        border: 1px solid #f3c180;
+        background: #fff8ed;
+        color: #9a5200;
+      }
+
+      .nosDeclinedNote {
+        border: 1px solid #f1aaa4;
+        background: #fff4f3;
+        color: #a62017;
+      }
+
+      .nosTabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid #dde3ea;
+        overflow-x: auto;
+        margin-bottom: 15px;
+      }
+
+      .nosTabs button {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        color: #53647c;
+        padding: 12px 15px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .nosTabs button.active {
+        border-bottom-color: #0b4d91;
+        color: #0b4d91;
+      }
+
+      .nosManagerPanel,
+      .nosDetailSection {
+        border: 1px solid #dce3ec;
+        border-radius: 14px;
+        background: white;
+        padding: 18px;
+        margin-bottom: 14px;
+      }
+
+      .nosManagerPanel > h2,
+      .nosDetailSection h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .nosManagerPanel > p {
+        margin: 5px 0 18px;
+        color: #667085;
+      }
+
+      .nosDetailGrid {
+        display: grid;
+        grid-template-columns:
+          repeat(
+            3,
+            minmax(0, 1fr)
+          );
         gap: 9px;
         margin-top: 14px;
       }
 
-      .nosapMessage {
-        margin-bottom: 18px;
-        border-radius: 14px;
-        padding: 16px;
-      }
-
-      .nosapMessage strong {
-        display: block;
-        margin-bottom: 5px;
-      }
-
-      .nosapMessage p {
-        margin: 0 0 5px;
-        line-height: 1.5;
-      }
-
-      .nosapMessage small {
-        font-size: 12px;
-      }
-
-      .nosapMessageChanges {
-        border: 1px solid #fdba74;
-        background: #fff7ed;
-        color: #9a3412;
-      }
-
-      .nosapMessageDeclined {
-        border: 1px solid #fca5a5;
-        background: #fef2f2;
-        color: #991b1b;
-      }
-
-      .nosapMessageApproved {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 15px;
-        border: 1px solid #86efac;
-        background: #f0fdf4;
-        color: #166534;
-      }
-
-      .nosapTabs {
-        display: flex;
-        gap: 4px;
-        overflow-x: auto;
-        margin-bottom: 18px;
-        border-bottom: 1px solid #e5e7eb;
-      }
-
-      .nosapTabs button {
-        appearance: none;
-        border: 0;
-        border-bottom: 3px solid transparent;
-        background: transparent;
-        color: #6b7280;
-        padding: 12px 14px;
-        font: inherit;
-        font-size: 13px;
-        font-weight: 800;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .nosapTabs button.active {
-        color: #111827;
-        border-bottom-color: #111827;
-      }
-
-      .nosapManager,
-      .nosapDetailSection {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 21px;
-        margin-bottom: 16px;
-      }
-
-      .nosapManagerHeading {
-        margin-bottom: 18px;
-      }
-
-      .nosapManagerHeading h2,
-      .nosapDetailSection h2 {
-        margin: 0 0 5px;
-        font-size: 18px;
-      }
-
-      .nosapManagerHeading p {
-        margin: 0;
-        color: #6b7280;
-      }
-
-      .nosapDetails {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-      }
-
-      .nosapDetailGrid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        margin-top: 15px;
-      }
-
-      .nosapDetail {
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        background: #f9fafb;
-        padding: 12px;
+      .nosDetailBox {
         min-width: 0;
+        border: 1px solid #dde3eb;
+        border-radius: 8px;
+        background: #fbfcfd;
+        padding: 11px 12px;
+
         display: flex;
         flex-direction: column;
         gap: 5px;
       }
 
-      .nosapDetail strong,
-      .nosapDetail a {
-        color: #111827;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.45;
+      .nosDetailBox strong,
+      .nosDetailBox a {
+        color: #101828;
+        font-size: 12px;
+        line-height: 1.5;
         overflow-wrap: anywhere;
         white-space: pre-wrap;
       }
 
-      .nosapDetail a {
-        color: #1d4ed8;
+      .nosDetailBox a {
+        color: #0b57d0;
       }
 
-      .nosapDetailWide {
+      .nosWideDetail {
         grid-column: 1 / -1;
       }
 
-      .nosapTags {
+      .nosTags {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 15px;
+        gap: 7px;
+        margin-top: 14px;
       }
 
-      .nosapTags span {
-        border: 1px solid #d1d5db;
-        background: #f9fafb;
+      .nosTags span {
+        border: 1px solid #d5dde7;
         border-radius: 999px;
-        padding: 7px 10px;
-        font-size: 12px;
+        background: #fafbfc;
+        padding: 6px 10px;
+        font-size: 11px;
         font-weight: 700;
       }
 
-      @media (max-width: 1200px) {
-        .nosapStats {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+      .nosError,
+      .nosSuccess {
+        border-radius: 9px;
+        padding: 12px 14px;
+        margin-bottom: 15px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .nosError {
+        border: 1px solid #f0aaa4;
+        background: #fff4f3;
+        color: #b42318;
+      }
+
+      .nosSuccess {
+        border: 1px solid #a8dfb8;
+        background: #eefaf2;
+        color: #137333;
+      }
+
+      .nosEmptyState,
+      .nosLoading {
+        border: 1px solid #dce3ec;
+        border-radius: 14px;
+        background: white;
+        padding: 45px 20px;
+        text-align: center;
+      }
+
+      .nosLoading {
+        width: min(
+          800px,
+          calc(100% - 40px)
+        );
+        margin: 50px auto;
+      }
+
+      @media (max-width: 1150px) {
+        .nosStatsGrid {
+          grid-template-columns:
+            repeat(
+              3,
+              minmax(0, 1fr)
+            );
         }
 
-        .nosapDetailGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .nosDetailGrid {
+          grid-template-columns:
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
       }
 
-      @media (max-width: 950px) {
-        .nosapGrid {
+      @media (max-width: 900px) {
+        .nosPropertyGrid {
           grid-template-columns: 1fr;
         }
 
-        .nosapSummaryGrid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .nosSummaryGrid {
+          grid-template-columns:
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
       }
 
       @media (max-width: 700px) {
-        .nosapContainer {
-          width: min(100% - 24px, 1500px);
-          padding: 24px 0 50px;
+        .nosContainer {
+          width: calc(100% - 24px);
+          padding-top: 22px;
         }
 
-        .nosapTitleRow,
-        .nosapPropertyHeader {
+        .nosPageHeader,
+        .nosPropertyTitle {
           flex-direction: column;
         }
 
-        .nosapHeaderBadges,
-        .nosapCardBadges {
-          flex-direction: row;
-          flex-wrap: wrap;
-          align-items: flex-start;
+        .nosPageHeader h1,
+        .nosPropertyTitle h1 {
+          font-size: 27px;
         }
 
-        .nosapStats {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .nosStatsGrid {
+          grid-template-columns:
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
 
-        .nosapSummaryGrid,
-        .nosapDetailGrid {
+        .nosDetailGrid {
           grid-template-columns: 1fr;
         }
 
-        .nosapDetailWide {
+        .nosWideDetail {
           grid-column: auto;
         }
 
-        .nosapMessageApproved {
+        .nosApprovedPanel {
           flex-direction: column;
           align-items: flex-start;
         }
 
-        .nosapReviewActions button {
-          width: 100%;
-        }
-
-        .nosapTitleRow h1,
-        .nosapPropertyHeader h1 {
-          font-size: 26px;
+        .nosModerationPanel {
+          position: static;
         }
       }
 
       @media (max-width: 450px) {
-        .nosapStats {
+        .nosStatsGrid,
+        .nosSummaryGrid,
+        .nosFeatureGrid {
           grid-template-columns: 1fr;
-        }
-
-        .nosapMiniGrid {
-          grid-template-columns: 1fr 1fr;
-        }
-
-        .nosapCardTop {
-          flex-direction: column;
         }
       }
     `}</style>
