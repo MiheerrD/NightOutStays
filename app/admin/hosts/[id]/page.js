@@ -10,13 +10,23 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-const FILTERS = [
+const PROPERTY_FILTERS = [
   { key: 'all', label: 'All Properties' },
   { key: 'live', label: 'Live' },
   { key: 'pending_review', label: 'Pending Review' },
   { key: 'draft', label: 'Draft' },
   { key: 'changes_requested', label: 'Changes Requested' },
   { key: 'declined', label: 'Declined' },
+];
+
+const BOOKING_FILTERS = [
+  { key: 'all', label: 'All Bookings' },
+  { key: 'requests', label: 'Booking Requests' },
+  { key: 'payment_pending', label: 'Approved / Payment Pending' },
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'cancelled', label: 'Cancelled / Declined' },
+  { key: 'discount', label: 'Discount Requests' },
+  { key: 'offers', label: 'Special Offers' },
 ];
 
 export default function AdminHostDetailsPage() {
@@ -28,26 +38,20 @@ export default function AdminHostDetailsPage() {
       ? params.id
       : '';
 
-  const [host, setHost] =
-    useState(null);
+  const [host, setHost] = useState(null);
+  const [properties, setProperties] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [guests, setGuests] = useState([]);
 
-  const [properties, setProperties] =
-    useState([]);
+  const [propertyFilter, setPropertyFilter] = useState('all');
+  const [bookingFilter, setBookingFilter] = useState('all');
 
-  const [activeFilter, setActiveFilter] =
-    useState('all');
+  const [propertySearch, setPropertySearch] = useState('');
+  const [bookingSearch, setBookingSearch] = useState('');
 
-  const [search, setSearch] =
-    useState('');
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [error, setError] =
-    useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (hostId) {
@@ -55,9 +59,7 @@ export default function AdminHostDetailsPage() {
     }
   }, [hostId]);
 
-  async function loadHostPage(
-    refresh = false
-  ) {
+  async function loadHostPage(refresh = false) {
     if (refresh) {
       setRefreshing(true);
     } else {
@@ -77,10 +79,7 @@ export default function AdminHostDetailsPage() {
       }
 
       if (!session) {
-        router.replace(
-          '/admin/login'
-        );
-
+        router.replace('/admin/login');
         return;
       }
 
@@ -99,8 +98,7 @@ export default function AdminHostDetailsPage() {
         (roles || []).some(
           (item) =>
             (
-              item.role ===
-                'super_admin' ||
+              item.role === 'super_admin' ||
               item.role === 'admin'
             ) &&
             item.is_active === true
@@ -181,21 +179,128 @@ export default function AdminHostDetailsPage() {
           updated_at
         `)
         .eq('host_id', hostId)
-        .order(
-          'created_at',
-          {
-            ascending: false,
-          }
-        );
+        .order('created_at', {
+          ascending: false,
+        });
 
       if (propertyError) {
         throw propertyError;
       }
 
+      const safeProperties =
+        propertyRows || [];
+
+      const propertyIds =
+        safeProperties.map(
+          (property) => property.id
+        );
+
+      let bookingRows = [];
+
+      if (propertyIds.length > 0) {
+        const {
+          data,
+          error: bookingError,
+        } = await supabase
+          .from('bookings')
+          .select(`
+            id,
+            booking_code,
+            property_id,
+            guest_id,
+            check_in,
+            check_out,
+            guests_count,
+            nights,
+            nightly_rate,
+            cleaning_fee,
+            security_deposit,
+            total_amount,
+            booking_status,
+            payment_status,
+            notes,
+            created_at,
+            updated_at,
+            paid_at,
+            base_amount,
+            auto_discount_amount,
+            host_discount_amount,
+            final_payable_amount,
+            offer_note,
+            offer_status,
+            offer_created_at,
+            host_decision,
+            host_decision_at,
+            guest_discount_requested,
+            guest_discount_message,
+            payment_due_at,
+            taxable_amount,
+            gst_rate,
+            gst_amount,
+            amount_including_gst,
+            property_offer_id
+          `)
+          .in(
+            'property_id',
+            propertyIds
+          )
+          .order(
+            'created_at',
+            {
+              ascending: false,
+            }
+          );
+
+        if (bookingError) {
+          throw bookingError;
+        }
+
+        bookingRows =
+          data || [];
+      }
+
+      const guestIds = [
+        ...new Set(
+          bookingRows
+            .map(
+              (booking) =>
+                booking.guest_id
+            )
+            .filter(Boolean)
+        ),
+      ];
+
+      let guestRows = [];
+
+      if (guestIds.length > 0) {
+        const {
+          data,
+          error: guestError,
+        } = await supabase
+          .from('guests')
+          .select(`
+            id,
+            full_name,
+            phone,
+            email
+          `)
+          .in(
+            'id',
+            guestIds
+          );
+
+        if (guestError) {
+          throw guestError;
+        }
+
+        guestRows =
+          data || [];
+      }
+
       setHost(hostRow);
-      setProperties(
-        propertyRows || []
-      );
+      setProperties(safeProperties);
+      setBookings(bookingRows);
+      setGuests(guestRows);
     } catch (err) {
       console.error(
         'Host Details error:',
@@ -212,17 +317,16 @@ export default function AdminHostDetailsPage() {
     }
   }
 
-  const counts = useMemo(() => {
-    return {
-      total: properties.length,
+  const propertyCounts =
+    useMemo(() => ({
+      total:
+        properties.length,
 
       live:
         properties.filter(
           (property) =>
-            property.is_active ===
-              true &&
-            property.moderation_status ===
-              'approved'
+            property.is_active === true &&
+            property.moderation_status === 'approved'
         ).length,
 
       pending:
@@ -235,8 +339,7 @@ export default function AdminHostDetailsPage() {
       draft:
         properties.filter(
           (property) =>
-            property.moderation_status ===
-            'draft'
+            property.moderation_status === 'draft'
         ).length,
 
       changes:
@@ -252,13 +355,73 @@ export default function AdminHostDetailsPage() {
             property.moderation_status ===
             'declined'
         ).length,
-    };
-  }, [properties]);
+    }), [properties]);
+
+  const bookingCounts =
+    useMemo(() => ({
+      all:
+        bookings.length,
+
+      requests:
+        bookings.filter(
+          isBookingRequest
+        ).length,
+
+      paymentPending:
+        bookings.filter(
+          isPaymentPending
+        ).length,
+
+      confirmed:
+        bookings.filter(
+          isConfirmed
+        ).length,
+
+      cancelled:
+        bookings.filter(
+          isCancelled
+        ).length,
+
+      discount:
+        bookings.filter(
+          (booking) =>
+            booking.guest_discount_requested === true
+        ).length,
+
+      offers:
+        bookings.filter(
+          (booking) =>
+            Boolean(
+              booking.offer_status ||
+              booking.offer_note ||
+              Number(
+                booking.host_discount_amount || 0
+              ) > 0
+            )
+        ).length,
+    }), [bookings]);
+
+  const totalBookingValue =
+    useMemo(
+      () =>
+        bookings.reduce(
+          (total, booking) =>
+            total +
+            Number(
+              booking.amount_including_gst ??
+              booking.final_payable_amount ??
+              booking.total_amount ??
+              0
+            ),
+          0
+        ),
+      [bookings]
+    );
 
   const filteredProperties =
     useMemo(() => {
       const cleanSearch =
-        search
+        propertySearch
           .trim()
           .toLowerCase();
 
@@ -267,19 +430,17 @@ export default function AdminHostDetailsPage() {
           let matchesFilter = true;
 
           if (
-            activeFilter === 'live'
+            propertyFilter === 'live'
           ) {
             matchesFilter =
-              property.is_active ===
-                true &&
-              property.moderation_status ===
-                'approved';
+              property.is_active === true &&
+              property.moderation_status === 'approved';
           } else if (
-            activeFilter !== 'all'
+            propertyFilter !== 'all'
           ) {
             matchesFilter =
               property.moderation_status ===
-              activeFilter;
+              propertyFilter;
           }
 
           if (!matchesFilter) {
@@ -309,21 +470,152 @@ export default function AdminHostDetailsPage() {
       );
     }, [
       properties,
-      activeFilter,
-      search,
+      propertyFilter,
+      propertySearch,
     ]);
 
-  function bankDetailsComplete() {
-    if (!host) {
-      return false;
-    }
+  const filteredBookings =
+    useMemo(() => {
+      const cleanSearch =
+        bookingSearch
+          .trim()
+          .toLowerCase();
 
+      return bookings.filter(
+        (booking) => {
+          let matchesFilter = true;
+
+          if (
+            bookingFilter ===
+            'requests'
+          ) {
+            matchesFilter =
+              isBookingRequest(
+                booking
+              );
+          }
+
+          if (
+            bookingFilter ===
+            'payment_pending'
+          ) {
+            matchesFilter =
+              isPaymentPending(
+                booking
+              );
+          }
+
+          if (
+            bookingFilter ===
+            'confirmed'
+          ) {
+            matchesFilter =
+              isConfirmed(
+                booking
+              );
+          }
+
+          if (
+            bookingFilter ===
+            'cancelled'
+          ) {
+            matchesFilter =
+              isCancelled(
+                booking
+              );
+          }
+
+          if (
+            bookingFilter ===
+            'discount'
+          ) {
+            matchesFilter =
+              booking.guest_discount_requested ===
+              true;
+          }
+
+          if (
+            bookingFilter ===
+            'offers'
+          ) {
+            matchesFilter =
+              Boolean(
+                booking.offer_status ||
+                booking.offer_note ||
+                Number(
+                  booking.host_discount_amount ||
+                    0
+                ) > 0
+              );
+          }
+
+          if (!matchesFilter) {
+            return false;
+          }
+
+          if (!cleanSearch) {
+            return true;
+          }
+
+          const property =
+            getProperty(
+              booking.property_id
+            );
+
+          const guest =
+            getGuest(
+              booking.guest_id
+            );
+
+          const searchable = [
+            booking.booking_code,
+            booking.booking_status,
+            booking.payment_status,
+            booking.host_decision,
+            booking.offer_status,
+            property?.name,
+            guest?.full_name,
+            guest?.phone,
+            guest?.email,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+          return searchable.includes(
+            cleanSearch
+          );
+        }
+      );
+    }, [
+      bookings,
+      bookingFilter,
+      bookingSearch,
+      properties,
+      guests,
+    ]);
+
+  function getProperty(propertyId) {
+    return properties.find(
+      (property) =>
+        property.id === propertyId
+    );
+  }
+
+  function getGuest(guestId) {
+    return guests.find(
+      (guest) =>
+        guest.id === guestId
+    );
+  }
+
+  function bankDetailsComplete() {
     return Boolean(
-      host.bank_account_name &&
-        host.bank_name &&
-        host.bank_account_number &&
-        host.bank_ifsc &&
-        host.bank_account_type
+      host?.bank_account_name &&
+      host?.bank_name &&
+      host?.bank_account_number &&
+      host?.bank_ifsc &&
+      host?.bank_account_type
     );
   }
 
@@ -430,14 +722,9 @@ export default function AdminHostDetailsPage() {
                   {displayName}
                 </h1>
 
-                {host.full_name &&
-                  host.business_name &&
-                  host.full_name !==
-                    host.business_name && (
-                    <p>
-                      {host.full_name}
-                    </p>
-                  )}
+                <p>
+                  {host.email || ''}
+                </p>
 
               </div>
 
@@ -495,9 +782,8 @@ export default function AdminHostDetailsPage() {
               <InfoCard
                 label="GSTIN"
                 value={
-                  host.gstin
-                    ? host.gstin
-                    : 'Not Added'
+                  host.gstin ||
+                  'Not Added'
                 }
               />
 
@@ -527,26 +813,19 @@ export default function AdminHostDetailsPage() {
 
           <section className="nosHostPropertiesSection">
 
-            <div className="nosHostPropertiesHeading">
+            <div className="nosSectionHeading">
 
-              <div>
+              <span className="nosEyebrow">
+                HOST INVENTORY
+              </span>
 
-                <span className="nosEyebrow">
-                  HOST INVENTORY
-                </span>
+              <h2>
+                Properties by {displayName}
+              </h2>
 
-                <h2>
-                  Properties by {displayName}
-                </h2>
-
-                <p>
-                  Every property uploaded
-                  by this Host is shown
-                  here with its current
-                  moderation status.
-                </p>
-
-              </div>
+              <p>
+                All properties uploaded by this Host and their current moderation status.
+              </p>
 
             </div>
 
@@ -555,35 +834,47 @@ export default function AdminHostDetailsPage() {
 
               <FilterCard
                 label="All Properties"
-                value={counts.total}
+                value={
+                  propertyCounts.total
+                }
                 active={
-                  activeFilter === 'all'
+                  propertyFilter ===
+                  'all'
                 }
                 onClick={() =>
-                  setActiveFilter('all')
+                  setPropertyFilter(
+                    'all'
+                  )
                 }
               />
 
               <FilterCard
                 label="Live"
-                value={counts.live}
+                value={
+                  propertyCounts.live
+                }
                 active={
-                  activeFilter === 'live'
+                  propertyFilter ===
+                  'live'
                 }
                 onClick={() =>
-                  setActiveFilter('live')
+                  setPropertyFilter(
+                    'live'
+                  )
                 }
               />
 
               <FilterCard
                 label="Pending Review"
-                value={counts.pending}
+                value={
+                  propertyCounts.pending
+                }
                 active={
-                  activeFilter ===
+                  propertyFilter ===
                   'pending_review'
                 }
                 onClick={() =>
-                  setActiveFilter(
+                  setPropertyFilter(
                     'pending_review'
                   )
                 }
@@ -591,24 +882,31 @@ export default function AdminHostDetailsPage() {
 
               <FilterCard
                 label="Draft"
-                value={counts.draft}
+                value={
+                  propertyCounts.draft
+                }
                 active={
-                  activeFilter === 'draft'
+                  propertyFilter ===
+                  'draft'
                 }
                 onClick={() =>
-                  setActiveFilter('draft')
+                  setPropertyFilter(
+                    'draft'
+                  )
                 }
               />
 
               <FilterCard
                 label="Changes Requested"
-                value={counts.changes}
+                value={
+                  propertyCounts.changes
+                }
                 active={
-                  activeFilter ===
+                  propertyFilter ===
                   'changes_requested'
                 }
                 onClick={() =>
-                  setActiveFilter(
+                  setPropertyFilter(
                     'changes_requested'
                   )
                 }
@@ -616,13 +914,15 @@ export default function AdminHostDetailsPage() {
 
               <FilterCard
                 label="Declined"
-                value={counts.declined}
+                value={
+                  propertyCounts.declined
+                }
                 active={
-                  activeFilter ===
+                  propertyFilter ===
                   'declined'
                 }
                 onClick={() =>
-                  setActiveFilter(
+                  setPropertyFilter(
                     'declined'
                   )
                 }
@@ -631,21 +931,18 @@ export default function AdminHostDetailsPage() {
             </div>
 
 
-            <div className="nosPropertyTools">
+            <div className="nosToolRow">
 
               <div>
                 <h3>
-                  {filterHeading(
-                    activeFilter
+                  {propertyFilterHeading(
+                    propertyFilter
                   )}
                 </h3>
 
                 <p>
-                  {
-                    filteredProperties.length
-                  }{' '}
-                  {filteredProperties.length ===
-                  1
+                  {filteredProperties.length}{' '}
+                  {filteredProperties.length === 1
                     ? 'property'
                     : 'properties'}
                 </p>
@@ -653,24 +950,22 @@ export default function AdminHostDetailsPage() {
 
               <input
                 type="search"
-                value={search}
+                value={propertySearch}
                 onChange={(event) =>
-                  setSearch(
+                  setPropertySearch(
                     event.target.value
                   )
                 }
                 placeholder="Search property, location or type..."
-                className="nosPropertySearch"
+                className="nosSearch"
               />
 
             </div>
 
 
-            {filteredProperties.length ===
-            0 ? (
-              <div className="nosPropertyEmpty">
-                No properties found in
-                this category.
+            {filteredProperties.length === 0 ? (
+              <div className="nosEmpty">
+                No properties found in this category.
               </div>
             ) : (
               <div className="nosHostPropertiesGrid">
@@ -689,11 +984,562 @@ export default function AdminHostDetailsPage() {
 
           </section>
 
+
+          <section className="nosBookingOperations">
+
+            <div className="nosSectionHeading bookingHeading">
+
+              <span className="nosEyebrow">
+                HOST OPERATIONS
+              </span>
+
+              <h2>
+                Bookings, Requests & Discounts
+              </h2>
+
+              <p>
+                Monitor booking requests, host approvals, payment status, discounts and special offers for all properties belonging to {displayName}.
+              </p>
+
+            </div>
+
+
+            <div className="nosBookingSummaryTop">
+
+              <div>
+                <span>
+                  Total Booking Value
+                </span>
+
+                <strong>
+                  ₹{Number(
+                    totalBookingValue
+                  ).toLocaleString(
+                    'en-IN'
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Total Booking Records
+                </span>
+
+                <strong>
+                  {bookingCounts.all}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Discount Requests
+                </span>
+
+                <strong>
+                  {
+                    bookingCounts.discount
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Confirmed
+                </span>
+
+                <strong className="green">
+                  {
+                    bookingCounts.confirmed
+                  }
+                </strong>
+              </div>
+
+            </div>
+
+
+            <div className="nosBookingFilters">
+
+              <BookingFilter
+                label="All Bookings"
+                value={bookingCounts.all}
+                active={
+                  bookingFilter ===
+                  'all'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'all'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Booking Requests"
+                value={
+                  bookingCounts.requests
+                }
+                active={
+                  bookingFilter ===
+                  'requests'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'requests'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Approved / Payment Pending"
+                value={
+                  bookingCounts.paymentPending
+                }
+                active={
+                  bookingFilter ===
+                  'payment_pending'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'payment_pending'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Confirmed"
+                value={
+                  bookingCounts.confirmed
+                }
+                active={
+                  bookingFilter ===
+                  'confirmed'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'confirmed'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Cancelled / Declined"
+                value={
+                  bookingCounts.cancelled
+                }
+                active={
+                  bookingFilter ===
+                  'cancelled'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'cancelled'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Discount Requests"
+                value={
+                  bookingCounts.discount
+                }
+                active={
+                  bookingFilter ===
+                  'discount'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'discount'
+                  )
+                }
+              />
+
+              <BookingFilter
+                label="Special Offers"
+                value={
+                  bookingCounts.offers
+                }
+                active={
+                  bookingFilter ===
+                  'offers'
+                }
+                onClick={() =>
+                  setBookingFilter(
+                    'offers'
+                  )
+                }
+              />
+
+            </div>
+
+
+            <div className="nosToolRow">
+
+              <div>
+                <h3>
+                  {bookingFilterHeading(
+                    bookingFilter
+                  )}
+                </h3>
+
+                <p>
+                  {filteredBookings.length}{' '}
+                  {filteredBookings.length === 1
+                    ? 'record'
+                    : 'records'}
+                </p>
+              </div>
+
+              <input
+                type="search"
+                value={bookingSearch}
+                onChange={(event) =>
+                  setBookingSearch(
+                    event.target.value
+                  )
+                }
+                placeholder="Search booking, guest, property or status..."
+                className="nosSearch"
+              />
+
+            </div>
+
+
+            {filteredBookings.length === 0 ? (
+              <div className="nosEmpty">
+                No booking records found in this category.
+              </div>
+            ) : (
+              <div className="nosBookingsGrid">
+
+                {filteredBookings.map(
+                  (booking) => (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      property={
+                        getProperty(
+                          booking.property_id
+                        )
+                      }
+                      guest={
+                        getGuest(
+                          booking.guest_id
+                        )
+                      }
+                    />
+                  )
+                )}
+
+              </div>
+            )}
+
+          </section>
+
         </div>
       </main>
 
       <Styles />
     </>
+  );
+}
+
+
+function BookingCard({
+  booking,
+  property,
+  guest,
+}) {
+  const payableAmount =
+    booking.amount_including_gst ??
+    booking.final_payable_amount ??
+    booking.total_amount ??
+    0;
+
+  const hasDiscount =
+    booking.guest_discount_requested === true ||
+    Number(
+      booking.host_discount_amount || 0
+    ) > 0 ||
+    Number(
+      booking.auto_discount_amount || 0
+    ) > 0;
+
+  return (
+    <article className="nosBookingCard">
+
+      <div className="nosBookingCardHeader">
+
+        <div>
+
+          <span className="nosEyebrow">
+            BOOKING
+          </span>
+
+          <h3>
+            {booking.booking_code ||
+              shortId(
+                booking.id
+              )}
+          </h3>
+
+          <p>
+            {property?.name ||
+              'Property'}
+          </p>
+
+        </div>
+
+        <div className="nosBookingBadges">
+
+          <BookingStatusBadge
+            value={
+              booking.booking_status ||
+              'requested'
+            }
+          />
+
+          <PaymentStatusBadge
+            value={
+              booking.payment_status ||
+              'pending'
+            }
+          />
+
+        </div>
+
+      </div>
+
+
+      <div className="nosBookingGuest">
+
+        <span>
+          GUEST
+        </span>
+
+        <strong>
+          {guest?.full_name ||
+            'Guest'}
+        </strong>
+
+        <p>
+          {[
+            guest?.phone,
+            guest?.email,
+          ]
+            .filter(Boolean)
+            .join(' · ') || '—'}
+        </p>
+
+      </div>
+
+
+      <div className="nosBookingDates">
+
+        <div>
+          <span>
+            Check-in
+          </span>
+
+          <strong>
+            {formatDate(
+              booking.check_in
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Check-out
+          </span>
+
+          <strong>
+            {formatDate(
+              booking.check_out
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Nights
+          </span>
+
+          <strong>
+            {booking.nights ?? '—'}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Guests
+          </span>
+
+          <strong>
+            {booking.guests_count ?? '—'}
+          </strong>
+        </div>
+
+      </div>
+
+
+      <div className="nosBookingFinancials">
+
+        <FinancialItem
+          label="Base Amount"
+          value={
+            booking.base_amount ??
+            booking.total_amount
+          }
+        />
+
+        <FinancialItem
+          label="Auto Discount"
+          value={
+            booking.auto_discount_amount
+          }
+          minus
+        />
+
+        <FinancialItem
+          label="Host Discount"
+          value={
+            booking.host_discount_amount
+          }
+          minus
+        />
+
+        <FinancialItem
+          label="GST"
+          value={
+            booking.gst_amount
+          }
+        />
+
+      </div>
+
+
+      <div className="nosBookingPayable">
+
+        <span>
+          Final Payable
+        </span>
+
+        <strong>
+          ₹{Number(
+            payableAmount || 0
+          ).toLocaleString(
+            'en-IN'
+          )}
+        </strong>
+
+      </div>
+
+
+      <div className="nosBookingDecisionGrid">
+
+        <div>
+          <span>
+            Host Decision
+          </span>
+
+          <strong>
+            {prettyStatus(
+              booking.host_decision ||
+              'pending'
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Offer Status
+          </span>
+
+          <strong>
+            {booking.offer_status
+              ? prettyStatus(
+                  booking.offer_status
+                )
+              : '—'}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Payment Due
+          </span>
+
+          <strong>
+            {formatDateTime(
+              booking.payment_due_at
+            )}
+          </strong>
+        </div>
+
+      </div>
+
+
+      {hasDiscount && (
+        <div className="nosDiscountBox">
+
+          <strong>
+            Discount / Offer
+          </strong>
+
+          {booking.guest_discount_requested && (
+            <p>
+              Guest requested discount
+              {booking.guest_discount_message
+                ? `: ${booking.guest_discount_message}`
+                : '.'}
+            </p>
+          )}
+
+          {Number(
+            booking.host_discount_amount || 0
+          ) > 0 && (
+            <p>
+              Host discount: ₹
+              {Number(
+                booking.host_discount_amount
+              ).toLocaleString(
+                'en-IN'
+              )}
+            </p>
+          )}
+
+          {booking.offer_note && (
+            <p>
+              Offer note: {
+                booking.offer_note
+              }
+            </p>
+          )}
+
+        </div>
+      )}
+
+
+      <div className="nosBookingCardFooter">
+
+        <span>
+          Requested {
+            formatDateTime(
+              booking.created_at
+            )
+          }
+        </span>
+
+        <Link
+          href="/admin/bookings"
+          className="nosOpenBookings"
+        >
+          Open Bookings
+        </Link>
+
+      </div>
+
+    </article>
   );
 }
 
@@ -728,18 +1574,20 @@ function PropertyCard({
               property.location_name,
             ]
               .filter(Boolean)
-              .join(', ') || 'Location not added'}
+              .join(', ') ||
+              'Location not added'}
           </p>
 
         </div>
-
 
         <div className="nosPropertyBadges">
 
           <span
             className={`nosModerationBadge ${status}`}
           >
-            {prettyStatus(status)}
+            {prettyStatus(
+              status
+            )}
           </span>
 
           {live && (
@@ -754,16 +1602,16 @@ function PropertyCard({
 
 
       <div className="nosPropertyPrice">
-
         ₹
         {Number(
           property.base_price || 0
-        ).toLocaleString('en-IN')}
+        ).toLocaleString(
+          'en-IN'
+        )}
 
         <span>
           / night
         </span>
-
       </div>
 
 
@@ -772,21 +1620,24 @@ function PropertyCard({
         <PropertyInfo
           label="Bedrooms"
           value={
-            property.bedrooms ?? '—'
+            property.bedrooms ??
+            '—'
           }
         />
 
         <PropertyInfo
           label="Bathrooms"
           value={
-            property.bathrooms ?? '—'
+            property.bathrooms ??
+            '—'
           }
         />
 
         <PropertyInfo
           label="Guests"
           value={
-            property.max_guests ?? '—'
+            property.max_guests ??
+            '—'
           }
         />
 
@@ -821,37 +1672,19 @@ function PropertyCard({
       </div>
 
 
-      {status ===
-        'changes_requested' &&
-        property.moderation_notes && (
-          <div className="nosPropertyNote">
-            <strong>
-              Changes Requested
-            </strong>
+      {property.moderation_notes && (
+        <div className="nosPropertyNote">
+          <strong>
+            Moderation Note
+          </strong>
 
-            <p>
-              {
-                property.moderation_notes
-              }
-            </p>
-          </div>
-        )}
-
-
-      {status === 'declined' &&
-        property.moderation_notes && (
-          <div className="nosPropertyNote declined">
-            <strong>
-              Decline Note
-            </strong>
-
-            <p>
-              {
-                property.moderation_notes
-              }
-            </p>
-          </div>
-        )}
+          <p>
+            {
+              property.moderation_notes
+            }
+          </p>
+        </div>
+      )}
 
 
       <div className="nosPropertyActions">
@@ -881,22 +1714,62 @@ function PropertyCard({
 }
 
 
-function PropertyInfo({
+function FinancialItem({
   label,
   value,
+  minus = false,
 }) {
-  return (
-    <div className="nosPropertyInfo">
+  const amount =
+    Number(
+      value || 0
+    );
 
-      <strong>
-        {value}
-      </strong>
+  return (
+    <div className="nosFinancialItem">
 
       <span>
         {label}
       </span>
 
+      <strong>
+        {minus && amount > 0
+          ? '- '
+          : ''}
+        ₹
+        {amount.toLocaleString(
+          'en-IN'
+        )}
+      </strong>
+
     </div>
+  );
+}
+
+
+function BookingFilter({
+  label,
+  value,
+  active,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        active
+          ? 'nosBookingFilter active'
+          : 'nosBookingFilter'
+      }
+      onClick={onClick}
+    >
+      <span>
+        {label}
+      </span>
+
+      <strong>
+        {value}
+      </strong>
+    </button>
   );
 }
 
@@ -956,6 +1829,26 @@ function InfoCard({
 }
 
 
+function PropertyInfo({
+  label,
+  value,
+}) {
+  return (
+    <div className="nosPropertyInfo">
+
+      <strong>
+        {value}
+      </strong>
+
+      <span>
+        {label}
+      </span>
+
+    </div>
+  );
+}
+
+
 function HostStatus({
   status,
 }) {
@@ -966,18 +1859,158 @@ function HostStatus({
     <span
       className={`nosHostStatusBadge ${value}`}
     >
-      {prettyStatus(value)}
+      {prettyStatus(
+        value
+      )}
     </span>
+  );
+}
+
+
+function BookingStatusBadge({
+  value,
+}) {
+  return (
+    <span className="nosBookingStatus">
+      {prettyStatus(
+        value
+      )}
+    </span>
+  );
+}
+
+
+function PaymentStatusBadge({
+  value,
+}) {
+  const clean =
+    String(
+      value || 'pending'
+    ).toLowerCase();
+
+  return (
+    <span
+      className={`nosPaymentStatus ${
+        clean === 'paid'
+          ? 'paid'
+          : clean === 'failed'
+            ? 'failed'
+            : 'pending'
+      }`}
+    >
+      {prettyStatus(
+        value
+      )}
+    </span>
+  );
+}
+
+
+function isBookingRequest(
+  booking
+) {
+  const status =
+    String(
+      booking.booking_status ||
+        ''
+    ).toLowerCase();
+
+  const decision =
+    String(
+      booking.host_decision ||
+        ''
+    ).toLowerCase();
+
+  return (
+    status.includes('request') ||
+    status.includes('pending') ||
+    !decision ||
+    decision === 'pending'
+  );
+}
+
+
+function isPaymentPending(
+  booking
+) {
+  const decision =
+    String(
+      booking.host_decision ||
+        ''
+    ).toLowerCase();
+
+  const payment =
+    String(
+      booking.payment_status ||
+        ''
+    ).toLowerCase();
+
+  return (
+    [
+      'approved',
+      'accepted',
+      'accept',
+    ].includes(
+      decision
+    ) &&
+    payment !== 'paid'
+  );
+}
+
+
+function isConfirmed(
+  booking
+) {
+  const bookingStatus =
+    String(
+      booking.booking_status ||
+        ''
+    ).toLowerCase();
+
+  const payment =
+    String(
+      booking.payment_status ||
+        ''
+    ).toLowerCase();
+
+  return (
+    payment === 'paid' ||
+    bookingStatus.includes(
+      'confirm'
+    ) ||
+    bookingStatus.includes(
+      'booked'
+    )
+  );
+}
+
+
+function isCancelled(
+  booking
+) {
+  const values = [
+    booking.booking_status,
+    booking.host_decision,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    values.includes('cancel') ||
+    values.includes('declin') ||
+    values.includes('reject') ||
+    values.includes('expired')
   );
 }
 
 
 function prettyStatus(value) {
   if (!value) {
-    return 'Draft';
+    return '—';
   }
 
-  return value
+  return String(value)
     .replaceAll('_', ' ')
     .replace(
       /\b\w/g,
@@ -987,17 +2020,40 @@ function prettyStatus(value) {
 }
 
 
-function filterHeading(value) {
-  const filter =
-    FILTERS.find(
+function propertyFilterHeading(
+  value
+) {
+  return (
+    PROPERTY_FILTERS.find(
       (item) =>
         item.key === value
-    );
-
-  return (
-    filter?.label ||
+    )?.label ||
     'Properties'
   );
+}
+
+
+function bookingFilterHeading(
+  value
+) {
+  return (
+    BOOKING_FILTERS.find(
+      (item) =>
+        item.key === value
+    )?.label ||
+    'Bookings'
+  );
+}
+
+
+function shortId(value) {
+  if (!value) {
+    return 'Booking';
+  }
+
+  return value
+    .slice(0, 8)
+    .toUpperCase();
 }
 
 
@@ -1023,6 +2079,30 @@ function formatDate(value) {
 }
 
 
+function formatDateTime(value) {
+  if (!value) {
+    return '—';
+  }
+
+  try {
+    return new Date(
+      value
+    ).toLocaleString(
+      'en-IN',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }
+    );
+  } catch {
+    return '—';
+  }
+}
+
+
 function Styles() {
   return (
     <style jsx global>{`
@@ -1033,848 +2113,626 @@ function Styles() {
 
       .nosHostDetailPage {
         min-height: 100vh;
-
         background: #f5f7fa;
-
         color: #101828;
       }
 
-
       .nosHostDetailContainer {
         width: calc(100% - 64px);
-
         max-width: 1500px;
-
         margin: 0 auto;
-
         padding: 28px 0 70px;
       }
 
-
-      /*
-      TOP ACTIONS
-      */
+      .nosHostTopActions,
+      .nosToolRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
 
       .nosHostTopActions {
-        display: flex;
-
-        align-items: center;
-
-        justify-content:
-          space-between;
-
-        gap: 20px;
-
         margin-bottom: 18px;
       }
 
-
       .nosBackHosts {
         color: #0a579f;
-
         font-size: 11px;
-
         font-weight: 900;
-
         text-decoration: none;
       }
 
-
       .nosHostRefresh {
         min-height: 42px;
-
         padding: 0 16px;
-
         border: 0;
-
         border-radius: 8px;
-
         background: #07569f;
-
         color: #ffffff;
-
         font-size: 11px;
-
         font-weight: 900;
-
         cursor: pointer;
       }
 
-
-      /*
-      PROFILE
-      */
-
-      .nosHostProfileCard {
+      .nosHostProfileCard,
+      .nosHostPropertyCard,
+      .nosBookingCard {
         border: 1px solid #d9e2ec;
-
-        border-radius: 16px;
-
         background: #ffffff;
-
-        padding: 23px;
-
-        margin-bottom: 25px;
       }
 
+      .nosHostProfileCard {
+        border-radius: 16px;
+        padding: 23px;
+        margin-bottom: 28px;
+      }
 
       .nosHostProfileTop {
         display: flex;
-
         align-items: center;
-
         gap: 15px;
       }
 
-
       .nosHostLargeAvatar {
         width: 62px;
-
         height: 62px;
-
         flex: 0 0 62px;
-
         display: flex;
-
         align-items: center;
-
         justify-content: center;
-
         border-radius: 15px;
-
         background: #e6eff9;
-
         color: #07569f;
-
         font-size: 25px;
-
         font-weight: 900;
       }
-
 
       .nosHostProfileTitle {
         flex: 1;
       }
 
-
       .nosEyebrow {
         display: block;
-
         margin-bottom: 5px;
-
         color: #68778c;
-
         font-size: 9px;
-
         font-weight: 900;
-
         letter-spacing: 1px;
       }
 
+      .nosHostProfileTitle h1,
+      .nosSectionHeading h2 {
+        margin: 0;
+        color: #071d38;
+      }
 
       .nosHostProfileTitle h1 {
-        margin: 0;
-
-        color: #071d38;
-
         font-size: 29px;
-
-        letter-spacing: -0.6px;
       }
 
-
-      .nosHostProfileTitle p {
-        margin: 4px 0 0;
-
+      .nosHostProfileTitle p,
+      .nosSectionHeading p {
         color: #667085;
-
-        font-size: 12px;
       }
-
-
-      .nosHostStatusBadge,
-      .nosModerationBadge,
-      .nosLiveBadge {
-        min-height: 25px;
-
-        display: inline-flex;
-
-        align-items: center;
-
-        justify-content: center;
-
-        padding: 0 10px;
-
-        border-radius: 999px;
-
-        font-size: 9px;
-
-        font-weight: 900;
-      }
-
-
-      .nosHostStatusBadge.active,
-      .nosModerationBadge.approved,
-      .nosLiveBadge {
-        background: #e5f7eb;
-
-        color: #14743b;
-      }
-
-
-      .nosHostStatusBadge.suspended,
-      .nosModerationBadge.pending_review {
-        background: #fff3da;
-
-        color: #976400;
-      }
-
-
-      .nosHostStatusBadge.blocked,
-      .nosHostStatusBadge.rejected,
-      .nosModerationBadge.declined {
-        background: #feeceb;
-
-        color: #b42318;
-      }
-
-
-      .nosModerationBadge.draft {
-        background: #eef2f6;
-
-        color: #495b70;
-      }
-
-
-      .nosModerationBadge.changes_requested {
-        background: #eaf2ff;
-
-        color: #175fa7;
-      }
-
 
       .nosHostInformationGrid {
         display: grid;
-
-        grid-template-columns:
-          repeat(
-            4,
-            minmax(0,1fr)
-          );
-
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
-
         margin-top: 22px;
       }
 
-
       .nosHostInfoCard {
         min-height: 67px;
-
         padding: 12px;
-
         border: 1px solid #e0e6ed;
-
         border-radius: 9px;
-
         background: #fafbfd;
       }
 
-
-      .nosHostInfoCard span {
+      .nosHostInfoCard span,
+      .nosFinancialItem span,
+      .nosBookingDates span,
+      .nosBookingDecisionGrid span,
+      .nosBookingSummaryTop span {
         color: #728095;
-
         font-size: 9px;
-
         font-weight: 900;
       }
 
-
       .nosHostInfoCard strong {
         display: block;
-
         margin-top: 6px;
-
-        color: #172c46;
-
         font-size: 11px;
-
-        overflow-wrap:
-          anywhere;
       }
-
 
       .nosHostInfoCard strong.success {
         color: #14743b;
       }
 
-
-      /*
-      PROPERTY SECTION
-      */
-
-      .nosHostPropertiesSection {
-        margin-top: 10px;
-      }
-
-
-      .nosHostPropertiesHeading h2 {
-        margin: 0;
-
-        color: #071d38;
-
-        font-size: 27px;
-      }
-
-
-      .nosHostPropertiesHeading p {
-        margin: 6px 0 0;
-
-        color: #65758a;
-
-        font-size: 12px;
-
-        line-height: 1.55;
-      }
-
-
-      .nosHostPropertyStats {
-        display: grid;
-
-        grid-template-columns:
-          repeat(
-            6,
-            minmax(0,1fr)
-          );
-
-        gap: 11px;
-
-        margin: 20px 0 24px;
-      }
-
-
-      .nosHostFilterCard {
-        min-height: 95px;
-
-        display: flex;
-
-        flex-direction: column;
-
-        align-items: flex-start;
-
-        justify-content:
-          center;
-
-        padding: 15px;
-
-        border: 1px solid #d8e1eb;
-
-        border-radius: 12px;
-
-        background: #ffffff;
-
-        color: #101828;
-
-        cursor: pointer;
-      }
-
-
-      .nosHostFilterCard.active {
-        border-color: #082f5a;
-
-        background: #082f5a;
-
-        color: #ffffff;
-      }
-
-
-      .nosHostFilterCard span {
-        font-size: 10px;
-
-        font-weight: 900;
-
-        color: #53647a;
-      }
-
-
-      .nosHostFilterCard.active span {
-        color: #ffffff;
-      }
-
-
-      .nosHostFilterCard strong {
-        margin-top: 8px;
-
-        font-size: 23px;
-      }
-
-
-      /*
-      SEARCH
-      */
-
-      .nosPropertyTools {
-        display: flex;
-
-        align-items: flex-end;
-
-        justify-content:
-          space-between;
-
-        gap: 20px;
-
-        margin-bottom: 13px;
-      }
-
-
-      .nosPropertyTools h3 {
-        margin: 0;
-
-        font-size: 20px;
-      }
-
-
-      .nosPropertyTools p {
-        margin: 3px 0 0;
-
-        color: #667085;
-
-        font-size: 10px;
-      }
-
-
-      .nosPropertySearch {
-        width: min(
-          420px,
-          100%
-        );
-
-        min-height: 41px;
-
-        padding: 0 13px;
-
-        border: 1px solid #ccd6e1;
-
-        border-radius: 8px;
-
-        background: #ffffff;
-
-        outline: none;
-      }
-
-
-      /*
-      PROPERTY CARDS
-      */
-
-      .nosHostPropertiesGrid {
-        display: grid;
-
-        grid-template-columns:
-          repeat(
-            2,
-            minmax(0,1fr)
-          );
-
-        gap: 16px;
-      }
-
-
-      .nosHostPropertyCard {
-        border: 1px solid #d8e1eb;
-
-        border-radius: 15px;
-
-        background: #ffffff;
-
-        padding: 20px;
-      }
-
-
-      .nosPropertyCardTop {
-        display: flex;
-
-        justify-content:
-          space-between;
-
-        align-items:
-          flex-start;
-
-        gap: 15px;
-      }
-
-
-      .nosPropertyCardTop h3 {
-        margin: 0;
-
-        color: #071d38;
-
-        font-size: 18px;
-      }
-
-
-      .nosPropertyCardTop p {
-        margin: 5px 0 0;
-
-        color: #68778c;
-
-        font-size: 11px;
-      }
-
-
-      .nosPropertyBadges {
-        display: flex;
-
+      .nosHostStatusBadge,
+      .nosModerationBadge,
+      .nosLiveBadge,
+      .nosBookingStatus,
+      .nosPaymentStatus {
+        min-height: 25px;
+        display: inline-flex;
         align-items: center;
-
-        justify-content:
-          flex-end;
-
-        gap: 6px;
-
-        flex-wrap: wrap;
-      }
-
-
-      .nosPropertyPrice {
-        margin-top: 18px;
-
-        color: #071d38;
-
-        font-size: 24px;
-
+        justify-content: center;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 9px;
         font-weight: 900;
       }
 
-
-      .nosPropertyPrice span {
-        color: #667085;
-
-        font-size: 9px;
-
-        font-weight: 600;
+      .nosHostStatusBadge.active,
+      .nosModerationBadge.approved,
+      .nosLiveBadge,
+      .nosPaymentStatus.paid {
+        background: #e5f7eb;
+        color: #14743b;
       }
 
-
-      .nosPropertyNumbers {
-        display: grid;
-
-        grid-template-columns:
-          repeat(
-            3,
-            minmax(0,1fr)
-          );
-
-        gap: 8px;
-
-        margin-top: 14px;
+      .nosHostStatusBadge.suspended,
+      .nosModerationBadge.pending_review,
+      .nosPaymentStatus.pending {
+        background: #fff3da;
+        color: #976400;
       }
 
-
-      .nosPropertyInfo {
-        min-height: 59px;
-
-        display: flex;
-
-        flex-direction: column;
-
-        justify-content:
-          center;
-
-        padding: 10px;
-
-        border: 1px solid #dce4ed;
-
-        border-radius: 8px;
-      }
-
-
-      .nosPropertyInfo strong {
-        color: #112b47;
-
-        font-size: 14px;
-      }
-
-
-      .nosPropertyInfo span {
-        margin-top: 3px;
-
-        color: #6b7a8e;
-
-        font-size: 8px;
-      }
-
-
-      .nosPropertyMeta {
-        display: grid;
-
-        grid-template-columns:
-          1fr 1fr;
-
-        gap: 15px;
-
-        margin-top: 13px;
-
-        padding-top: 12px;
-
-        border-top: 1px solid #e5eaf0;
-      }
-
-
-      .nosPropertyMeta div:last-child {
-        text-align: right;
-      }
-
-
-      .nosPropertyMeta span {
-        display: block;
-
-        color: #718095;
-
-        font-size: 8px;
-      }
-
-
-      .nosPropertyMeta strong {
-        display: block;
-
-        margin-top: 4px;
-
-        color: #26384c;
-
-        font-size: 10px;
-      }
-
-
-      .nosPropertyNote {
-        margin-top: 13px;
-
-        padding: 11px;
-
-        border-radius: 8px;
-
-        background: #edf5ff;
-
-        color: #175fa7;
-      }
-
-
-      .nosPropertyNote.declined {
-        background: #fff0ef;
-
+      .nosHostStatusBadge.blocked,
+      .nosModerationBadge.declined,
+      .nosPaymentStatus.failed {
+        background: #feeceb;
         color: #b42318;
       }
 
+      .nosModerationBadge.draft {
+        background: #eef2f6;
+        color: #495b70;
+      }
 
+      .nosModerationBadge.changes_requested {
+        background: #eaf2ff;
+        color: #175fa7;
+      }
+
+      .nosBookingStatus {
+        background: #e9f1fa;
+        color: #185d9f;
+      }
+
+      .nosSectionHeading {
+        margin-bottom: 18px;
+      }
+
+      .nosSectionHeading h2 {
+        font-size: 27px;
+      }
+
+      .nosSectionHeading p {
+        margin: 6px 0 0;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .nosBookingOperations {
+        margin-top: 45px;
+        padding-top: 34px;
+        border-top: 2px solid #dfe6ee;
+      }
+
+      .nosHostPropertyStats,
+      .nosBookingFilters {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nosHostPropertyStats {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        margin-bottom: 24px;
+      }
+
+      .nosBookingFilters {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        margin: 18px 0 24px;
+      }
+
+      .nosHostFilterCard,
+      .nosBookingFilter {
+        min-height: 90px;
+        padding: 14px;
+        border: 1px solid #d8e1eb;
+        border-radius: 12px;
+        background: #ffffff;
+        color: #101828;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .nosHostFilterCard.active,
+      .nosBookingFilter.active {
+        border-color: #082f5a;
+        background: #082f5a;
+        color: #ffffff;
+      }
+
+      .nosHostFilterCard span,
+      .nosBookingFilter span {
+        display: block;
+        font-size: 9px;
+        font-weight: 900;
+        color: #53647a;
+        line-height: 1.35;
+      }
+
+      .nosHostFilterCard.active span,
+      .nosBookingFilter.active span {
+        color: #ffffff;
+      }
+
+      .nosHostFilterCard strong,
+      .nosBookingFilter strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 23px;
+      }
+
+      .nosBookingSummaryTop {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .nosBookingSummaryTop > div {
+        padding: 16px;
+        border: 1px solid #d8e1eb;
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .nosBookingSummaryTop strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 23px;
+      }
+
+      .nosBookingSummaryTop strong.green {
+        color: #14743b;
+      }
+
+      .nosToolRow {
+        margin-bottom: 13px;
+        align-items: flex-end;
+      }
+
+      .nosToolRow h3 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .nosToolRow p {
+        margin: 3px 0 0;
+        color: #667085;
+        font-size: 10px;
+      }
+
+      .nosSearch {
+        width: min(420px, 100%);
+        min-height: 41px;
+        padding: 0 13px;
+        border: 1px solid #ccd6e1;
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .nosHostPropertiesGrid,
+      .nosBookingsGrid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .nosHostPropertyCard,
+      .nosBookingCard {
+        border-radius: 15px;
+        padding: 20px;
+      }
+
+      .nosPropertyCardTop,
+      .nosBookingCardHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 15px;
+      }
+
+      .nosPropertyCardTop h3,
+      .nosBookingCardHeader h3 {
+        margin: 0;
+        color: #071d38;
+        font-size: 18px;
+      }
+
+      .nosPropertyCardTop p,
+      .nosBookingCardHeader p {
+        margin: 5px 0 0;
+        color: #68778c;
+        font-size: 11px;
+      }
+
+      .nosPropertyBadges,
+      .nosBookingBadges {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .nosPropertyPrice {
+        margin-top: 18px;
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      .nosPropertyPrice span {
+        color: #667085;
+        font-size: 9px;
+        font-weight: 600;
+      }
+
+      .nosPropertyNumbers,
+      .nosBookingDates,
+      .nosBookingFinancials,
+      .nosBookingDecisionGrid {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .nosPropertyNumbers {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .nosBookingDates,
+      .nosBookingFinancials {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .nosBookingDecisionGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .nosPropertyInfo,
+      .nosBookingDates > div,
+      .nosFinancialItem,
+      .nosBookingDecisionGrid > div {
+        min-height: 58px;
+        padding: 10px;
+        border: 1px solid #dce4ed;
+        border-radius: 8px;
+      }
+
+      .nosPropertyInfo strong,
+      .nosBookingDates strong,
+      .nosFinancialItem strong,
+      .nosBookingDecisionGrid strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 11px;
+      }
+
+      .nosPropertyInfo span {
+        display: block;
+        margin-top: 3px;
+        color: #6b7a8e;
+        font-size: 8px;
+      }
+
+      .nosBookingGuest {
+        margin-top: 15px;
+        padding: 12px;
+        border-radius: 9px;
+        background: #f7f9fc;
+      }
+
+      .nosBookingGuest span {
+        font-size: 8px;
+        font-weight: 900;
+        color: #728095;
+      }
+
+      .nosBookingGuest strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 13px;
+      }
+
+      .nosBookingGuest p {
+        margin: 3px 0 0;
+        color: #667085;
+        font-size: 10px;
+      }
+
+      .nosBookingPayable {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 14px;
+        padding: 13px;
+        border-radius: 9px;
+        background: #082f5a;
+        color: #ffffff;
+      }
+
+      .nosBookingPayable span {
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .nosBookingPayable strong {
+        font-size: 20px;
+      }
+
+      .nosDiscountBox,
+      .nosPropertyNote {
+        margin-top: 13px;
+        padding: 11px;
+        border-radius: 8px;
+        background: #edf5ff;
+        color: #175fa7;
+      }
+
+      .nosDiscountBox strong,
       .nosPropertyNote strong {
         font-size: 10px;
       }
 
-
+      .nosDiscountBox p,
       .nosPropertyNote p {
         margin: 4px 0 0;
-
         font-size: 10px;
-
         line-height: 1.45;
       }
 
-
+      .nosBookingCardFooter,
       .nosPropertyActions {
         display: flex;
-
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
-
         margin-top: 16px;
       }
 
+      .nosBookingCardFooter {
+        padding-top: 13px;
+        border-top: 1px solid #e3e8ee;
+      }
 
+      .nosBookingCardFooter span {
+        color: #77869a;
+        font-size: 9px;
+      }
+
+      .nosOpenBookings,
       .nosManageProperty,
       .nosViewLiveProperty {
         min-height: 38px;
-
         display: inline-flex;
-
         align-items: center;
-
         justify-content: center;
-
         padding: 0 13px;
-
         border-radius: 8px;
-
         font-size: 10px;
-
         font-weight: 900;
-
         text-decoration: none;
       }
 
-
+      .nosOpenBookings,
       .nosManageProperty {
         background: #082f5a;
-
         color: #ffffff;
       }
 
-
       .nosViewLiveProperty {
         border: 1px solid #ccd6e1;
-
-        background: #ffffff;
-
         color: #07569f;
       }
 
-
-      .nosPropertyEmpty,
+      .nosEmpty,
       .nosHostDetailLoading {
         padding: 45px 20px;
-
         border: 1px solid #d8e1eb;
-
         border-radius: 14px;
-
         background: #ffffff;
-
         text-align: center;
       }
 
-
       .nosHostDetailLoading {
         width: calc(100% - 40px);
-
         max-width: 900px;
-
         margin: 40px auto;
       }
 
-
       .nosHostError {
         margin-bottom: 17px;
-
         padding: 11px 13px;
-
         border: 1px solid #f0b7b0;
-
         border-radius: 8px;
-
         background: #fff3f2;
-
         color: #b42318;
-
         font-size: 11px;
       }
 
-
       button:disabled {
         opacity: 0.55;
-
         cursor: not-allowed;
       }
 
-
-      /*
-      RESPONSIVE
-      */
-
-      @media (
-        max-width: 1050px
-      ) {
-
-        .nosHostInformationGrid {
-          grid-template-columns:
-            repeat(
-              2,
-              minmax(0,1fr)
-            );
+      @media (max-width: 1100px) {
+        .nosHostInformationGrid,
+        .nosBookingSummaryTop {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .nosHostPropertyStats {
-          grid-template-columns:
-            repeat(
-              3,
-              minmax(0,1fr)
-            );
+          grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
-        .nosHostPropertiesGrid {
-          grid-template-columns:
-            1fr;
+        .nosBookingFilters {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
         }
 
+        .nosHostPropertiesGrid,
+        .nosBookingsGrid {
+          grid-template-columns: 1fr;
+        }
       }
 
-
-      @media (
-        max-width: 700px
-      ) {
-
+      @media (max-width: 700px) {
         .nosHostDetailContainer {
-          width:
-            calc(100% - 24px);
+          width: calc(100% - 24px);
         }
 
-        .nosHostProfileTop {
-          align-items:
-            flex-start;
-        }
-
-        .nosHostProfileTitle h1 {
-          font-size: 24px;
-        }
-
-        .nosPropertyTools {
+        .nosToolRow {
           flex-direction: column;
-
           align-items: stretch;
         }
 
-        .nosPropertySearch {
+        .nosSearch {
           width: 100%;
         }
 
-        .nosHostPropertyStats {
-          grid-template-columns:
-            repeat(
-              2,
-              minmax(0,1fr)
-            );
+        .nosHostPropertyStats,
+        .nosBookingFilters {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        .nosBookingDates,
+        .nosBookingFinancials,
+        .nosBookingDecisionGrid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
 
-
-      @media (
-        max-width: 480px
-      ) {
-
-        .nosHostInformationGrid {
-          grid-template-columns:
-            1fr;
+      @media (max-width: 480px) {
+        .nosHostInformationGrid,
+        .nosBookingSummaryTop {
+          grid-template-columns: 1fr;
         }
 
-        .nosHostProfileTop {
+        .nosHostProfileTop,
+        .nosPropertyCardTop,
+        .nosBookingCardHeader {
           flex-wrap: wrap;
         }
 
-        .nosHostStatusBadge {
-          margin-left: 77px;
-        }
-
-        .nosPropertyCardTop {
-          flex-direction: column;
-        }
-
-        .nosPropertyBadges {
-          justify-content:
-            flex-start;
-        }
-
+        .nosBookingCardFooter,
         .nosPropertyActions {
           flex-direction: column;
+          align-items: stretch;
         }
-
       }
 
     `}</style>
