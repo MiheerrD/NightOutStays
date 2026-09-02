@@ -102,14 +102,9 @@ export default function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [adminProfile, setAdminProfile] =
-    useState(null);
-
-  const [permissions, setPermissions] =
-    useState({});
-
-  const [loading, setLoading] =
-    useState(true);
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [permissions, setPermissions] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadAdmin();
@@ -156,12 +151,9 @@ export default function AdminNav() {
       if (
         !profile ||
         !profile.is_active ||
-        !['super_admin', 'admin'].includes(
-          profile.role
-        )
+        !['super_admin', 'admin'].includes(profile.role)
       ) {
         await supabase.auth.signOut();
-
         router.replace('/admin/login');
         return;
       }
@@ -174,7 +166,7 @@ export default function AdminNav() {
       ) {
         const {
           data: permissionRows,
-          error: permissionsError,
+          error: permissionError,
         } = await supabase
           .from('admin_permissions')
           .select(`
@@ -186,20 +178,22 @@ export default function AdminNav() {
             session.user.id
           );
 
-        if (permissionsError) {
-          throw permissionsError;
+        if (permissionError) {
+          throw permissionError;
         }
 
-        const permissionMap = {};
+        const map = {};
 
         (permissionRows || []).forEach(
           (row) => {
-            permissionMap[row.module] =
+            map[row.module] =
               row.can_view === true;
           }
         );
 
-        setPermissions(permissionMap);
+        setPermissions(map);
+      } else {
+        setPermissions({});
       }
     } catch (error) {
       console.error(
@@ -225,7 +219,8 @@ export default function AdminNav() {
 
     if (adminProfile.full_access) {
       return ALL_MENU_ITEMS.filter(
-        (item) => !item.superAdminOnly
+        (item) =>
+          !item.superAdminOnly
       );
     }
 
@@ -270,8 +265,8 @@ export default function AdminNav() {
   if (loading) {
     return (
       <>
-        <div className="nosAdminMenuLoading">
-          Loading...
+        <div className="nosNavLoading">
+          Loading Admin...
         </div>
 
         <Styles />
@@ -288,12 +283,22 @@ export default function AdminNav() {
 
   return (
     <>
-      <header className="nosAdminNavigation">
+      <div className="nosAdminNavRoot">
 
-        {/* DARK BLUE MENU ONLY */}
-        <nav className="nosAdminMenuBar">
-          <div className="nosAdminMenuInner">
+        {/* =====================================
+            ROW 1
+            ONLY BLUE ADMIN MENU
+        ====================================== */}
 
+        <div className="nosBlueMenuRow">
+
+          <div
+            className="nosBlueMenuGrid"
+            style={{
+              gridTemplateColumns:
+                `repeat(${visibleMenuItems.length}, minmax(0, 1fr))`,
+            }}
+          >
             {visibleMenuItems.map(
               (item) => {
                 const active =
@@ -305,37 +310,42 @@ export default function AdminNav() {
                     href={item.href}
                     className={
                       active
-                        ? 'nosAdminMenuItem active'
-                        : 'nosAdminMenuItem'
+                        ? 'nosBlueMenuItem active'
+                        : 'nosBlueMenuItem'
                     }
                   >
-                    <span className="nosAdminMenuIcon">
+                    <span className="nosBlueMenuIcon">
                       {item.icon}
                     </span>
 
-                    <span className="nosAdminMenuLabel">
+                    <span className="nosBlueMenuLabel">
                       {item.label}
                     </span>
                   </Link>
                 );
               }
             )}
-
           </div>
-        </nav>
 
-        {/* WHITE ADMIN DETAILS BELOW MENU */}
-        <div className="nosAdminInfoRow">
+        </div>
 
-          <div className="nosAdminInfoInner">
 
-            <div className="nosAdminRoleArea">
+        {/* =====================================
+            ROW 2
+            ADMIN DETAILS BELOW MENU
+        ====================================== */}
+
+        <div className="nosAdminDetailRow">
+
+          <div className="nosAdminDetailInner">
+
+            <div className="nosAdminDetailLeft">
 
               <span
                 className={
                   isSuperAdmin
-                    ? 'nosAdminRoleBadge super'
-                    : 'nosAdminRoleBadge'
+                    ? 'nosRoleBadge super'
+                    : 'nosRoleBadge'
                 }
               >
                 {isSuperAdmin
@@ -345,7 +355,7 @@ export default function AdminNav() {
                     : 'ADMIN · LIMITED ACCESS'}
               </span>
 
-              <div className="nosAdminName">
+              <div className="nosAdminIdentity">
                 <strong>
                   {adminProfile.full_name ||
                     'Administrator'}
@@ -362,12 +372,13 @@ export default function AdminNav() {
 
             </div>
 
-            <div className="nosAdminActions">
+
+            <div className="nosAdminDetailRight">
 
               <Link
                 href="/"
                 target="_blank"
-                className="nosAdminWebsiteButton"
+                className="nosWebsiteButton"
               >
                 ↗ View Website
               </Link>
@@ -375,7 +386,7 @@ export default function AdminNav() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="nosAdminLogoutButton"
+                className="nosLogoutButton"
               >
                 Logout
               </button>
@@ -386,7 +397,7 @@ export default function AdminNav() {
 
         </div>
 
-      </header>
+      </div>
 
       <Styles />
     </>
@@ -397,199 +408,231 @@ function Styles() {
   return (
     <style jsx global>{`
 
-      * {
+      /*
+      ==========================================
+      IMPORTANT RESET FOR ADMIN HEADER
+      ==========================================
+      */
+
+      .nosAdminNavRoot,
+      .nosAdminNavRoot * {
         box-sizing: border-box;
       }
 
-      /*
-      ==============================
-      COMPLETE ADMIN NAVIGATION
-      ==============================
-      */
+      .nosAdminNavRoot {
+        display: block !important;
 
-      .nosAdminNavigation {
-        width: 100%;
+        position: relative !important;
+
+        width: 100% !important;
+
+        max-width: none !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        overflow: visible !important;
+
         background: #ffffff;
-        position: relative;
+
         z-index: 1000;
       }
 
 
       /*
-      ==============================
-      DARK BLUE MENU
-      ==============================
+      ==========================================
+      ROW 1
+      BLUE MENU ONLY
+      ==========================================
       */
 
-      .nosAdminMenuBar {
-        width: 100%;
-        background: #082f5a;
+      .nosBlueMenuRow {
+        display: block !important;
+
+        width: 100% !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        background: #082f5a !important;
+
+        overflow: hidden !important;
       }
 
-      .nosAdminMenuInner {
-        width: 100%;
 
-        display: flex;
+      .nosBlueMenuGrid {
+        display: grid !important;
+
+        width: 100% !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
         align-items: stretch;
 
-        overflow-x: auto;
+        background: #082f5a;
 
-        scrollbar-width: thin;
-        scrollbar-color:
-          rgba(255,255,255,0.35)
-          transparent;
-      }
-
-      .nosAdminMenuInner::-webkit-scrollbar {
-        height: 5px;
-      }
-
-      .nosAdminMenuInner::-webkit-scrollbar-track {
-        background: transparent;
-      }
-
-      .nosAdminMenuInner::-webkit-scrollbar-thumb {
-        background:
-          rgba(255,255,255,0.30);
-
-        border-radius: 999px;
+        overflow: hidden !important;
       }
 
 
       /*
-      ==============================
-      MENU ITEMS
-      ==============================
+      ==========================================
+      INDIVIDUAL MENU ITEM
+      ==========================================
       */
 
-      .nosAdminMenuItem {
+      .nosBlueMenuItem {
         position: relative;
 
-        flex: 1 0 92px;
+        min-width: 0 !important;
 
-        min-width: 92px;
-        min-height: 74px;
+        min-height: 70px;
 
-        display: flex;
+        padding: 8px 3px;
+
+        display: flex !important;
+
         flex-direction: column;
 
         align-items: center;
+
         justify-content: center;
 
-        gap: 7px;
+        gap: 5px;
 
-        padding: 10px 9px;
+        background: transparent;
 
         color: #ffffff !important;
+
         text-decoration: none !important;
 
-        opacity: 0.88;
-
-        transition:
-          background 0.15s ease,
-          opacity 0.15s ease;
+        overflow: hidden;
       }
 
-      .nosAdminMenuItem:hover {
+
+      .nosBlueMenuItem:hover {
         background:
-          rgba(255,255,255,0.10);
-
-        opacity: 1;
-
-        color: #ffffff !important;
+          rgba(
+            255,
+            255,
+            255,
+            0.10
+          ) !important;
       }
 
-      .nosAdminMenuItem.active {
-        background: #35618c;
 
-        opacity: 1;
-
-        color: #ffffff !important;
+      .nosBlueMenuItem.active {
+        background: #35618c !important;
       }
 
-      .nosAdminMenuItem.active::after {
+
+      .nosBlueMenuItem.active::after {
         content: '';
 
         position: absolute;
 
-        left: 16px;
-        right: 16px;
+        left: 20%;
+        right: 20%;
 
         bottom: 0;
 
         height: 4px;
 
+        background: #ffffff;
+
         border-radius:
           4px 4px 0 0;
-
-        background: #ffffff;
       }
 
-      .nosAdminMenuIcon {
+
+      .nosBlueMenuIcon {
+        display: block;
+
         color: #ffffff !important;
 
-        font-size: 18px;
+        font-size: 16px;
 
         line-height: 1;
       }
 
-      .nosAdminMenuLabel {
+
+      .nosBlueMenuLabel {
+        display: block;
+
+        width: 100%;
+
         color: #ffffff !important;
 
-        font-size: 10px;
+        font-size: 9px;
 
         font-weight: 900;
 
-        line-height: 1.2;
+        line-height: 1.15;
 
         text-align: center;
 
-        white-space: nowrap;
+        white-space: normal;
+
+        overflow-wrap: normal;
+
+        word-break: normal;
       }
 
 
       /*
-      ==============================
-      WHITE INFORMATION ROW
-      BELOW MENU
-      ==============================
+      ==========================================
+      ROW 2
+      WHITE ADMIN DETAILS
+      ==========================================
       */
 
-      .nosAdminInfoRow {
-        width: 100%;
+      .nosAdminDetailRow {
+        display: block !important;
 
-        background: #ffffff;
+        width: 100% !important;
+
+        margin: 0 !important;
+
+        background: #ffffff !important;
 
         border-bottom:
           1px solid #dfe5ec;
       }
 
-      .nosAdminInfoInner {
-        width: calc(100% - 64px);
+
+      .nosAdminDetailInner {
+        width:
+          calc(100% - 64px);
 
         max-width: 1500px;
 
-        min-height: 66px;
+        min-height: 62px;
 
         margin: 0 auto;
 
-        display: flex;
+        display: flex !important;
 
-        align-items: center;
+        flex-direction: row !important;
 
-        justify-content: space-between;
+        align-items: center !important;
+
+        justify-content:
+          space-between !important;
 
         gap: 20px;
+
+        background: #ffffff;
       }
 
 
       /*
-      ==============================
-      ADMIN ROLE + NAME
-      ==============================
+      ==========================================
+      LEFT SIDE
+      ==========================================
       */
 
-      .nosAdminRoleArea {
+      .nosAdminDetailLeft {
         display: flex;
 
         align-items: center;
@@ -597,45 +640,49 @@ function Styles() {
         gap: 14px;
       }
 
-      .nosAdminRoleBadge {
+
+      .nosRoleBadge {
+        min-height: 27px;
+
+        padding: 0 12px;
+
         display: inline-flex;
 
         align-items: center;
 
         justify-content: center;
 
-        min-height: 27px;
-
-        padding: 0 12px;
-
         border-radius: 999px;
 
-        background: #e8f1fb;
+        background: #eaf2fb;
 
-        color: #0a569d;
+        color: #0b579e;
 
         font-size: 9px;
 
         font-weight: 900;
 
-        letter-spacing: 0.7px;
+        letter-spacing: 0.6px;
 
         white-space: nowrap;
       }
 
-      .nosAdminRoleBadge.super {
+
+      .nosRoleBadge.super {
         background: #082f5a;
 
         color: #ffffff;
       }
 
-      .nosAdminName {
+
+      .nosAdminIdentity {
         display: flex;
 
         flex-direction: column;
       }
 
-      .nosAdminName strong {
+
+      .nosAdminIdentity strong {
         color: #101828;
 
         font-size: 13px;
@@ -643,7 +690,8 @@ function Styles() {
         font-weight: 900;
       }
 
-      .nosAdminName span {
+
+      .nosAdminIdentity span {
         margin-top: 2px;
 
         color: #667085;
@@ -655,12 +703,12 @@ function Styles() {
 
 
       /*
-      ==============================
-      WEBSITE + LOGOUT
-      ==============================
+      ==========================================
+      RIGHT SIDE
+      ==========================================
       */
 
-      .nosAdminActions {
+      .nosAdminDetailRight {
         display: flex;
 
         align-items: center;
@@ -668,71 +716,61 @@ function Styles() {
         gap: 10px;
       }
 
-      .nosAdminWebsiteButton {
+
+      .nosWebsiteButton,
+      .nosLogoutButton {
+        min-height: 36px;
+
+        padding: 0 14px;
+
         display: inline-flex;
 
         align-items: center;
 
         justify-content: center;
 
-        min-height: 37px;
-
-        padding: 0 15px;
-
-        border: 1px solid #cdd7e2;
+        border: 1px solid #ccd6e1;
 
         border-radius: 8px;
 
         background: #ffffff;
 
-        color: #0a579f;
-
-        font-size: 11px;
-
-        font-weight: 900;
-
-        text-decoration: none;
-      }
-
-      .nosAdminWebsiteButton:hover {
-        background: #f5f8fb;
-      }
-
-      .nosAdminLogoutButton {
-        min-height: 37px;
-
-        padding: 0 16px;
-
-        border: 1px solid #cdd7e2;
-
-        border-radius: 8px;
-
-        background: #ffffff;
-
-        color: #26384c;
-
-        font-size: 11px;
+        font-size: 10px;
 
         font-weight: 900;
 
         cursor: pointer;
       }
 
-      .nosAdminLogoutButton:hover {
-        background: #f5f8fb;
+
+      .nosWebsiteButton {
+        color: #0b579e;
+
+        text-decoration: none;
+      }
+
+
+      .nosLogoutButton {
+        color: #25364a;
+      }
+
+
+      .nosWebsiteButton:hover,
+      .nosLogoutButton:hover {
+        background: #f5f7fa;
       }
 
 
       /*
-      ==============================
+      ==========================================
       LOADING
-      ==============================
+      ==========================================
       */
 
-      .nosAdminMenuLoading {
+      .nosNavLoading {
         width: 100%;
 
-        min-height: 74px;
+        min-height: 70px;
 
         display: flex;
 
@@ -746,50 +784,74 @@ function Styles() {
 
         font-size: 11px;
 
-        font-weight: 800;
+        font-weight: 900;
       }
 
 
       /*
-      ==============================
-      RESPONSIVE
-      ==============================
+      ==========================================
+      TABLET
+      ==========================================
       */
 
       @media (max-width: 1000px) {
 
-        .nosAdminMenuItem {
-          flex: 0 0 92px;
+        .nosBlueMenuLabel {
+          font-size: 8px;
         }
 
-        .nosAdminInfoInner {
-          width: calc(100% - 30px);
+        .nosBlueMenuIcon {
+          font-size: 14px;
+        }
+
+        .nosAdminDetailInner {
+          width:
+            calc(100% - 30px);
         }
 
       }
 
 
-      @media (max-width: 650px) {
+      /*
+      ==========================================
+      MOBILE
 
-        .nosAdminInfoInner {
+      We DO NOT create a horizontal scrollbar.
+
+      Menu wraps to multiple rows instead.
+      ==========================================
+      */
+
+      @media (max-width: 750px) {
+
+        .nosBlueMenuGrid {
+          grid-template-columns:
+            repeat(4, 1fr)
+            !important;
+        }
+
+        .nosBlueMenuItem {
           min-height: 60px;
         }
 
-        .nosAdminRoleBadge {
+        .nosBlueMenuLabel {
+          font-size: 9px;
+        }
+
+        .nosAdminDetailInner {
+          min-height: 58px;
+        }
+
+        .nosRoleBadge {
           display: none;
         }
 
-        .nosAdminName span {
+        .nosAdminIdentity span {
           display: none;
         }
 
-        .nosAdminWebsiteButton {
+        .nosWebsiteButton {
           display: none;
-        }
-
-        .nosAdminMenuItem {
-          min-width: 84px;
-          flex-basis: 84px;
         }
 
       }
@@ -797,24 +859,41 @@ function Styles() {
 
       @media (max-width: 450px) {
 
-        .nosAdminInfoInner {
-          width: calc(100% - 20px);
+        .nosBlueMenuGrid {
+          grid-template-columns:
+            repeat(3, 1fr)
+            !important;
         }
 
-        .nosAdminName strong {
-          max-width: 150px;
+        .nosAdminDetailInner {
+          width:
+            calc(100% - 20px);
+        }
+
+        .nosAdminIdentity strong {
+          max-width: 160px;
 
           overflow: hidden;
 
-          white-space: nowrap;
-
           text-overflow: ellipsis;
+
+          white-space: nowrap;
         }
 
-        .nosAdminMenuLabel {
-          font-size: 9px;
-        }
+      }
 
+
+      /*
+      ==========================================
+      REMOVE HORIZONTAL SCROLL CAUSED BY HEADER
+      ==========================================
+      */
+
+      html,
+      body {
+        max-width: 100%;
+
+        overflow-x: hidden !important;
       }
 
     `}</style>
