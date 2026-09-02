@@ -62,6 +62,7 @@ export default function AddPropertyPage() {
   const [success, setSuccess] = useState('');
 
   const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [amenities, setAmenities] = useState([]);
 
   const [form, setForm] = useState({
     name: '',
@@ -132,8 +133,6 @@ export default function AddPropertyPage() {
     seasonMarkupPercent: 0,
   });
 
-  const [amenities, setAmenities] = useState([]);
-
   useEffect(() => {
     initialise();
   }, []);
@@ -186,27 +185,23 @@ export default function AddPropertyPage() {
         return;
       }
 
-      const {
-        data: hostData,
-        error: hostError,
-      } = await supabase
-        .from('host_profiles')
-        .select(`
-          id,
-          user_id,
-          full_name,
-          business_name,
-          status
-        `)
-        .eq('user_id', session.user.id)
-        .single();
+      const { data: hostData, error: hostError } =
+        await supabase
+          .from('host_profiles')
+          .select(`
+            id,
+            user_id,
+            full_name,
+            business_name,
+            status
+          `)
+          .eq('user_id', session.user.id)
+          .single();
 
       if (hostError) throw hostError;
 
       if (hostData.status !== 'active') {
-        throw new Error(
-          'Your Host account is not active.'
-        );
+        throw new Error('Your Host account is not active.');
       }
 
       setHost(hostData);
@@ -223,8 +218,7 @@ export default function AddPropertyPage() {
   }
 
   function updateField(event) {
-    const { name, value, type, checked } =
-      event.target;
+    const { name, value, type, checked } = event.target;
 
     setForm((current) => ({
       ...current,
@@ -238,29 +232,22 @@ export default function AddPropertyPage() {
   function toggleAmenity(item) {
     setAmenities((current) =>
       current.includes(item)
-        ? current.filter(
-            (value) => value !== item
-          )
+        ? current.filter((value) => value !== item)
         : [...current, item]
     );
   }
 
   function handlePhotoSelection(event) {
-    const files = Array.from(
-      event.target.files || []
-    );
+    const files = Array.from(event.target.files || []);
 
     if (!files.length) return;
 
-    const imageFiles = files.filter(
-      (file) =>
-        file.type.startsWith('image/')
+    const imageFiles = files.filter((file) =>
+      file.type.startsWith('image/')
     );
 
     if (imageFiles.length !== files.length) {
-      setError(
-        'Only image files can be uploaded.'
-      );
+      setError('Only image files can be uploaded.');
       return;
     }
 
@@ -298,10 +285,7 @@ export default function AddPropertyPage() {
       .filter(Boolean);
   }
 
-  async function uploadPhotos(
-    propertyId,
-    propertyName
-  ) {
+  async function uploadPhotos(propertyId, propertyName) {
     if (!selectedPhotos.length) {
       return;
     }
@@ -322,28 +306,22 @@ export default function AddPropertyPage() {
       const storagePath =
         `${sessionUser.id}/${propertyId}/${safeName}`;
 
-      const {
-        error: uploadError,
-      } = await supabase.storage
-        .from('property-photos')
-        .upload(
-          storagePath,
-          file,
-          {
+      const { error: uploadError } =
+        await supabase.storage
+          .from('property-photos')
+          .upload(storagePath, file, {
             cacheControl: '3600',
             upsert: false,
-          }
-        );
+          });
 
       if (uploadError) {
         throw uploadError;
       }
 
-      const {
-        data: publicUrlData,
-      } = supabase.storage
-        .from('property-photos')
-        .getPublicUrl(storagePath);
+      const { data: publicUrlData } =
+        supabase.storage
+          .from('property-photos')
+          .getPublicUrl(storagePath);
 
       const imageUrl =
         publicUrlData?.publicUrl;
@@ -354,18 +332,17 @@ export default function AddPropertyPage() {
         );
       }
 
-      const {
-        error: photoInsertError,
-      } = await supabase
-        .from('property_photos')
-        .insert({
-          property_id: propertyId,
-          image_url: imageUrl,
-          alt_text:
-            `${propertyName} photo ${index + 1}`,
-          sort_order: index,
-          is_cover: index === 0,
-        });
+      const { error: photoInsertError } =
+        await supabase
+          .from('property_photos')
+          .insert({
+            property_id: propertyId,
+            image_url: imageUrl,
+            alt_text:
+              `${propertyName} photo ${index + 1}`,
+            sort_order: index,
+            is_cover: index === 0,
+          });
 
       if (photoInsertError) {
         throw photoInsertError;
@@ -373,44 +350,32 @@ export default function AddPropertyPage() {
     }
   }
 
-  async function saveProperty(
-    submitForReview
-  ) {
+  async function saveProperty(submitForReview) {
     setError('');
     setSuccess('');
 
     if (!host?.id) {
-      setError(
-        'Host information is missing.'
-      );
+      setError('Host information is missing.');
       return;
     }
 
     if (!form.name.trim()) {
-      setError(
-        'Please enter the property name.'
-      );
+      setError('Please enter the property name.');
       return;
     }
 
     if (!form.city.trim()) {
-      setError(
-        'Please enter the city.'
-      );
+      setError('Please enter the city.');
       return;
     }
 
     if (!form.area.trim()) {
-      setError(
-        'Please enter the area or locality.'
-      );
+      setError('Please enter the area or locality.');
       return;
     }
 
     if (!form.basePrice) {
-      setError(
-        'Please enter the nightly base rate.'
-      );
+      setError('Please enter the nightly base rate.');
       return;
     }
 
@@ -442,9 +407,7 @@ export default function AddPropertyPage() {
           ? 'pending_review'
           : 'draft';
 
-      const slug = createSlug(
-        form.name
-      );
+      const slug = createSlug(form.name);
 
       const payload = {
         host_id: host.id,
@@ -456,30 +419,24 @@ export default function AddPropertyPage() {
           form.propertyType,
 
         short_description:
-          form.shortDescription.trim() ||
-          null,
+          form.shortDescription.trim() || null,
 
         description:
-          form.description.trim() ||
-          null,
+          form.description.trim() || null,
 
-        city:
-          form.city.trim(),
+        city: form.city.trim(),
 
-        area:
-          form.area.trim(),
+        area: form.area.trim(),
 
         location_name:
           form.locationName.trim() ||
           `${form.area.trim()}, ${form.city.trim()}`,
 
         address:
-          form.address.trim() ||
-          null,
+          form.address.trim() || null,
 
         google_maps_url:
-          form.googleMapsUrl.trim() ||
-          null,
+          form.googleMapsUrl.trim() || null,
 
         latitude:
           form.latitude === ''
@@ -516,9 +473,7 @@ export default function AddPropertyPage() {
           Number(form.cleaningFee || 0),
 
         security_deposit:
-          Number(
-            form.securityDeposit || 0
-          ),
+          Number(form.securityDeposit || 0),
 
         min_stay_nights:
           Number(form.minStayNights),
@@ -533,30 +488,21 @@ export default function AddPropertyPage() {
           form.checkOutTime,
 
         late_checkout_hourly_fee:
-          Number(
-            form.lateCheckoutHourlyFee || 0
-          ),
+          Number(form.lateCheckoutHourlyFee || 0),
 
         amenities,
 
         features:
-          splitLines(
-            form.featuresText
-          ),
+          splitLines(form.featuresText),
 
         house_rules:
-          splitLines(
-            form.houseRulesText
-          ),
+          splitLines(form.houseRulesText),
 
         kitchen_features:
-          splitLines(
-            form.kitchenFeaturesText
-          ),
+          splitLines(form.kitchenFeaturesText),
 
         direction_instructions:
-          form.directionInstructions.trim() ||
-          null,
+          form.directionInstructions.trim() || null,
 
         fridge_available:
           form.fridgeAvailable,
@@ -579,24 +525,16 @@ export default function AddPropertyPage() {
           form.wifiAvailable,
 
         water_heater_count:
-          Number(
-            form.waterHeaterCount || 0
-          ),
+          Number(form.waterHeaterCount || 0),
 
         sofa_cum_bed_count:
-          Number(
-            form.sofaCumBedCount || 0
-          ),
+          Number(form.sofaCumBedCount || 0),
 
         single_bed_count:
-          Number(
-            form.singleBedCount || 0
-          ),
+          Number(form.singleBedCount || 0),
 
         queen_bed_count:
-          Number(
-            form.queenBedCount || 0
-          ),
+          Number(form.queenBedCount || 0),
 
         pets_allowed:
           form.petsAllowed,
@@ -630,25 +568,18 @@ export default function AddPropertyPage() {
           form.dynamicPricingEnabled,
 
         weekend_markup_percent:
-          Number(
-            form.weekendMarkupPercent || 0
-          ),
+          Number(form.weekendMarkupPercent || 0),
 
         long_weekend_markup_percent:
           Number(
-            form.longWeekendMarkupPercent ||
-              0
+            form.longWeekendMarkupPercent || 0
           ),
 
         festival_markup_percent:
-          Number(
-            form.festivalMarkupPercent || 0
-          ),
+          Number(form.festivalMarkupPercent || 0),
 
         season_markup_percent:
-          Number(
-            form.seasonMarkupPercent || 0
-          ),
+          Number(form.seasonMarkupPercent || 0),
 
         moderation_status:
           moderationStatus,
@@ -717,618 +648,641 @@ export default function AddPropertyPage() {
 
   if (loading) {
     return (
-      <main className="loading">
+      <main className="nosAddLoading">
         Loading Add Property...
-        <Styles />
+        <PageStyles />
       </main>
     );
   }
 
   return (
-    <main className="page">
-      <header className="top">
-        <div>
+    <main className="nosAddPage">
+      <header className="nosAddHeader">
+        <div className="nosAddBrandArea">
           <a
             href="/host"
-            className="brand"
+            className="nosAddBrand"
           >
             NightOutStays
           </a>
 
-          <span className="badge">
+          <span className="nosAddBadge">
             HOST
           </span>
         </div>
 
         <a
           href="/host/properties"
-          className="back"
+          className="nosAddBack"
         >
           Back to My Properties
         </a>
       </header>
 
-      <section className="content">
-        <div className="pageTitle">
+      <div className="nosAddShell">
+        <section className="nosAddPageTitle">
           <div>
-            <p className="eyebrow">
+            <p className="nosAddEyebrow">
               HOST PROPERTY LISTING
             </p>
 
             <h1>Add Property</h1>
 
             <p>
-              Create your listing, save it as
-              Draft, or submit it for Admin
-              review.
+              Create your listing, save it as Draft,
+              or submit it for Admin review.
             </p>
           </div>
-        </div>
+
+          <div className="nosAddTopActions">
+            <button
+              type="button"
+              disabled={saving}
+              className="nosAddDraftButton"
+              onClick={() =>
+                saveProperty(false)
+              }
+            >
+              Save as Draft
+            </button>
+
+            <button
+              type="button"
+              disabled={saving}
+              className="nosAddSubmitButton"
+              onClick={() =>
+                saveProperty(true)
+              }
+            >
+              Submit for Review
+            </button>
+          </div>
+        </section>
 
         {error && (
-          <div className="alert error">
+          <div className="nosAddAlert nosAddError">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="alert success">
+          <div className="nosAddAlert nosAddSuccess">
             {success}
           </div>
         )}
 
-        <section className="card">
-          <h2>Basic Information</h2>
+        <div className="nosAddFormLayout">
+          <div className="nosAddMainColumn">
+            <Section title="Basic Information">
+              <div className="nosAddGrid2">
+                <Field
+                  label="PROPERTY NAME"
+                  name="name"
+                  value={form.name}
+                  onChange={updateField}
+                  placeholder="Example: Cozy 2BHK Bavdhan"
+                  full
+                />
 
-          <div className="grid">
-            <Field
-              label="PROPERTY NAME"
-              name="name"
-              value={form.name}
-              onChange={updateField}
-              placeholder="Example: Cozy 2BHK Bavdhan"
-              full
-            />
+                <SelectField
+                  label="PROPERTY TYPE"
+                  name="propertyType"
+                  value={form.propertyType}
+                  onChange={updateField}
+                  options={PROPERTY_TYPES}
+                />
 
-            <SelectField
-              label="PROPERTY TYPE"
-              name="propertyType"
-              value={form.propertyType}
-              onChange={updateField}
-              options={PROPERTY_TYPES}
-            />
+                <Field
+                  label="SHORT DESCRIPTION"
+                  name="shortDescription"
+                  value={form.shortDescription}
+                  onChange={updateField}
+                  placeholder="Short property highlight"
+                />
 
-            <Field
-              label="SHORT DESCRIPTION"
-              name="shortDescription"
-              value={form.shortDescription}
-              onChange={updateField}
-              placeholder="Short property highlight"
-            />
+                <TextArea
+                  label="FULL DESCRIPTION"
+                  name="description"
+                  value={form.description}
+                  onChange={updateField}
+                  placeholder="Describe the property, stay experience and nearby attractions."
+                  full
+                />
+              </div>
+            </Section>
 
-            <TextArea
-              label="FULL DESCRIPTION"
-              name="description"
-              value={form.description}
-              onChange={updateField}
-              placeholder="Describe the property, stay experience and nearby attractions."
-              full
-            />
-          </div>
-        </section>
+            <Section title="Location">
+              <div className="nosAddGrid2">
+                <Field
+                  label="CITY"
+                  name="city"
+                  value={form.city}
+                  onChange={updateField}
+                />
 
-        <section className="card">
-          <h2>Location</h2>
+                <Field
+                  label="AREA / LOCALITY"
+                  name="area"
+                  value={form.area}
+                  onChange={updateField}
+                  placeholder="Bavdhan"
+                />
 
-          <div className="grid">
-            <Field
-              label="CITY"
-              name="city"
-              value={form.city}
-              onChange={updateField}
-            />
+                <Field
+                  label="DISPLAY LOCATION"
+                  name="locationName"
+                  value={form.locationName}
+                  onChange={updateField}
+                  placeholder="Bavdhan, Pune"
+                />
 
-            <Field
-              label="AREA / LOCALITY"
-              name="area"
-              value={form.area}
-              onChange={updateField}
-              placeholder="Bavdhan"
-            />
+                <Field
+                  label="GOOGLE MAPS LINK"
+                  name="googleMapsUrl"
+                  value={form.googleMapsUrl}
+                  onChange={updateField}
+                  placeholder="Paste Maps link"
+                />
 
-            <Field
-              label="DISPLAY LOCATION"
-              name="locationName"
-              value={form.locationName}
-              onChange={updateField}
-              placeholder="Bavdhan, Pune"
-            />
+                <TextArea
+                  label="FULL ADDRESS"
+                  name="address"
+                  value={form.address}
+                  onChange={updateField}
+                  placeholder="Exact property address"
+                  full
+                />
 
-            <Field
-              label="GOOGLE MAPS LINK"
-              name="googleMapsUrl"
-              value={form.googleMapsUrl}
-              onChange={updateField}
-              placeholder="Paste Maps link"
-            />
+                <Field
+                  label="LATITUDE"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  value={form.latitude}
+                  onChange={updateField}
+                />
 
-            <TextArea
-              label="FULL ADDRESS"
-              name="address"
-              value={form.address}
-              onChange={updateField}
-              placeholder="Exact property address"
-              full
-            />
+                <Field
+                  label="LONGITUDE"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  value={form.longitude}
+                  onChange={updateField}
+                />
+              </div>
+            </Section>
 
-            <Field
-              label="LATITUDE"
-              name="latitude"
-              type="number"
-              step="any"
-              value={form.latitude}
-              onChange={updateField}
-            />
+            <Section title="Rooms and Guests">
+              <div className="nosAddGrid4">
+                <NumberField
+                  label="BEDROOMS"
+                  name="bedrooms"
+                  value={form.bedrooms}
+                  onChange={updateField}
+                />
 
-            <Field
-              label="LONGITUDE"
-              name="longitude"
-              type="number"
-              step="any"
-              value={form.longitude}
-              onChange={updateField}
-            />
-          </div>
-        </section>
+                <NumberField
+                  label="BATHROOMS"
+                  name="bathrooms"
+                  value={form.bathrooms}
+                  onChange={updateField}
+                />
 
-        <section className="card">
-          <h2>Rooms and Guests</h2>
+                <NumberField
+                  label="MIN GUESTS"
+                  name="minGuests"
+                  value={form.minGuests}
+                  onChange={updateField}
+                />
 
-          <div className="grid four">
-            <NumberField
-              label="BEDROOMS"
-              name="bedrooms"
-              value={form.bedrooms}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="INCLUDED GUESTS"
+                  name="includedGuests"
+                  value={form.includedGuests}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="BATHROOMS"
-              name="bathrooms"
-              value={form.bathrooms}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="MAX GUESTS"
+                  name="maxGuests"
+                  value={form.maxGuests}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="MIN GUESTS"
-              name="minGuests"
-              value={form.minGuests}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="QUEEN BEDS"
+                  name="queenBedCount"
+                  value={form.queenBedCount}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="INCLUDED GUESTS"
-              name="includedGuests"
-              value={form.includedGuests}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="SINGLE BEDS"
+                  name="singleBedCount"
+                  value={form.singleBedCount}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="MAX GUESTS"
-              name="maxGuests"
-              value={form.maxGuests}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="SOFA CUM BEDS"
+                  name="sofaCumBedCount"
+                  value={form.sofaCumBedCount}
+                  onChange={updateField}
+                />
+              </div>
+            </Section>
 
-            <NumberField
-              label="QUEEN BEDS"
-              name="queenBedCount"
-              value={form.queenBedCount}
-              onChange={updateField}
-            />
+            <Section title="Pricing">
+              <div className="nosAddGrid4">
+                <NumberField
+                  label="BASE NIGHTLY RATE ₹"
+                  name="basePrice"
+                  value={form.basePrice}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="SINGLE BEDS"
-              name="singleBedCount"
-              value={form.singleBedCount}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="EXTRA GUEST FEE ₹"
+                  name="extraGuestFee"
+                  value={form.extraGuestFee}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="SOFA CUM BEDS"
-              name="sofaCumBedCount"
-              value={form.sofaCumBedCount}
-              onChange={updateField}
-            />
-          </div>
-        </section>
+                <NumberField
+                  label="CLEANING FEE ₹"
+                  name="cleaningFee"
+                  value={form.cleaningFee}
+                  onChange={updateField}
+                />
 
-        <section className="card">
-          <h2>Pricing</h2>
+                <NumberField
+                  label="SECURITY DEPOSIT ₹"
+                  name="securityDeposit"
+                  value={form.securityDeposit}
+                  onChange={updateField}
+                />
 
-          <div className="grid four">
-            <NumberField
-              label="BASE NIGHTLY RATE ₹"
-              name="basePrice"
-              value={form.basePrice}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="MINIMUM NIGHTS"
+                  name="minStayNights"
+                  value={form.minStayNights}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="EXTRA GUEST FEE ₹"
-              name="extraGuestFee"
-              value={form.extraGuestFee}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="MAXIMUM NIGHTS"
+                  name="maxStayNights"
+                  value={form.maxStayNights}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="CLEANING FEE ₹"
-              name="cleaningFee"
-              value={form.cleaningFee}
-              onChange={updateField}
-            />
+                <NumberField
+                  label="LATE CHECKOUT / HOUR ₹"
+                  name="lateCheckoutHourlyFee"
+                  value={form.lateCheckoutHourlyFee}
+                  onChange={updateField}
+                />
+              </div>
+            </Section>
 
-            <NumberField
-              label="SECURITY DEPOSIT ₹"
-              name="securityDeposit"
-              value={form.securityDeposit}
-              onChange={updateField}
-            />
+            <Section title="Check-in and House Rules">
+              <div className="nosAddGrid2">
+                <Field
+                  label="CHECK-IN TIME"
+                  name="checkInTime"
+                  type="time"
+                  value={form.checkInTime}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="MINIMUM NIGHTS"
-              name="minStayNights"
-              value={form.minStayNights}
-              onChange={updateField}
-            />
+                <Field
+                  label="CHECK-OUT TIME"
+                  name="checkOutTime"
+                  type="time"
+                  value={form.checkOutTime}
+                  onChange={updateField}
+                />
+              </div>
 
-            <NumberField
-              label="MAXIMUM NIGHTS"
-              name="maxStayNights"
-              value={form.maxStayNights}
-              onChange={updateField}
-            />
+              <div className="nosAddChecks">
+                <Check
+                  label="Pets Allowed"
+                  name="petsAllowed"
+                  checked={form.petsAllowed}
+                  onChange={updateField}
+                />
 
-            <NumberField
-              label="LATE CHECKOUT / HOUR ₹"
-              name="lateCheckoutHourlyFee"
-              value={form.lateCheckoutHourlyFee}
-              onChange={updateField}
-            />
-          </div>
-        </section>
+                <Check
+                  label="Parties Allowed"
+                  name="partiesAllowed"
+                  checked={form.partiesAllowed}
+                  onChange={updateField}
+                />
 
-        <section className="card">
-          <h2>Check-in and House Rules</h2>
+                <Check
+                  label="Couples Allowed"
+                  name="couplesAllowed"
+                  checked={form.couplesAllowed}
+                  onChange={updateField}
+                />
 
-          <div className="grid">
-            <Field
-              label="CHECK-IN TIME"
-              name="checkInTime"
-              type="time"
-              value={form.checkInTime}
-              onChange={updateField}
-            />
+                <Check
+                  label="Alcohol Allowed"
+                  name="alcoholAllowed"
+                  checked={form.alcoholAllowed}
+                  onChange={updateField}
+                />
 
-            <Field
-              label="CHECK-OUT TIME"
-              name="checkOutTime"
-              type="time"
-              value={form.checkOutTime}
-              onChange={updateField}
-            />
-          </div>
+                <Check
+                  label="Smoking Allowed"
+                  name="smokingAllowed"
+                  checked={form.smokingAllowed}
+                  onChange={updateField}
+                />
 
-          <div className="checks">
-            <Check
-              label="Pets Allowed"
-              name="petsAllowed"
-              checked={form.petsAllowed}
-              onChange={updateField}
-            />
+                <Check
+                  label="Quiet Hours Enabled"
+                  name="quietHoursEnabled"
+                  checked={form.quietHoursEnabled}
+                  onChange={updateField}
+                />
+              </div>
 
-            <Check
-              label="Parties Allowed"
-              name="partiesAllowed"
-              checked={form.partiesAllowed}
-              onChange={updateField}
-            />
+              {form.quietHoursEnabled && (
+                <div className="nosAddGrid2">
+                  <Field
+                    label="QUIET HOURS START"
+                    name="quietHoursStart"
+                    type="time"
+                    value={form.quietHoursStart}
+                    onChange={updateField}
+                  />
 
-            <Check
-              label="Couples Allowed"
-              name="couplesAllowed"
-              checked={form.couplesAllowed}
-              onChange={updateField}
-            />
-
-            <Check
-              label="Alcohol Allowed"
-              name="alcoholAllowed"
-              checked={form.alcoholAllowed}
-              onChange={updateField}
-            />
-
-            <Check
-              label="Smoking Allowed"
-              name="smokingAllowed"
-              checked={form.smokingAllowed}
-              onChange={updateField}
-            />
-
-            <Check
-              label="Quiet Hours Enabled"
-              name="quietHoursEnabled"
-              checked={form.quietHoursEnabled}
-              onChange={updateField}
-            />
-          </div>
-
-          {form.quietHoursEnabled && (
-            <div className="grid">
-              <Field
-                label="QUIET HOURS START"
-                name="quietHoursStart"
-                type="time"
-                value={form.quietHoursStart}
-                onChange={updateField}
-              />
-
-              <Field
-                label="QUIET HOURS END"
-                name="quietHoursEnd"
-                type="time"
-                value={form.quietHoursEnd}
-                onChange={updateField}
-              />
-            </div>
-          )}
-
-          <TextArea
-            label="HOUSE RULES"
-            name="houseRulesText"
-            value={form.houseRulesText}
-            onChange={updateField}
-            placeholder={
-              'Enter one rule per line\nNo loud music after 10 PM\nGovernment ID required'
-            }
-            full
-          />
-        </section>
-
-        <section className="card">
-          <h2>Amenities</h2>
-
-          <div className="amenities">
-            {AMENITIES.map((item) => (
-              <button
-                type="button"
-                key={item}
-                onClick={() =>
-                  toggleAmenity(item)
-                }
-                className={
-                  amenities.includes(item)
-                    ? 'amenity active'
-                    : 'amenity'
-                }
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-
-          <div className="checks">
-            <Check
-              label="Wi-Fi Available"
-              name="wifiAvailable"
-              checked={form.wifiAvailable}
-              onChange={updateField}
-            />
-
-            <Check
-              label="TV Available"
-              name="tvAvailable"
-              checked={form.tvAvailable}
-              onChange={updateField}
-            />
-
-            <Check
-              label="Fridge Available"
-              name="fridgeAvailable"
-              checked={form.fridgeAvailable}
-              onChange={updateField}
-            />
-
-            <Check
-              label="Washing Machine"
-              name="washingMachineAvailable"
-              checked={
-                form.washingMachineAvailable
-              }
-              onChange={updateField}
-            />
-
-            <Check
-              label="AC Available"
-              name="acAvailable"
-              checked={form.acAvailable}
-              onChange={updateField}
-            />
-          </div>
-
-          <div className="grid four">
-            <NumberField
-              label="AC COUNT"
-              name="acCount"
-              value={form.acCount}
-              onChange={updateField}
-            />
-
-            <NumberField
-              label="WATER HEATERS"
-              name="waterHeaterCount"
-              value={form.waterHeaterCount}
-              onChange={updateField}
-            />
-          </div>
-
-          <TextArea
-            label="OTHER FEATURES"
-            name="featuresText"
-            value={form.featuresText}
-            onChange={updateField}
-            placeholder="One feature per line"
-            full
-          />
-
-          <TextArea
-            label="KITCHEN FEATURES"
-            name="kitchenFeaturesText"
-            value={form.kitchenFeaturesText}
-            onChange={updateField}
-            placeholder="One item per line"
-            full
-          />
-        </section>
-
-        <section className="card">
-          <h2>Directions</h2>
-
-          <TextArea
-            label="DIRECTION / CHECK-IN INSTRUCTIONS"
-            name="directionInstructions"
-            value={form.directionInstructions}
-            onChange={updateField}
-            placeholder="Landmark, entry gate, parking instructions etc."
-            full
-          />
-        </section>
-
-        <section className="card">
-          <h2>Photos</h2>
-
-          <p className="helper">
-            First photo will automatically become the cover photo.
-          </p>
-
-          <label className="uploadBox">
-            Select Property Photos
-
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoSelection}
-            />
-          </label>
-
-          {photoPreviews.length > 0 && (
-            <div className="photoGrid">
-              {photoPreviews.map(
-                (item, index) => (
-                  <div
-                    className="photoItem"
-                    key={`${item.file.name}-${index}`}
-                  >
-                    <img
-                      src={item.url}
-                      alt=""
-                    />
-
-                    {index === 0 && (
-                      <span className="cover">
-                        COVER
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeSelectedPhoto(
-                          index
-                        )
-                      }
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )
+                  <Field
+                    label="QUIET HOURS END"
+                    name="quietHoursEnd"
+                    type="time"
+                    value={form.quietHoursEnd}
+                    onChange={updateField}
+                  />
+                </div>
               )}
-            </div>
-          )}
-        </section>
 
-        <section className="card">
-          <h2>Dynamic Pricing</h2>
-
-          <Check
-            label="Enable automatic pricing markups"
-            name="dynamicPricingEnabled"
-            checked={
-              form.dynamicPricingEnabled
-            }
-            onChange={updateField}
-          />
-
-          {form.dynamicPricingEnabled && (
-            <div className="grid four">
-              <NumberField
-                label="WEEKEND MARKUP %"
-                name="weekendMarkupPercent"
-                value={
-                  form.weekendMarkupPercent
+              <TextArea
+                label="HOUSE RULES"
+                name="houseRulesText"
+                value={form.houseRulesText}
+                onChange={updateField}
+                placeholder={
+                  'Enter one rule per line\nNo loud music after 10 PM\nGovernment ID required'
                 }
+                full
+              />
+            </Section>
+
+            <Section title="Amenities">
+              <div className="nosAddAmenities">
+                {AMENITIES.map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    onClick={() =>
+                      toggleAmenity(item)
+                    }
+                    className={
+                      amenities.includes(item)
+                        ? 'nosAddAmenity active'
+                        : 'nosAddAmenity'
+                    }
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              <div className="nosAddChecks">
+                <Check
+                  label="Wi-Fi Available"
+                  name="wifiAvailable"
+                  checked={form.wifiAvailable}
+                  onChange={updateField}
+                />
+
+                <Check
+                  label="TV Available"
+                  name="tvAvailable"
+                  checked={form.tvAvailable}
+                  onChange={updateField}
+                />
+
+                <Check
+                  label="Fridge Available"
+                  name="fridgeAvailable"
+                  checked={form.fridgeAvailable}
+                  onChange={updateField}
+                />
+
+                <Check
+                  label="Washing Machine"
+                  name="washingMachineAvailable"
+                  checked={
+                    form.washingMachineAvailable
+                  }
+                  onChange={updateField}
+                />
+
+                <Check
+                  label="AC Available"
+                  name="acAvailable"
+                  checked={form.acAvailable}
+                  onChange={updateField}
+                />
+              </div>
+
+              <div className="nosAddGrid4">
+                <NumberField
+                  label="AC COUNT"
+                  name="acCount"
+                  value={form.acCount}
+                  onChange={updateField}
+                />
+
+                <NumberField
+                  label="WATER HEATERS"
+                  name="waterHeaterCount"
+                  value={form.waterHeaterCount}
+                  onChange={updateField}
+                />
+              </div>
+
+              <div className="nosAddGrid2">
+                <TextArea
+                  label="OTHER FEATURES"
+                  name="featuresText"
+                  value={form.featuresText}
+                  onChange={updateField}
+                  placeholder="One feature per line"
+                />
+
+                <TextArea
+                  label="KITCHEN FEATURES"
+                  name="kitchenFeaturesText"
+                  value={form.kitchenFeaturesText}
+                  onChange={updateField}
+                  placeholder="One item per line"
+                />
+              </div>
+            </Section>
+
+            <Section title="Directions">
+              <TextArea
+                label="DIRECTION / CHECK-IN INSTRUCTIONS"
+                name="directionInstructions"
+                value={form.directionInstructions}
+                onChange={updateField}
+                placeholder="Landmark, entry gate, parking instructions etc."
+                full
+              />
+            </Section>
+
+            <Section title="Photos">
+              <p className="nosAddHelper">
+                First photo will automatically become the cover photo.
+              </p>
+
+              <label className="nosAddUploadBox">
+                <span>Select Property Photos</span>
+                <small>
+                  Choose multiple JPG, PNG or WEBP images
+                </small>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePhotoSelection}
+                />
+              </label>
+
+              {photoPreviews.length > 0 && (
+                <div className="nosAddPhotoGrid">
+                  {photoPreviews.map(
+                    (item, index) => (
+                      <div
+                        className="nosAddPhotoItem"
+                        key={`${item.file.name}-${index}`}
+                      >
+                        <img
+                          src={item.url}
+                          alt=""
+                        />
+
+                        {index === 0 && (
+                          <span className="nosAddCover">
+                            COVER
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeSelectedPhoto(index)
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </Section>
+          </div>
+
+          <aside className="nosAddSideColumn">
+            <section className="nosAddSideCard">
+              <h2>Dynamic Pricing</h2>
+
+              <Check
+                label="Enable automatic pricing markups"
+                name="dynamicPricingEnabled"
+                checked={form.dynamicPricingEnabled}
                 onChange={updateField}
               />
 
-              <NumberField
-                label="LONG WEEKEND %"
-                name="longWeekendMarkupPercent"
-                value={
-                  form.longWeekendMarkupPercent
-                }
-                onChange={updateField}
-              />
+              {form.dynamicPricingEnabled && (
+                <div className="nosAddGrid2">
+                  <NumberField
+                    label="WEEKEND MARKUP %"
+                    name="weekendMarkupPercent"
+                    value={
+                      form.weekendMarkupPercent
+                    }
+                    onChange={updateField}
+                  />
 
-              <NumberField
-                label="FESTIVAL %"
-                name="festivalMarkupPercent"
-                value={
-                  form.festivalMarkupPercent
-                }
-                onChange={updateField}
-              />
+                  <NumberField
+                    label="LONG WEEKEND %"
+                    name="longWeekendMarkupPercent"
+                    value={
+                      form.longWeekendMarkupPercent
+                    }
+                    onChange={updateField}
+                  />
 
-              <NumberField
-                label="SEASON %"
-                name="seasonMarkupPercent"
-                value={
-                  form.seasonMarkupPercent
-                }
-                onChange={updateField}
-              />
-            </div>
-          )}
-        </section>
+                  <NumberField
+                    label="FESTIVAL %"
+                    name="festivalMarkupPercent"
+                    value={
+                      form.festivalMarkupPercent
+                    }
+                    onChange={updateField}
+                  />
 
-        <section className="reviewBox">
-          <strong>
-            Property Review
-          </strong>
+                  <NumberField
+                    label="SEASON %"
+                    name="seasonMarkupPercent"
+                    value={
+                      form.seasonMarkupPercent
+                    }
+                    onChange={updateField}
+                  />
+                </div>
+              )}
+            </section>
 
-          <p>
-            Saving as Draft keeps the listing private.
-            Submit for Review when the listing is complete.
-            The Super Admin can approve it, decline it, or
-            request changes before it goes live.
-          </p>
-        </section>
+            <section className="nosAddReviewCard">
+              <h2>Property Review</h2>
 
-        <div className="actions">
+              <p>
+                Save as Draft while preparing the listing.
+                Submit for Review only when everything is complete.
+              </p>
+
+              <div className="nosAddReviewSteps">
+                <span>1. Host creates listing</span>
+                <span>2. Submit for review</span>
+                <span>3. Admin checks listing</span>
+                <span>4. Approve or request changes</span>
+                <span>5. Approved property goes live</span>
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <div className="nosAddBottomActions">
+          <a
+            href="/host/properties"
+            className="nosAddCancel"
+          >
+            Cancel
+          </a>
+
           <button
             type="button"
-            className="secondary"
             disabled={saving}
+            className="nosAddDraftButton"
             onClick={() =>
               saveProperty(false)
             }
@@ -1340,8 +1294,8 @@ export default function AddPropertyPage() {
 
           <button
             type="button"
-            className="primary"
             disabled={saving}
+            className="nosAddSubmitButton"
             onClick={() =>
               saveProperty(true)
             }
@@ -1351,10 +1305,19 @@ export default function AddPropertyPage() {
               : 'Submit for Review'}
           </button>
         </div>
-      </section>
+      </div>
 
-      <Styles />
+      <PageStyles />
     </main>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <section className="nosAddCard">
+      <h2>{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -1366,11 +1329,12 @@ function Field({
   return (
     <label
       className={
-        full ? 'field full' : 'field'
+        full
+          ? 'nosAddField nosAddFull'
+          : 'nosAddField'
       }
     >
       <span>{label}</span>
-
       <input {...props} />
     </label>
   );
@@ -1392,7 +1356,7 @@ function SelectField({
   ...props
 }) {
   return (
-    <label className="field">
+    <label className="nosAddField">
       <span>{label}</span>
 
       <select {...props}>
@@ -1417,14 +1381,16 @@ function TextArea({
   return (
     <label
       className={
-        full ? 'field full' : 'field'
+        full
+          ? 'nosAddField nosAddFull'
+          : 'nosAddField'
       }
     >
       <span>{label}</span>
 
       <textarea
         {...props}
-        rows="4"
+        rows="5"
       />
     </label>
   );
@@ -1435,7 +1401,7 @@ function Check({
   ...props
 }) {
   return (
-    <label className="check">
+    <label className="nosAddCheck">
       <input
         type="checkbox"
         {...props}
@@ -1446,7 +1412,7 @@ function Check({
   );
 }
 
-function Styles() {
+function PageStyles() {
   return (
     <style jsx global>{`
       * {
@@ -1457,54 +1423,59 @@ function Styles() {
         margin: 0;
       }
 
-      .page,
-      .loading {
+      .nosAddPage,
+      .nosAddLoading {
         min-height: 100vh;
+        width: 100%;
         background: #f6f7f9;
         color: #111827;
         font-family: Arial, sans-serif;
       }
 
-      .loading {
+      .nosAddLoading {
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
       }
 
-      .top {
+      .nosAddHeader {
+        width: 100%;
         min-height: 72px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 32px;
-        background: white;
+        padding: 0 40px;
+        background: #ffffff;
         border-bottom: 1px solid #e5e7eb;
+        position: sticky;
+        top: 0;
+        z-index: 100;
       }
 
-      .top > div {
+      .nosAddBrandArea {
         display: flex;
         align-items: center;
         gap: 12px;
       }
 
-      .brand {
+      .nosAddBrand {
         color: #0b4b8c;
         font-size: 25px;
         font-weight: 900;
         text-decoration: none;
       }
 
-      .badge {
+      .nosAddBadge {
         background: #111827;
-        color: white;
+        color: #ffffff;
         border-radius: 999px;
         padding: 7px 11px;
         font-size: 10px;
         font-weight: 900;
       }
 
-      .back {
+      .nosAddBack {
         color: #374151;
         border: 1px solid #d1d5db;
         padding: 10px 14px;
@@ -1514,18 +1485,21 @@ function Styles() {
         font-weight: 800;
       }
 
-      .content {
-        width: 100%;
-        max-width: 1200px;
-        margin: auto;
-        padding: 32px;
+      .nosAddShell {
+        width: min(1500px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 32px 0 50px;
       }
 
-      .pageTitle {
+      .nosAddPageTitle {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
         margin-bottom: 24px;
       }
 
-      .eyebrow {
+      .nosAddEyebrow {
         margin: 0 0 7px;
         color: #6b7280;
         font-size: 11px;
@@ -1533,294 +1507,468 @@ function Styles() {
         letter-spacing: 1px;
       }
 
-      h1 {
+      .nosAddPageTitle h1 {
         margin: 0;
         font-size: 34px;
       }
 
-      .pageTitle p:last-child {
+      .nosAddPageTitle p:last-child {
+        margin: 8px 0 0;
         color: #6b7280;
+        font-size: 14px;
       }
 
-      .card {
-        background: white;
+      .nosAddTopActions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .nosAddFormLayout {
+        display: grid;
+        grid-template-columns:
+          minmax(0, 1fr) 340px;
+        gap: 22px;
+        align-items: start;
+      }
+
+      .nosAddMainColumn {
+        min-width: 0;
+      }
+
+      .nosAddSideColumn {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        position: sticky;
+        top: 94px;
+      }
+
+      .nosAddCard,
+      .nosAddSideCard,
+      .nosAddReviewCard {
+        width: 100%;
+        background: #ffffff;
         border: 1px solid #e5e7eb;
         border-radius: 14px;
         padding: 24px;
         margin-bottom: 18px;
       }
 
-      .card h2 {
+      .nosAddSideCard,
+      .nosAddReviewCard {
+        margin-bottom: 0;
+      }
+
+      .nosAddCard h2,
+      .nosAddSideCard h2,
+      .nosAddReviewCard h2 {
         margin: 0 0 20px;
         font-size: 19px;
       }
 
-      .grid {
+      .nosAddGrid2 {
         display: grid;
         grid-template-columns:
           repeat(2, minmax(0, 1fr));
         gap: 16px;
       }
 
-      .grid.four {
+      .nosAddGrid4 {
+        display: grid;
         grid-template-columns:
           repeat(4, minmax(0, 1fr));
+        gap: 16px;
       }
 
-      .field {
+      .nosAddField {
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 7px;
-        margin-bottom: 16px;
       }
 
-      .field.full {
+      .nosAddFull {
         grid-column: 1 / -1;
       }
 
-      .field span {
+      .nosAddField span {
+        min-height: 14px;
         color: #374151;
         font-size: 11px;
         font-weight: 900;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.35px;
+        line-height: 1.3;
       }
 
-      .field input,
-      .field select,
-      .field textarea {
+      .nosAddField input,
+      .nosAddField select,
+      .nosAddField textarea {
         width: 100%;
+        min-width: 0;
         border: 1px solid #d1d5db;
         border-radius: 9px;
-        background: white;
-        padding: 12px;
+        background: #ffffff;
+        color: #111827;
+        padding: 12px 13px;
         font-size: 14px;
+        font-family: inherit;
         outline: none;
       }
 
-      .field input:focus,
-      .field select:focus,
-      .field textarea:focus {
+      .nosAddField input,
+      .nosAddField select {
+        height: 45px;
+      }
+
+      .nosAddField textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      .nosAddField input:focus,
+      .nosAddField select:focus,
+      .nosAddField textarea:focus {
         border-color: #111827;
+        box-shadow:
+          0 0 0 2px
+          rgba(17, 24, 39, 0.06);
       }
 
-      .checks {
-        display: flex;
-        flex-wrap: wrap;
+      .nosAddChecks {
+        display: grid;
+        grid-template-columns:
+          repeat(3, minmax(0, 1fr));
         gap: 10px;
-        margin: 15px 0 22px;
+        margin: 18px 0 22px;
       }
 
-      .check {
-        display: inline-flex;
+      .nosAddCheck {
+        min-height: 44px;
+        display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 9px;
         border: 1px solid #e5e7eb;
         border-radius: 9px;
         padding: 10px 12px;
+        background: #ffffff;
         cursor: pointer;
         font-size: 13px;
         font-weight: 700;
       }
 
-      .amenities {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+      .nosAddCheck input {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+
+      .nosAddAmenities {
+        display: grid;
+        grid-template-columns:
+          repeat(4, minmax(0, 1fr));
+        gap: 10px;
         margin-bottom: 18px;
       }
 
-      .amenity {
+      .nosAddAmenity {
+        min-height: 42px;
         border: 1px solid #d1d5db;
-        border-radius: 999px;
-        background: white;
-        padding: 9px 13px;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #374151;
+        padding: 8px 10px;
         cursor: pointer;
         font-size: 12px;
         font-weight: 800;
       }
 
-      .amenity.active {
+      .nosAddAmenity.active {
         background: #111827;
-        color: white;
+        color: #ffffff;
         border-color: #111827;
       }
 
-      .helper {
+      .nosAddHelper {
+        margin: -6px 0 16px;
         color: #6b7280;
         font-size: 13px;
       }
 
-      .uploadBox {
-        min-height: 90px;
+      .nosAddUploadBox {
+        min-height: 120px;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 7px;
         border: 2px dashed #d1d5db;
         border-radius: 12px;
+        background: #fafafa;
         cursor: pointer;
-        font-weight: 800;
+        text-align: center;
       }
 
-      .uploadBox input {
+      .nosAddUploadBox span {
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .nosAddUploadBox small {
+        color: #6b7280;
+      }
+
+      .nosAddUploadBox input {
         display: none;
       }
 
-      .photoGrid {
+      .nosAddPhotoGrid {
         display: grid;
         grid-template-columns:
           repeat(4, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 16px;
+        gap: 14px;
+        margin-top: 18px;
       }
 
-      .photoItem {
+      .nosAddPhotoItem {
         position: relative;
-        border-radius: 10px;
         overflow: hidden;
         border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: white;
       }
 
-      .photoItem img {
+      .nosAddPhotoItem img {
         display: block;
         width: 100%;
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 16 / 10;
         object-fit: cover;
       }
 
-      .photoItem button {
+      .nosAddPhotoItem button {
         width: 100%;
-        min-height: 34px;
+        min-height: 38px;
         border: 0;
+        border-top: 1px solid #e5e7eb;
         background: #ffffff;
         cursor: pointer;
+        font-size: 12px;
         font-weight: 800;
       }
 
-      .cover {
+      .nosAddCover {
         position: absolute;
-        top: 7px;
-        left: 7px;
+        top: 8px;
+        left: 8px;
         background: #111827;
-        color: white;
+        color: #ffffff;
         padding: 5px 7px;
         border-radius: 5px;
         font-size: 9px;
         font-weight: 900;
       }
 
-      .reviewBox {
+      .nosAddReviewCard {
         background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        border-radius: 13px;
-        padding: 18px;
-        margin-bottom: 20px;
+        border-color: #bfdbfe;
       }
 
-      .reviewBox strong {
-        display: block;
-        margin-bottom: 7px;
-      }
-
-      .reviewBox p {
-        margin: 0;
+      .nosAddReviewCard p {
+        margin: 0 0 16px;
         color: #4b5563;
-        line-height: 1.6;
         font-size: 13px;
+        line-height: 1.6;
       }
 
-      .alert {
+      .nosAddReviewSteps {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .nosAddReviewSteps span {
+        display: block;
+        padding: 9px 10px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.7);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .nosAddAlert {
         border-radius: 10px;
         padding: 13px 15px;
         margin-bottom: 18px;
         font-weight: 700;
       }
 
-      .alert.error {
+      .nosAddError {
         background: #fef2f2;
         color: #b91c1c;
       }
 
-      .alert.success {
+      .nosAddSuccess {
         background: #ecfdf5;
         color: #047857;
       }
 
-      .actions {
+      .nosAddBottomActions {
         display: flex;
         justify-content: flex-end;
         gap: 10px;
-        padding-bottom: 30px;
+        padding-top: 6px;
       }
 
-      .actions button {
+      .nosAddCancel,
+      .nosAddDraftButton,
+      .nosAddSubmitButton {
         min-height: 46px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 9px;
-        padding: 0 20px;
+        padding: 0 19px;
         font-size: 13px;
         font-weight: 900;
+      }
+
+      .nosAddCancel {
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #374151;
+        text-decoration: none;
+      }
+
+      .nosAddDraftButton {
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #111827;
         cursor: pointer;
       }
 
-      .actions .secondary {
-        border: 1px solid #d1d5db;
-        background: white;
-        color: #111827;
-      }
-
-      .actions .primary {
+      .nosAddSubmitButton {
         border: 0;
         background: #111827;
-        color: white;
+        color: #ffffff;
+        cursor: pointer;
       }
 
-      .actions button:disabled {
+      .nosAddDraftButton:disabled,
+      .nosAddSubmitButton:disabled {
         opacity: 0.6;
         cursor: not-allowed;
       }
 
-      @media (max-width: 900px) {
-        .grid.four {
-          grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-        }
-
-        .photoGrid {
-          grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      @media (max-width: 650px) {
-        .top {
-          padding: 0 14px;
-        }
-
-        .brand {
-          font-size: 20px;
-        }
-
-        .content {
-          padding: 20px 12px;
-        }
-
-        .grid,
-        .grid.four {
+      @media (max-width: 1150px) {
+        .nosAddFormLayout {
           grid-template-columns: 1fr;
         }
 
-        .field.full {
-          grid-column: auto;
+        .nosAddSideColumn {
+          position: static;
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
         }
 
-        .photoGrid {
-          grid-template-columns: 1fr 1fr;
+        .nosAddGrid4 {
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
         }
 
-        .actions {
+        .nosAddAmenities {
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 800px) {
+        .nosAddHeader {
+          padding: 0 18px;
+        }
+
+        .nosAddShell {
+          width: min(100% - 24px, 1500px);
+          padding-top: 22px;
+        }
+
+        .nosAddPageTitle {
           flex-direction: column;
         }
 
-        .actions button {
+        .nosAddTopActions {
+          width: 100%;
+        }
+
+        .nosAddTopActions button {
+          flex: 1;
+        }
+
+        .nosAddGrid2,
+        .nosAddGrid4 {
+          grid-template-columns: 1fr;
+        }
+
+        .nosAddFull {
+          grid-column: auto;
+        }
+
+        .nosAddChecks {
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        }
+
+        .nosAddAmenities {
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        }
+
+        .nosAddPhotoGrid {
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        }
+
+        .nosAddSideColumn {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .nosAddHeader {
+          min-height: 64px;
+        }
+
+        .nosAddBrand {
+          font-size: 20px;
+        }
+
+        .nosAddBack {
+          font-size: 10px;
+          padding: 8px 9px;
+        }
+
+        .nosAddPageTitle h1 {
+          font-size: 28px;
+        }
+
+        .nosAddCard,
+        .nosAddSideCard,
+        .nosAddReviewCard {
+          padding: 18px;
+        }
+
+        .nosAddChecks,
+        .nosAddAmenities,
+        .nosAddPhotoGrid {
+          grid-template-columns: 1fr;
+        }
+
+        .nosAddBottomActions {
+          flex-direction: column;
+        }
+
+        .nosAddCancel,
+        .nosAddDraftButton,
+        .nosAddSubmitButton {
           width: 100%;
         }
       }
