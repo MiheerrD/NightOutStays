@@ -44,9 +44,10 @@ export default function AdminHostDetailsPage() {
   const [guests, setGuests] = useState([]);
 
   const [propertyFilter, setPropertyFilter] = useState('all');
-  const [bookingFilter, setBookingFilter] = useState('all');
-
   const [propertySearch, setPropertySearch] = useState('');
+
+  const [bookingPropertyId, setBookingPropertyId] = useState('all');
+  const [bookingFilter, setBookingFilter] = useState('all');
   const [bookingSearch, setBookingSearch] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -94,15 +95,14 @@ export default function AdminHostDetailsPage() {
         throw roleError;
       }
 
-      const allowed =
-        (roles || []).some(
-          (item) =>
-            (
-              item.role === 'super_admin' ||
-              item.role === 'admin'
-            ) &&
-            item.is_active === true
-        );
+      const allowed = (roles || []).some(
+        (item) =>
+          (
+            item.role === 'super_admin' ||
+            item.role === 'admin'
+          ) &&
+          item.is_active === true
+      );
 
       if (!allowed) {
         throw new Error(
@@ -301,6 +301,7 @@ export default function AdminHostDetailsPage() {
       setProperties(safeProperties);
       setBookings(bookingRows);
       setGuests(guestRows);
+
     } catch (err) {
       console.error(
         'Host Details error:',
@@ -309,8 +310,9 @@ export default function AdminHostDetailsPage() {
 
       setError(
         err?.message ||
-          'Unable to load Host.'
+        'Unable to load Host.'
       );
+
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -326,85 +328,110 @@ export default function AdminHostDetailsPage() {
         properties.filter(
           (property) =>
             property.is_active === true &&
-            property.moderation_status === 'approved'
+            property.moderation_status ===
+              'approved'
         ).length,
 
       pending:
         properties.filter(
           (property) =>
             property.moderation_status ===
-            'pending_review'
+              'pending_review'
         ).length,
 
       draft:
         properties.filter(
           (property) =>
-            property.moderation_status === 'draft'
+            property.moderation_status ===
+              'draft'
         ).length,
 
       changes:
         properties.filter(
           (property) =>
             property.moderation_status ===
-            'changes_requested'
+              'changes_requested'
         ).length,
 
       declined:
         properties.filter(
           (property) =>
             property.moderation_status ===
-            'declined'
+              'declined'
         ).length,
+
     }), [properties]);
+
+  const propertyScopedBookings =
+    useMemo(() => {
+      if (
+        bookingPropertyId ===
+        'all'
+      ) {
+        return bookings;
+      }
+
+      return bookings.filter(
+        (booking) =>
+          booking.property_id ===
+          bookingPropertyId
+      );
+    }, [
+      bookings,
+      bookingPropertyId,
+    ]);
 
   const bookingCounts =
     useMemo(() => ({
       all:
-        bookings.length,
+        propertyScopedBookings.length,
 
       requests:
-        bookings.filter(
+        propertyScopedBookings.filter(
           isBookingRequest
         ).length,
 
       paymentPending:
-        bookings.filter(
+        propertyScopedBookings.filter(
           isPaymentPending
         ).length,
 
       confirmed:
-        bookings.filter(
+        propertyScopedBookings.filter(
           isConfirmed
         ).length,
 
       cancelled:
-        bookings.filter(
+        propertyScopedBookings.filter(
           isCancelled
         ).length,
 
       discount:
-        bookings.filter(
+        propertyScopedBookings.filter(
           (booking) =>
-            booking.guest_discount_requested === true
+            booking.guest_discount_requested ===
+              true
         ).length,
 
       offers:
-        bookings.filter(
+        propertyScopedBookings.filter(
           (booking) =>
             Boolean(
               booking.offer_status ||
               booking.offer_note ||
               Number(
-                booking.host_discount_amount || 0
+                booking.host_discount_amount ||
+                  0
               ) > 0
             )
         ).length,
-    }), [bookings]);
+
+    }), [propertyScopedBookings]);
 
   const totalBookingValue =
     useMemo(
       () =>
-        bookings.reduce(
+        propertyScopedBookings.reduce(
           (total, booking) =>
             total +
             Number(
@@ -415,7 +442,7 @@ export default function AdminHostDetailsPage() {
             ),
           0
         ),
-      [bookings]
+      [propertyScopedBookings]
     );
 
   const filteredProperties =
@@ -434,7 +461,8 @@ export default function AdminHostDetailsPage() {
           ) {
             matchesFilter =
               property.is_active === true &&
-              property.moderation_status === 'approved';
+              property.moderation_status ===
+                'approved';
           } else if (
             propertyFilter !== 'all'
           ) {
@@ -468,6 +496,7 @@ export default function AdminHostDetailsPage() {
           );
         }
       );
+
     }, [
       properties,
       propertyFilter,
@@ -481,7 +510,7 @@ export default function AdminHostDetailsPage() {
           .trim()
           .toLowerCase();
 
-      return bookings.filter(
+      return propertyScopedBookings.filter(
         (booking) => {
           let matchesFilter = true;
 
@@ -587,22 +616,27 @@ export default function AdminHostDetailsPage() {
           );
         }
       );
+
     }, [
-      bookings,
+      propertyScopedBookings,
       bookingFilter,
       bookingSearch,
       properties,
       guests,
     ]);
 
-  function getProperty(propertyId) {
+  function getProperty(
+    propertyId
+  ) {
     return properties.find(
       (property) =>
         property.id === propertyId
     );
   }
 
-  function getGuest(guestId) {
+  function getGuest(
+    guestId
+  ) {
     return guests.find(
       (guest) =>
         guest.id === guestId
@@ -638,6 +672,7 @@ export default function AdminHostDetailsPage() {
       <>
         <main className="nosHostDetailPage">
           <div className="nosHostDetailLoading">
+
             <h2>
               Host not available
             </h2>
@@ -652,6 +687,7 @@ export default function AdminHostDetailsPage() {
             >
               ← Back to Hosts
             </Link>
+
           </div>
         </main>
 
@@ -665,9 +701,19 @@ export default function AdminHostDetailsPage() {
     host.full_name ||
     'Host';
 
+  const selectedBookingProperty =
+    bookingPropertyId === 'all'
+      ? null
+      : properties.find(
+          (property) =>
+            property.id ===
+            bookingPropertyId
+        );
+
   return (
     <>
       <main className="nosHostDetailPage">
+
         <div className="nosHostDetailContainer">
 
           <div className="nosHostTopActions">
@@ -759,7 +805,8 @@ export default function AdminHostDetailsPage() {
                     host.state,
                   ]
                     .filter(Boolean)
-                    .join(', ') || '—'
+                    .join(', ') ||
+                  '—'
                 }
               />
 
@@ -801,9 +848,11 @@ export default function AdminHostDetailsPage() {
 
               <InfoCard
                 label="Joined"
-                value={formatDate(
-                  host.created_at
-                )}
+                value={
+                  formatDate(
+                    host.created_at
+                  )
+                }
               />
 
             </div>
@@ -934,6 +983,7 @@ export default function AdminHostDetailsPage() {
             <div className="nosToolRow">
 
               <div>
+
                 <h3>
                   {propertyFilterHeading(
                     propertyFilter
@@ -941,11 +991,15 @@ export default function AdminHostDetailsPage() {
                 </h3>
 
                 <p>
-                  {filteredProperties.length}{' '}
-                  {filteredProperties.length === 1
+                  {
+                    filteredProperties.length
+                  }{' '}
+                  {filteredProperties.length ===
+                  1
                     ? 'property'
                     : 'properties'}
                 </p>
+
               </div>
 
               <input
@@ -963,7 +1017,8 @@ export default function AdminHostDetailsPage() {
             </div>
 
 
-            {filteredProperties.length === 0 ? (
+            {filteredProperties.length ===
+            0 ? (
               <div className="nosEmpty">
                 No properties found in this category.
               </div>
@@ -987,7 +1042,7 @@ export default function AdminHostDetailsPage() {
 
           <section className="nosBookingOperations">
 
-            <div className="nosSectionHeading bookingHeading">
+            <div className="nosSectionHeading">
 
               <span className="nosEyebrow">
                 HOST OPERATIONS
@@ -998,8 +1053,100 @@ export default function AdminHostDetailsPage() {
               </h2>
 
               <p>
-                Monitor booking requests, host approvals, payment status, discounts and special offers for all properties belonging to {displayName}.
+                View booking activity for all properties together or select one specific property.
               </p>
+
+            </div>
+
+
+            <div className="nosPropertyBookingSelector">
+
+              <div className="nosSelectorText">
+
+                <span className="nosEyebrow">
+                  PROPERTY-WISE BOOKING VIEW
+                </span>
+
+                <strong>
+                  Viewing Bookings For
+                </strong>
+
+                <p>
+                  Select one property to see only its bookings, requests, discounts and offers.
+                </p>
+
+              </div>
+
+
+              <div className="nosBookingPropertySelectWrap">
+
+                <select
+                  value={
+                    bookingPropertyId
+                  }
+                  onChange={(event) => {
+                    setBookingPropertyId(
+                      event.target.value
+                    );
+
+                    setBookingFilter(
+                      'all'
+                    );
+
+                    setBookingSearch(
+                      ''
+                    );
+                  }}
+                  className="nosBookingPropertySelect"
+                >
+                  <option value="all">
+                    All Properties
+                  </option>
+
+                  {properties.map(
+                    (property) => (
+                      <option
+                        key={
+                          property.id
+                        }
+                        value={
+                          property.id
+                        }
+                      >
+                        {property.name ||
+                          'Unnamed Property'}
+                        {property.area
+                          ? ` - ${property.area}`
+                          : ''}
+                      </option>
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+            </div>
+
+
+            <div className="nosSelectedPropertyLine">
+
+              <span>
+                Current View
+              </span>
+
+              <strong>
+                {selectedBookingProperty
+                  ? selectedBookingProperty.name
+                  : 'All Properties'}
+              </strong>
+
+              <small>
+                {
+                  propertyScopedBookings.length
+                }{' '}
+                booking records
+              </small>
 
             </div>
 
@@ -1012,7 +1159,8 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong>
-                  ₹{Number(
+                  ₹
+                  {Number(
                     totalBookingValue
                   ).toLocaleString(
                     'en-IN'
@@ -1036,9 +1184,7 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong>
-                  {
-                    bookingCounts.discount
-                  }
+                  {bookingCounts.discount}
                 </strong>
               </div>
 
@@ -1048,9 +1194,7 @@ export default function AdminHostDetailsPage() {
                 </span>
 
                 <strong className="green">
-                  {
-                    bookingCounts.confirmed
-                  }
+                  {bookingCounts.confirmed}
                 </strong>
               </div>
 
@@ -1061,7 +1205,9 @@ export default function AdminHostDetailsPage() {
 
               <BookingFilter
                 label="All Bookings"
-                value={bookingCounts.all}
+                value={
+                  bookingCounts.all
+                }
                 active={
                   bookingFilter ===
                   'all'
@@ -1175,6 +1321,7 @@ export default function AdminHostDetailsPage() {
             <div className="nosToolRow">
 
               <div>
+
                 <h3>
                   {bookingFilterHeading(
                     bookingFilter
@@ -1182,11 +1329,19 @@ export default function AdminHostDetailsPage() {
                 </h3>
 
                 <p>
-                  {filteredBookings.length}{' '}
-                  {filteredBookings.length === 1
+                  {selectedBookingProperty
+                    ? selectedBookingProperty.name
+                    : 'All Properties'}
+                  {' · '}
+                  {
+                    filteredBookings.length
+                  }{' '}
+                  {filteredBookings.length ===
+                  1
                     ? 'record'
                     : 'records'}
                 </p>
+
               </div>
 
               <input
@@ -1204,9 +1359,10 @@ export default function AdminHostDetailsPage() {
             </div>
 
 
-            {filteredBookings.length === 0 ? (
+            {filteredBookings.length ===
+            0 ? (
               <div className="nosEmpty">
-                No booking records found in this category.
+                No booking records found for this selection.
               </div>
             ) : (
               <div className="nosBookingsGrid">
@@ -1214,8 +1370,12 @@ export default function AdminHostDetailsPage() {
                 {filteredBookings.map(
                   (booking) => (
                     <BookingCard
-                      key={booking.id}
-                      booking={booking}
+                      key={
+                        booking.id
+                      }
+                      booking={
+                        booking
+                      }
                       property={
                         getProperty(
                           booking.property_id
@@ -1236,6 +1396,7 @@ export default function AdminHostDetailsPage() {
           </section>
 
         </div>
+
       </main>
 
       <Styles />
@@ -1256,12 +1417,15 @@ function BookingCard({
     0;
 
   const hasDiscount =
-    booking.guest_discount_requested === true ||
+    booking.guest_discount_requested ===
+      true ||
     Number(
-      booking.host_discount_amount || 0
+      booking.host_discount_amount ||
+        0
     ) > 0 ||
     Number(
-      booking.auto_discount_amount || 0
+      booking.auto_discount_amount ||
+        0
     ) > 0;
 
   return (
@@ -1288,6 +1452,7 @@ function BookingCard({
           </p>
 
         </div>
+
 
         <div className="nosBookingBadges">
 
@@ -1327,7 +1492,8 @@ function BookingCard({
             guest?.email,
           ]
             .filter(Boolean)
-            .join(' · ') || '—'}
+            .join(' · ') ||
+            '—'}
         </p>
 
       </div>
@@ -1365,7 +1531,8 @@ function BookingCard({
           </span>
 
           <strong>
-            {booking.nights ?? '—'}
+            {booking.nights ??
+              '—'}
           </strong>
         </div>
 
@@ -1375,7 +1542,8 @@ function BookingCard({
           </span>
 
           <strong>
-            {booking.guests_count ?? '—'}
+            {booking.guests_count ??
+              '—'}
           </strong>
         </div>
 
@@ -1425,7 +1593,8 @@ function BookingCard({
         </span>
 
         <strong>
-          ₹{Number(
+          ₹
+          {Number(
             payableAmount || 0
           ).toLocaleString(
             'en-IN'
@@ -1496,7 +1665,8 @@ function BookingCard({
           )}
 
           {Number(
-            booking.host_discount_amount || 0
+            booking.host_discount_amount ||
+              0
           ) > 0 && (
             <p>
               Host discount: ₹
@@ -1510,7 +1680,8 @@ function BookingCard({
 
           {booking.offer_note && (
             <p>
-              Offer note: {
+              Offer note:{' '}
+              {
                 booking.offer_note
               }
             </p>
@@ -1523,7 +1694,8 @@ function BookingCard({
       <div className="nosBookingCardFooter">
 
         <span>
-          Requested {
+          Requested{' '}
+          {
             formatDateTime(
               booking.created_at
             )
@@ -1580,6 +1752,7 @@ function PropertyCard({
 
         </div>
 
+
         <div className="nosPropertyBadges">
 
           <span
@@ -1602,6 +1775,7 @@ function PropertyCard({
 
 
       <div className="nosPropertyPrice">
+
         ₹
         {Number(
           property.base_price || 0
@@ -1612,6 +1786,7 @@ function PropertyCard({
         <span>
           / night
         </span>
+
       </div>
 
 
@@ -1674,6 +1849,7 @@ function PropertyCard({
 
       {property.moderation_notes && (
         <div className="nosPropertyNote">
+
           <strong>
             Moderation Note
           </strong>
@@ -1683,6 +1859,7 @@ function PropertyCard({
               property.moderation_notes
             }
           </p>
+
         </div>
       )}
 
@@ -1732,7 +1909,8 @@ function FinancialItem({
       </span>
 
       <strong>
-        {minus && amount > 0
+        {minus &&
+        amount > 0
           ? '- '
           : ''}
         ₹
@@ -1760,7 +1938,9 @@ function BookingFilter({
           ? 'nosBookingFilter active'
           : 'nosBookingFilter'
       }
-      onClick={onClick}
+      onClick={
+        onClick
+      }
     >
       <span>
         {label}
@@ -1788,7 +1968,9 @@ function FilterCard({
           ? 'nosHostFilterCard active'
           : 'nosHostFilterCard'
       }
-      onClick={onClick}
+      onClick={
+        onClick
+      }
     >
       <span>
         {label}
@@ -1853,7 +2035,8 @@ function HostStatus({
   status,
 }) {
   const value =
-    status || 'active';
+    status ||
+    'active';
 
   return (
     <span
@@ -1885,7 +2068,8 @@ function PaymentStatusBadge({
 }) {
   const clean =
     String(
-      value || 'pending'
+      value ||
+      'pending'
     ).toLowerCase();
 
   return (
@@ -1894,8 +2078,8 @@ function PaymentStatusBadge({
         clean === 'paid'
           ? 'paid'
           : clean === 'failed'
-            ? 'failed'
-            : 'pending'
+          ? 'failed'
+          : 'pending'
       }`}
     >
       {prettyStatus(
@@ -1912,20 +2096,25 @@ function isBookingRequest(
   const status =
     String(
       booking.booking_status ||
-        ''
+      ''
     ).toLowerCase();
 
   const decision =
     String(
       booking.host_decision ||
-        ''
+      ''
     ).toLowerCase();
 
   return (
-    status.includes('request') ||
-    status.includes('pending') ||
+    status.includes(
+      'request'
+    ) ||
+    status.includes(
+      'pending'
+    ) ||
     !decision ||
-    decision === 'pending'
+    decision ===
+      'pending'
   );
 }
 
@@ -1936,13 +2125,13 @@ function isPaymentPending(
   const decision =
     String(
       booking.host_decision ||
-        ''
+      ''
     ).toLowerCase();
 
   const payment =
     String(
       booking.payment_status ||
-        ''
+      ''
     ).toLowerCase();
 
   return (
@@ -1953,7 +2142,8 @@ function isPaymentPending(
     ].includes(
       decision
     ) &&
-    payment !== 'paid'
+    payment !==
+      'paid'
   );
 }
 
@@ -1964,17 +2154,18 @@ function isConfirmed(
   const bookingStatus =
     String(
       booking.booking_status ||
-        ''
+      ''
     ).toLowerCase();
 
   const payment =
     String(
       booking.payment_status ||
-        ''
+      ''
     ).toLowerCase();
 
   return (
-    payment === 'paid' ||
+    payment ===
+      'paid' ||
     bookingStatus.includes(
       'confirm'
     ) ||
@@ -1997,21 +2188,36 @@ function isCancelled(
     .toLowerCase();
 
   return (
-    values.includes('cancel') ||
-    values.includes('declin') ||
-    values.includes('reject') ||
-    values.includes('expired')
+    values.includes(
+      'cancel'
+    ) ||
+    values.includes(
+      'declin'
+    ) ||
+    values.includes(
+      'reject'
+    ) ||
+    values.includes(
+      'expired'
+    )
   );
 }
 
 
-function prettyStatus(value) {
+function prettyStatus(
+  value
+) {
   if (!value) {
     return '—';
   }
 
-  return String(value)
-    .replaceAll('_', ' ')
+  return String(
+    value
+  )
+    .replaceAll(
+      '_',
+      ' '
+    )
     .replace(
       /\b\w/g,
       (letter) =>
@@ -2026,7 +2232,8 @@ function propertyFilterHeading(
   return (
     PROPERTY_FILTERS.find(
       (item) =>
-        item.key === value
+        item.key ===
+        value
     )?.label ||
     'Properties'
   );
@@ -2039,14 +2246,17 @@ function bookingFilterHeading(
   return (
     BOOKING_FILTERS.find(
       (item) =>
-        item.key === value
+        item.key ===
+        value
     )?.label ||
     'Bookings'
   );
 }
 
 
-function shortId(value) {
+function shortId(
+  value
+) {
   if (!value) {
     return 'Booking';
   }
@@ -2057,7 +2267,9 @@ function shortId(value) {
 }
 
 
-function formatDate(value) {
+function formatDate(
+  value
+) {
   if (!value) {
     return '—';
   }
@@ -2068,9 +2280,12 @@ function formatDate(value) {
     ).toLocaleDateString(
       'en-IN',
       {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+        day:
+          '2-digit',
+        month:
+          'short',
+        year:
+          'numeric',
       }
     );
   } catch {
@@ -2079,7 +2294,9 @@ function formatDate(value) {
 }
 
 
-function formatDateTime(value) {
+function formatDateTime(
+  value
+) {
   if (!value) {
     return '—';
   }
@@ -2090,11 +2307,16 @@ function formatDateTime(value) {
     ).toLocaleString(
       'en-IN',
       {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+        day:
+          '2-digit',
+        month:
+          'short',
+        year:
+          'numeric',
+        hour:
+          '2-digit',
+        minute:
+          '2-digit',
       }
     );
   } catch {
@@ -2377,6 +2599,83 @@ function Styles() {
         display: block;
         margin-top: 8px;
         font-size: 23px;
+      }
+
+      .nosPropertyBookingSelector {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 18px 20px;
+        margin-bottom: 12px;
+        border: 1px solid #cfdbe7;
+        border-radius: 14px;
+        background: #ffffff;
+      }
+
+      .nosSelectorText {
+        flex: 1;
+      }
+
+      .nosSelectorText strong {
+        display: block;
+        color: #071d38;
+        font-size: 16px;
+      }
+
+      .nosSelectorText p {
+        margin: 4px 0 0;
+        color: #667085;
+        font-size: 10px;
+      }
+
+      .nosBookingPropertySelectWrap {
+        width: min(430px, 100%);
+      }
+
+      .nosBookingPropertySelect {
+        width: 100%;
+        min-height: 46px;
+        padding: 0 14px;
+        border: 1px solid #bcc9d7;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #102a44;
+        font-size: 12px;
+        font-weight: 800;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .nosBookingPropertySelect:focus {
+        border-color: #07569f;
+      }
+
+      .nosSelectedPropertyLine {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 18px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        background: #eaf2fb;
+      }
+
+      .nosSelectedPropertyLine span {
+        color: #68778c;
+        font-size: 9px;
+        font-weight: 900;
+      }
+
+      .nosSelectedPropertyLine strong {
+        color: #07569f;
+        font-size: 11px;
+      }
+
+      .nosSelectedPropertyLine small {
+        margin-left: auto;
+        color: #667085;
+        font-size: 9px;
       }
 
       .nosBookingSummaryTop {
@@ -2671,6 +2970,7 @@ function Styles() {
       }
 
       @media (max-width: 1100px) {
+
         .nosHostInformationGrid,
         .nosBookingSummaryTop {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2688,18 +2988,22 @@ function Styles() {
         .nosBookingsGrid {
           grid-template-columns: 1fr;
         }
+
       }
 
       @media (max-width: 700px) {
+
         .nosHostDetailContainer {
           width: calc(100% - 24px);
         }
 
-        .nosToolRow {
+        .nosToolRow,
+        .nosPropertyBookingSelector {
           flex-direction: column;
           align-items: stretch;
         }
 
+        .nosBookingPropertySelectWrap,
         .nosSearch {
           width: 100%;
         }
@@ -2714,9 +3018,11 @@ function Styles() {
         .nosBookingDecisionGrid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
       }
 
       @media (max-width: 480px) {
+
         .nosHostInformationGrid,
         .nosBookingSummaryTop {
           grid-template-columns: 1fr;
@@ -2733,6 +3039,16 @@ function Styles() {
           flex-direction: column;
           align-items: stretch;
         }
+
+        .nosSelectedPropertyLine {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .nosSelectedPropertyLine small {
+          margin-left: 0;
+        }
+
       }
 
     `}</style>
