@@ -1,9 +1,15 @@
 import AdminNav from './AdminNav';
 
-export default function AdminLayout({ children }) {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default function AdminLayout({
+  children,
+}) {
   return (
     <>
       <AdminNav />
+
       {children}
     </>
   );
