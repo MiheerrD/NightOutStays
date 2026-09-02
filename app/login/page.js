@@ -8,20 +8,25 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-export default function GuestLoginPage() {
+export default function LoginPage() {
   const [mode, setMode] = useState('login');
-  const [redirectTo, setRedirectTo] = useState('/account/bookings');
+  const [redirectTo, setRedirectTo] =
+    useState('/account/bookings');
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] =
+    useState('');
 
   const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [checkingSession, setCheckingSession] =
+    useState(true);
 
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] =
+    useState('');
+  const [successMessage, setSuccessMessage] =
+    useState('');
 
   useEffect(() => {
     initialisePage();
@@ -32,15 +37,21 @@ export default function GuestLoginPage() {
       let destination = '/account/bookings';
 
       if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const requestedRedirect = params.get('redirect');
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
+
+        const requestedRedirect =
+          params.get('redirect');
 
         if (
           requestedRedirect &&
           requestedRedirect.startsWith('/') &&
           !requestedRedirect.startsWith('//')
         ) {
-          destination = requestedRedirect;
+          destination =
+            requestedRedirect;
         }
       }
 
@@ -53,15 +64,20 @@ export default function GuestLoginPage() {
 
       if (error) throw error;
 
-      if (session) {
-        window.location.replace(destination);
+      if (session?.user) {
+        await routeLoggedInUser(
+          session.user,
+          destination
+        );
+
         return;
       }
     } catch (error) {
       console.error(error);
 
       setErrorMessage(
-        error?.message || 'Unable to check login status.'
+        error?.message ||
+          'Unable to check login status.'
       );
     } finally {
       setCheckingSession(false);
@@ -82,20 +98,105 @@ export default function GuestLoginPage() {
     setConfirmPassword('');
   }
 
-  async function ensureGuestProfile(user, suppliedName = '') {
+  async function getPlatformRoles() {
+    const {
+      data,
+      error,
+    } = await supabase.rpc(
+      'get_my_platform_roles'
+    );
+
+    if (error) {
+      console.error(
+        'Role lookup error:',
+        error
+      );
+
+      return [];
+    }
+
+    return data || [];
+  }
+
+  async function routeLoggedInUser(
+    user,
+    requestedDestination =
+      '/account/bookings'
+  ) {
+    const roles =
+      await getPlatformRoles();
+
+    const isSuperAdmin =
+      roles.some(
+        (item) =>
+          item.role === 'super_admin' &&
+          item.is_active === true
+      );
+
+    if (isSuperAdmin) {
+      window.location.replace('/admin');
+      return;
+    }
+
+    const isHost =
+      roles.some(
+        (item) =>
+          item.role === 'host' &&
+          item.is_active === true
+      );
+
+    if (isHost) {
+      window.location.replace('/host');
+      return;
+    }
+
+    await ensureGuestProfile(
+      user,
+      user?.user_metadata?.full_name ||
+        user?.email?.split('@')[0] ||
+        'Guest'
+    );
+
+    let guestDestination =
+      requestedDestination ||
+      '/account/bookings';
+
+    if (
+      guestDestination.startsWith('/admin') ||
+      guestDestination.startsWith('/host')
+    ) {
+      guestDestination =
+        '/account/bookings';
+    }
+
+    window.location.replace(
+      guestDestination
+    );
+  }
+
+  async function ensureGuestProfile(
+    user,
+    suppliedName = ''
+  ) {
     if (!user?.id) {
-      throw new Error('Guest account information is missing.');
+      throw new Error(
+        'Guest account information is missing.'
+      );
     }
 
     const normalizedEmail =
-      user.email?.trim().toLowerCase() || null;
+      user.email
+        ?.trim()
+        .toLowerCase() || null;
 
     const {
       data: existingByUser,
       error: userLookupError,
     } = await supabase
       .from('guests')
-      .select('id, user_id, full_name, email, phone')
+      .select(
+        'id, user_id, full_name, email, phone'
+      )
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -106,15 +207,25 @@ export default function GuestLoginPage() {
     if (existingByUser) {
       const updates = {};
 
-      if (!existingByUser.full_name && suppliedName.trim()) {
-        updates.full_name = suppliedName.trim();
+      if (
+        !existingByUser.full_name &&
+        suppliedName.trim()
+      ) {
+        updates.full_name =
+          suppliedName.trim();
       }
 
-      if (!existingByUser.email && normalizedEmail) {
-        updates.email = normalizedEmail;
+      if (
+        !existingByUser.email &&
+        normalizedEmail
+      ) {
+        updates.email =
+          normalizedEmail;
       }
 
-      if (Object.keys(updates).length > 0) {
+      if (
+        Object.keys(updates).length > 0
+      ) {
         const {
           data: updatedGuest,
           error: updateError,
@@ -122,10 +233,14 @@ export default function GuestLoginPage() {
           .from('guests')
           .update(updates)
           .eq('id', existingByUser.id)
-          .select('id, user_id, full_name, email, phone')
+          .select(
+            'id, user_id, full_name, email, phone'
+          )
           .single();
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          throw updateError;
+        }
 
         return updatedGuest;
       }
@@ -133,21 +248,15 @@ export default function GuestLoginPage() {
       return existingByUser;
     }
 
-    /*
-      Older NightOutStays guest records may already exist
-      with the same email but without user_id.
-
-      Link that existing guest to the authenticated account
-      instead of creating a duplicate guest.
-    */
-
     if (normalizedEmail) {
       const {
         data: existingByEmail,
         error: emailLookupError,
       } = await supabase
         .from('guests')
-        .select('id, user_id, full_name, email, phone')
+        .select(
+          'id, user_id, full_name, email, phone'
+        )
         .eq('email', normalizedEmail)
         .is('user_id', null)
         .maybeSingle();
@@ -168,14 +277,19 @@ export default function GuestLoginPage() {
             full_name:
               existingByEmail.full_name ||
               suppliedName.trim() ||
-              user.user_metadata?.full_name ||
+              user.user_metadata
+                ?.full_name ||
               normalizedEmail.split('@')[0],
           })
           .eq('id', existingByEmail.id)
-          .select('id, user_id, full_name, email, phone')
+          .select(
+            'id, user_id, full_name, email, phone'
+          )
           .single();
 
-        if (linkError) throw linkError;
+        if (linkError) {
+          throw linkError;
+        }
 
         return linkedGuest;
       }
@@ -198,10 +312,14 @@ export default function GuestLoginPage() {
         email: normalizedEmail,
         phone: null,
       })
-      .select('id, user_id, full_name, email, phone')
+      .select(
+        'id, user_id, full_name, email, phone'
+      )
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      throw insertError;
+    }
 
     return newGuest;
   }
@@ -211,15 +329,20 @@ export default function GuestLoginPage() {
 
     clearMessages();
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
     if (!fullName.trim()) {
-      setErrorMessage('Please enter your full name.');
+      setErrorMessage(
+        'Please enter your full name.'
+      );
       return;
     }
 
     if (!normalizedEmail) {
-      setErrorMessage('Please enter your email address.');
+      setErrorMessage(
+        'Please enter your email address.'
+      );
       return;
     }
 
@@ -230,21 +353,30 @@ export default function GuestLoginPage() {
       return;
     }
 
-    if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match.');
+    if (
+      password !== confirmPassword
+    ) {
+      setErrorMessage(
+        'Passwords do not match.'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const {
+        data,
+        error,
+      } = await supabase.auth.signUp({
         email: normalizedEmail,
         password,
 
         options: {
           data: {
-            full_name: fullName.trim(),
+            full_name:
+              fullName.trim(),
+            account_type: 'guest',
           },
         },
       });
@@ -252,13 +384,10 @@ export default function GuestLoginPage() {
       if (error) throw error;
 
       if (!data.user) {
-        throw new Error('Unable to create your account.');
+        throw new Error(
+          'Unable to create your account.'
+        );
       }
-
-      /*
-        Email confirmation is disabled in Supabase,
-        so a successful signup should return a session.
-      */
 
       if (!data.session) {
         throw new Error(
@@ -271,7 +400,9 @@ export default function GuestLoginPage() {
         fullName
       );
 
-      window.location.replace(redirectTo);
+      window.location.replace(
+        redirectTo
+      );
     } catch (error) {
       console.error(error);
 
@@ -291,9 +422,13 @@ export default function GuestLoginPage() {
 
     clearMessages();
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
-    if (!normalizedEmail || !password) {
+    if (
+      !normalizedEmail ||
+      !password
+    ) {
       setErrorMessage(
         'Please enter your email and password.'
       );
@@ -303,29 +438,31 @@ export default function GuestLoginPage() {
     setLoading(true);
 
     try {
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        });
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth
+          .signInWithPassword({
+            email: normalizedEmail,
+            password,
+          });
 
       if (error) throw error;
 
-      if (!data.user || !data.session) {
-        throw new Error('Unable to login.');
+      if (
+        !data.user ||
+        !data.session
+      ) {
+        throw new Error(
+          'Unable to login.'
+        );
       }
 
-      const guestName =
-        data.user.user_metadata?.full_name ||
-        data.user.email?.split('@')[0] ||
-        'Guest';
-
-      await ensureGuestProfile(
+      await routeLoggedInUser(
         data.user,
-        guestName
+        redirectTo
       );
-
-      window.location.replace(redirectTo);
     } catch (error) {
       console.error(error);
 
@@ -343,7 +480,8 @@ export default function GuestLoginPage() {
   async function forgotPassword() {
     clearMessages();
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
     if (!normalizedEmail) {
       setErrorMessage(
@@ -356,17 +494,20 @@ export default function GuestLoginPage() {
 
     try {
       const origin =
-        typeof window !== 'undefined'
+        typeof window !==
+        'undefined'
           ? window.location.origin
           : 'https://nightoutstay.com';
 
       const { error } =
-        await supabase.auth.resetPasswordForEmail(
-          normalizedEmail,
-          {
-            redirectTo: `${origin}/reset-password`,
-          }
-        );
+        await supabase.auth
+          .resetPasswordForEmail(
+            normalizedEmail,
+            {
+              redirectTo:
+                `${origin}/reset-password`,
+            }
+          );
 
       if (error) throw error;
 
@@ -403,14 +544,14 @@ export default function GuestLoginPage() {
 
         <h1>
           {mode === 'login'
-            ? 'Guest Login'
+            ? 'Login'
             : 'Create Guest Account'}
         </h1>
 
         <p className="subtitle">
           {mode === 'login'
-            ? 'Login to manage your bookings, messages, payments and stays.'
-            : 'Create your account to request bookings and manage your stays.'}
+            ? 'Login to continue to your NightOutStays account.'
+            : 'Create your guest account to request bookings and manage your stays.'}
         </p>
 
         <div className="tabs">
@@ -439,7 +580,7 @@ export default function GuestLoginPage() {
               switchMode('signup')
             }
           >
-            Sign Up
+            Guest Sign Up
           </button>
         </div>
 
@@ -492,7 +633,9 @@ export default function GuestLoginPage() {
               label="CONFIRM PASSWORD"
               type="password"
               value={confirmPassword}
-              onChange={setConfirmPassword}
+              onChange={
+                setConfirmPassword
+              }
               placeholder="Re-enter password"
               autoComplete="new-password"
             />
@@ -504,7 +647,9 @@ export default function GuestLoginPage() {
                 type="button"
                 className="forgot-button"
                 disabled={loading}
-                onClick={forgotPassword}
+                onClick={
+                  forgotPassword
+                }
               >
                 Forgot Password?
               </button>
@@ -532,15 +677,29 @@ export default function GuestLoginPage() {
               ? 'Please wait...'
               : mode === 'login'
               ? 'Login'
-              : 'Create Account'}
+              : 'Create Guest Account'}
           </button>
         </form>
 
+        <div className="host-box">
+          <strong>
+            Want to list your property?
+          </strong>
+
+          <span>
+            Create a Host account and start
+            adding your properties.
+          </span>
+
+          <a href="/host/register">
+            Become a Host
+          </a>
+        </div>
+
         <div className="note">
-          You can browse NightOutStays without
-          logging in. Login is required when you
-          request a booking, message a host, make
-          a payment or access your account.
+          NightOutStays automatically sends
+          Super Admins, Hosts and Guests to
+          the correct dashboard after login.
         </div>
       </section>
 
@@ -580,7 +739,7 @@ function friendlyAuthError(
       'email not confirmed'
     )
   ) {
-    return 'This older account is still awaiting email confirmation. Please contact support or reset the account.';
+    return 'This account is awaiting email confirmation.';
   }
 
   return message || fallback;
@@ -602,7 +761,9 @@ function Field({
         type={type}
         value={value}
         onChange={(event) =>
-          onChange(event.target.value)
+          onChange(
+            event.target.value
+          )
         }
         placeholder={placeholder}
         autoComplete={autoComplete}
@@ -775,6 +936,41 @@ function PageStyles() {
       .forgot-button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+
+      .host-box {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin-top: 20px;
+        padding: 16px;
+        border: 1px solid #dfe3e8;
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .host-box strong {
+        font-size: 14px;
+      }
+
+      .host-box span {
+        color: #687080;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .host-box a {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 42px;
+        margin-top: 5px;
+        border-radius: 9px;
+        background: #111827;
+        color: #ffffff;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 900;
       }
 
       .note {
