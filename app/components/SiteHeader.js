@@ -12,8 +12,11 @@ export default function SiteHeader({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const isAdmin =
-    pathname?.startsWith('/admin');
+  const isAdmin = pathname?.startsWith('/admin');
+
+  if (isAdmin) {
+    return null;
+  }
 
   const guestLinks = [
     {
@@ -35,51 +38,12 @@ export default function SiteHeader({
     },
   ];
 
-  const adminLinks = [
-    {
-      label: 'Bookings',
-      href: '/admin/bookings',
-    },
-    {
-      label: 'Properties',
-      href: '/admin/properties',
-    },
-    {
-      label: 'Calendar',
-      href: '/admin/calendar',
-    },
-    {
-      label: 'Messages',
-      href: '/admin/messages',
-    },
-    {
-      label: 'Notifications',
-      href: '/admin/notifications',
-      badge: notificationCount,
-    },
-    {
-      label: 'Reports',
-      href: '/admin/reports',
-    },
-    {
-      label: 'Offers',
-      href: '/admin/offers',
-    },
-  ];
-
-  const links = isAdmin
-    ? adminLinks
-    : guestLinks;
-
   function isActive(href) {
     if (!pathname) {
       return false;
     }
 
-    return (
-      pathname === href ||
-      pathname.startsWith(`${href}/`)
-    );
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   function closeMenu() {
@@ -98,7 +62,7 @@ export default function SiteHeader({
         </a>
 
         <nav className={styles.desktopNav}>
-          {links.map((link) => (
+          {guestLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -112,23 +76,11 @@ export default function SiteHeader({
 
               {Number(link.badge) > 0 && (
                 <span className={styles.badge}>
-                  {link.badge > 99
-                    ? '99+'
-                    : link.badge}
+                  {link.badge > 99 ? '99+' : link.badge}
                 </span>
               )}
             </a>
           ))}
-
-          {isAdmin && (
-            <div className={styles.adminIdentity}>
-              <span className={styles.adminName}>
-                {userName || 'Admin'}
-              </span>
-
-              <small>ADMIN</small>
-            </div>
-          )}
 
           {onLogout && (
             <button
@@ -168,7 +120,7 @@ export default function SiteHeader({
 
       {menuOpen && (
         <div className={styles.mobileMenu}>
-          {links.map((link) => (
+          {guestLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -190,16 +142,6 @@ export default function SiteHeader({
               )}
             </a>
           ))}
-
-          {isAdmin && (
-            <div className={styles.mobileAdmin}>
-              <strong>
-                {userName || 'Admin'}
-              </strong>
-
-              <span>Administrator</span>
-            </div>
-          )}
 
           {onLogout && (
             <button
