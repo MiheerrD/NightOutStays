@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -10,76 +10,91 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
-const menuItems = [
+const ALL_MENU_ITEMS = [
   {
     label: 'Dashboard',
     href: '/admin',
     icon: '⌂',
+    module: 'dashboard',
   },
   {
     label: 'Admins',
     href: '/admin/admins',
     icon: '♛',
+    module: 'admins',
+    superAdminOnly: true,
   },
   {
     label: 'Hosts',
     href: '/admin/hosts',
     icon: '♙',
+    module: 'hosts',
   },
   {
     label: 'Properties',
     href: '/admin/properties',
     icon: '▥',
+    module: 'properties',
   },
   {
     label: 'Guests',
     href: '/admin/guests',
     icon: '♙',
+    module: 'guests',
   },
   {
     label: 'Bookings',
     href: '/admin/bookings',
     icon: '▣',
+    module: 'bookings',
   },
   {
     label: 'Subscriptions',
     href: '/admin/subscriptions',
     icon: '▤',
+    module: 'subscriptions',
   },
   {
     label: 'Promotions',
     href: '/admin/promotions',
     icon: '◇',
+    module: 'promotions',
   },
   {
     label: 'Referrals',
     href: '/admin/referrals',
     icon: '⇄',
+    module: 'referrals',
   },
   {
     label: 'Payouts',
     href: '/admin/payouts',
     icon: '▰',
+    module: 'payouts',
   },
   {
     label: 'Payment Holds',
     href: '/admin/payment-holds',
     icon: '◈',
+    module: 'payment_holds',
   },
   {
     label: 'Messages',
     href: '/admin/messages',
     icon: '▭',
+    module: 'messages',
   },
   {
     label: 'Reports',
     href: '/admin/reports',
     icon: '≣',
+    module: 'reports',
   },
   {
     label: 'Settings',
     href: '/admin/settings',
     icon: '⚙',
+    module: 'settings',
   },
 ];
 
@@ -87,63 +102,149 @@ export default function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [adminName, setAdminName] =
-    useState('');
-
-  const [adminRole, setAdminRole] =
-    useState('');
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [permissions, setPermissions] = useState({});
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    loadAdminProfile();
+    loadAdminAccess();
   }, []);
 
-  async function loadAdminProfile() {
+  async function loadAdminAccess() {
+    setLoadingProfile(true);
+
     try {
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (!session) return;
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        router.replace('/admin/login');
+        return;
+      }
 
       const {
-        data,
-        error,
+        data: profile,
+        error: profileError,
       } = await supabase
         .from('admin_profiles')
         .select(
           `
+            user_id,
             full_name,
+            email,
             role,
-            is_active
+            is_active,
+            full_access
           `
         )
-        .eq(
-          'user_id',
-          session.user.id
-        )
+        .eq('user_id', session.user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error(error);
+      if (profileError) {
+        throw profileError;
+      }
+
+      if (!profile || !profile.is_active) {
+        await supabase.auth.signOut();
+        router.replace('/admin/login');
         return;
       }
 
-      if (!data) return;
+      if (
+        profile.role !== 'super_admin' &&
+        profile.role !== 'admin'
+      ) {
+        await supabase.auth.signOut();
+        router.replace('/admin/login');
+        return;
+      }
 
-      setAdminName(
-        data.full_name || 'Admin'
-      );
+      setAdminProfile(profile);
 
-      setAdminRole(
-        data.role || 'admin'
-      );
+      if (
+        profile.role === 'admin' &&
+        !profile.full_access
+      ) {
+        const {
+          data: permissionRows,
+          error: permissionsError,
+        } = await supabase
+          .from('admin_permissions')
+          .select(
+            `
+              module,
+              can_view
+            `
+          )
+          .eq(
+            'admin_user_id',
+            session.user.id
+          );
+
+        if (permissionsError) {
+          throw permissionsError;
+        }
+
+        const permissionMap = {};
+
+        (permissionRows || []).forEach(
+          (row) => {
+            permissionMap[row.module] =
+              row.can_view === true;
+          }
+        );
+
+        setPermissions(permissionMap);
+      } else {
+        setPermissions({});
+      }
     } catch (error) {
       console.error(
-        'Unable to load admin profile:',
+        'Admin navigation access error:',
         error
       );
+    } finally {
+      setLoadingProfile(false);
     }
   }
+
+  const visibleMenuItems = useMemo(() => {
+    if (!adminProfile) {
+      return [];
+    }
+
+    if (
+      adminProfile.role === 'super_admin' ||
+      adminProfile.full_access
+    ) {
+      return ALL_MENU_ITEMS.filter(
+        (item) =>
+          !item.superAdminOnly ||
+          adminProfile.role ===
+            'super_admin'
+      );
+    }
+
+    return ALL_MENU_ITEMS.filter(
+      (item) => {
+        if (item.superAdminOnly) {
+          return false;
+        }
+
+        if (item.module === 'dashboard') {
+          return true;
+        }
+
+        return permissions[item.module] === true;
+      }
+    );
+  }, [adminProfile, permissions]);
 
   function isActive(href) {
     if (href === '/admin') {
@@ -154,58 +255,86 @@ export default function AdminNav() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
-
-    router.replace('/admin/login');
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      router.replace('/admin/login');
+      router.refresh();
+    }
   }
+
+  if (loadingProfile) {
+    return (
+      <>
+        <div className="nosAdminHeaderLoading">
+          Loading Admin...
+        </div>
+
+        <Styles />
+      </>
+    );
+  }
+
+  if (!adminProfile) {
+    return null;
+  }
+
+  const isSuperAdmin =
+    adminProfile.role === 'super_admin';
 
   return (
     <>
       <header className="nosAdminHeader">
-        <div className="nosAdminTopRow">
-          <div className="nosAdminTopInner">
-            <div className="nosAdminBrandArea">
-              <Link
-                href="/admin"
-                className="nosAdminBrand"
-              >
-                NightOutStays
-              </Link>
+        <div className="nosAdminIdentityRow">
+          <div className="nosAdminIdentityInner">
+            <div className="nosAdminPortalInfo">
+              <div className="nosAdminPortalTitle">
+                Admin Portal
+              </div>
 
-              <span className="nosAdminBadge">
-                {adminRole === 'super_admin'
+              <span
+                className={
+                  isSuperAdmin
+                    ? 'nosAdminRoleBadge super'
+                    : 'nosAdminRoleBadge'
+                }
+              >
+                {isSuperAdmin
                   ? 'SUPER ADMIN'
-                  : 'ADMIN'}
+                  : adminProfile.full_access
+                    ? 'ADMIN · FULL ACCESS'
+                    : 'ADMIN · LIMITED ACCESS'}
               </span>
 
               <Link
                 href="/"
                 target="_blank"
-                className="nosViewWebsite"
+                className="nosAdminViewSite"
               >
                 ↗ View Website
               </Link>
             </div>
 
-            <div className="nosAdminUserArea">
-              <div className="nosAdminUserText">
+            <div className="nosAdminAccount">
+              <div className="nosAdminAccountText">
                 <strong>
-                  {adminName ||
+                  {adminProfile.full_name ||
                     'Administrator'}
                 </strong>
 
                 <span>
-                  {adminRole === 'super_admin'
+                  {isSuperAdmin
                     ? 'Super Admin'
-                    : 'Admin'}
+                    : adminProfile.full_access
+                      ? 'Admin · Full Access'
+                      : 'Admin · Limited Access'}
                 </span>
               </div>
 
               <button
                 type="button"
+                className="nosAdminLogoutButton"
                 onClick={handleLogout}
-                className="nosAdminLogout"
               >
                 Logout
               </button>
@@ -214,293 +343,373 @@ export default function AdminNav() {
         </div>
 
         <nav className="nosAdminMenuBar">
-          <div className="nosAdminMenuScroll">
-            {menuItems.map((item) => {
-              const active =
-                isActive(item.href);
+          <div className="nosAdminMenuInner">
+            {visibleMenuItems.map(
+              (item) => {
+                const active =
+                  isActive(item.href);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    active
-                      ? 'nosAdminMenuItem active'
-                      : 'nosAdminMenuItem'
-                  }
-                >
-                  <span className="nosAdminMenuIcon">
-                    {item.icon}
-                  </span>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={
+                      active
+                        ? 'nosAdminMenuItem active'
+                        : 'nosAdminMenuItem'
+                    }
+                  >
+                    <span className="nosAdminMenuIcon">
+                      {item.icon}
+                    </span>
 
-                  <span className="nosAdminMenuLabel">
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
+                    <span className="nosAdminMenuLabel">
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              }
+            )}
           </div>
         </nav>
       </header>
 
-      <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
+      <Styles />
+    </>
+  );
+}
 
-        .nosAdminHeader {
-          width: 100%;
-          position: sticky;
-          top: 0;
-          z-index: 1000;
-          background: #ffffff;
-          border-bottom: 1px solid #dde3eb;
-        }
+function Styles() {
+  return (
+    <style jsx global>{`
+      * {
+        box-sizing: border-box;
+      }
 
-        .nosAdminTopRow {
-          width: 100%;
-          background: #ffffff;
-        }
+      .nosAdminHeader {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        width: 100%;
+        background: #ffffff;
+        border-bottom: 1px solid #dfe5ec;
+      }
 
-        .nosAdminTopInner {
-          width: calc(100% - 64px);
-          max-width: 1500px;
-          min-height: 70px;
-          margin: 0 auto;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 24px;
-        }
+      .nosAdminIdentityRow {
+        width: 100%;
+        background: #ffffff;
+      }
 
-        .nosAdminBrandArea {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          min-width: 0;
-        }
+      .nosAdminIdentityInner {
+        width: calc(100% - 64px);
+        max-width: 1600px;
+        min-height: 64px;
+        margin: 0 auto;
 
-        .nosAdminBrand {
-          color: #0a4b89;
-          font-size: 24px;
-          font-weight: 900;
-          text-decoration: none;
-          letter-spacing: -0.7px;
-          white-space: nowrap;
-        }
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
 
-        .nosAdminBadge {
-          min-height: 25px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 11px;
-          border-radius: 999px;
-          background: #0b315d;
-          color: #ffffff;
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: 0.7px;
-          white-space: nowrap;
-        }
+        gap: 24px;
+      }
 
-        .nosViewWebsite {
-          color: #0c4f8f;
-          font-size: 12px;
-          font-weight: 800;
-          text-decoration: none;
-          white-space: nowrap;
-        }
+      .nosAdminPortalInfo {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+      }
 
-        .nosViewWebsite:hover {
-          text-decoration: underline;
-        }
+      .nosAdminPortalTitle {
+        color: #0a4b89;
+        font-size: 20px;
+        font-weight: 900;
+        letter-spacing: -0.5px;
+        white-space: nowrap;
+      }
 
-        .nosAdminUserArea {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          flex-shrink: 0;
-        }
+      .nosAdminRoleBadge {
+        min-height: 25px;
 
-        .nosAdminUserText {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          line-height: 1.2;
-        }
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
 
-        .nosAdminUserText strong {
-          color: #101828;
-          font-size: 12px;
-          font-weight: 900;
-        }
+        padding: 0 11px;
 
-        .nosAdminUserText span {
-          margin-top: 3px;
-          color: #667085;
-          font-size: 9px;
-          font-weight: 700;
-        }
+        border-radius: 999px;
 
-        .nosAdminLogout {
-          min-height: 36px;
-          padding: 0 14px;
-          border: 1px solid #ccd5df;
-          border-radius: 8px;
-          background: #ffffff;
-          color: #23344a;
-          font-size: 11px;
-          font-weight: 800;
-          cursor: pointer;
-        }
+        background: #eaf2fb;
+        color: #0b579e;
 
-        .nosAdminLogout:hover {
-          background: #f5f7fa;
-        }
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.6px;
 
-        .nosAdminMenuBar {
-          width: 100%;
-          background: #082f5a;
-        }
+        white-space: nowrap;
+      }
 
-        .nosAdminMenuScroll {
-          width: calc(100% - 64px);
-          max-width: 1500px;
-          min-height: 72px;
-          margin: 0 auto;
-          display: flex;
-          align-items: stretch;
-          overflow-x: auto;
-          scrollbar-width: thin;
-        }
+      .nosAdminRoleBadge.super {
+        background: #0a315d;
+        color: #ffffff;
+      }
 
-        .nosAdminMenuScroll::-webkit-scrollbar {
-          height: 5px;
-        }
+      .nosAdminViewSite {
+        color: #0a579f;
+        font-size: 11px;
+        font-weight: 800;
+        text-decoration: none;
+        white-space: nowrap;
+      }
 
-        .nosAdminMenuScroll::-webkit-scrollbar-thumb {
-          background: rgba(
-            255,
-            255,
-            255,
-            0.25
-          );
-          border-radius: 999px;
+      .nosAdminViewSite:hover {
+        text-decoration: underline;
+      }
+
+      .nosAdminAccount {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        flex-shrink: 0;
+      }
+
+      .nosAdminAccountText {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+      }
+
+      .nosAdminAccountText strong {
+        color: #101828;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .nosAdminAccountText span {
+        margin-top: 2px;
+
+        color: #667085;
+
+        font-size: 9px;
+        font-weight: 700;
+      }
+
+      .nosAdminLogoutButton {
+        min-height: 36px;
+
+        padding: 0 14px;
+
+        border: 1px solid #ccd5df;
+        border-radius: 8px;
+
+        background: #ffffff;
+        color: #26384c;
+
+        font-size: 11px;
+        font-weight: 800;
+
+        cursor: pointer;
+      }
+
+      .nosAdminLogoutButton:hover {
+        background: #f5f7fa;
+      }
+
+      .nosAdminMenuBar {
+        width: 100%;
+        background: #082f5a;
+      }
+
+      .nosAdminMenuInner {
+        width: 100%;
+
+        display: flex;
+        align-items: stretch;
+
+        overflow-x: auto;
+
+        scrollbar-width: thin;
+        scrollbar-color:
+          rgba(255, 255, 255, 0.35)
+          transparent;
+      }
+
+      .nosAdminMenuInner::-webkit-scrollbar {
+        height: 5px;
+      }
+
+      .nosAdminMenuInner::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .nosAdminMenuInner::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(
+          255,
+          255,
+          255,
+          0.32
+        );
+      }
+
+      .nosAdminMenuItem {
+        position: relative;
+
+        flex: 1 0 92px;
+
+        min-width: 92px;
+        min-height: 72px;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
+        gap: 6px;
+
+        padding: 9px 10px;
+
+        color: #ffffff !important;
+        text-decoration: none !important;
+
+        opacity: 0.86;
+
+        transition:
+          background 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      .nosAdminMenuItem:hover {
+        background: rgba(
+          255,
+          255,
+          255,
+          0.09
+        );
+
+        color: #ffffff !important;
+
+        opacity: 1;
+      }
+
+      .nosAdminMenuItem.active {
+        background: #315b85;
+
+        color: #ffffff !important;
+
+        opacity: 1;
+      }
+
+      .nosAdminMenuItem.active::after {
+        content: '';
+
+        position: absolute;
+
+        left: 18px;
+        right: 18px;
+        bottom: 0;
+
+        height: 4px;
+
+        border-radius:
+          4px 4px 0 0;
+
+        background: #ffffff;
+      }
+
+      .nosAdminMenuIcon {
+        color: #ffffff !important;
+
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .nosAdminMenuLabel {
+        color: #ffffff !important;
+
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.15;
+
+        text-align: center;
+
+        white-space: nowrap;
+      }
+
+      .nosAdminHeaderLoading {
+        width: 100%;
+        min-height: 64px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background: #ffffff;
+        border-bottom: 1px solid #dfe5ec;
+
+        color: #667085;
+
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      @media (min-width: 1500px) {
+        .nosAdminMenuItem {
+          flex-basis: 100px;
+        }
+      }
+
+      @media (max-width: 1000px) {
+        .nosAdminIdentityInner {
+          width: calc(100% - 30px);
         }
 
         .nosAdminMenuItem {
-          min-width: 91px;
-          min-height: 72px;
-          padding: 9px 11px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          position: relative;
-          color: #ffffff !important;
-          text-decoration: none;
-          opacity: 0.86;
-          transition: 0.15s ease;
-          flex-shrink: 0;
+          flex: 0 0 92px;
+        }
+      }
+
+      @media (max-width: 750px) {
+        .nosAdminIdentityInner {
+          min-height: 60px;
         }
 
-        .nosAdminMenuItem:hover {
-          background: rgba(
-            255,
-            255,
-            255,
-            0.09
-          );
-          color: #ffffff !important;
-          opacity: 1;
+        .nosAdminPortalInfo {
+          gap: 9px;
         }
 
-        .nosAdminMenuItem.active {
-          background: rgba(
-            255,
-            255,
-            255,
-            0.14
-          );
-          color: #ffffff !important;
-          opacity: 1;
+        .nosAdminPortalTitle {
+          font-size: 18px;
         }
 
-        .nosAdminMenuItem.active::after {
-          content: '';
-          position: absolute;
-          left: 18px;
-          right: 18px;
-          bottom: 0;
-          height: 4px;
-          border-radius: 4px 4px 0 0;
-          background: #ffffff;
+        .nosAdminViewSite {
+          display: none;
         }
 
-        .nosAdminMenuIcon {
-          color: #ffffff !important;
-          font-size: 19px;
-          line-height: 1;
-          font-weight: 400;
+        .nosAdminAccountText {
+          display: none;
+        }
+
+        .nosAdminRoleBadge {
+          display: none;
+        }
+      }
+
+      @media (max-width: 500px) {
+        .nosAdminIdentityInner {
+          width: calc(100% - 20px);
+        }
+
+        .nosAdminMenuItem {
+          flex-basis: 84px;
+          min-width: 84px;
         }
 
         .nosAdminMenuLabel {
-          color: #ffffff !important;
-          font-size: 10px;
-          line-height: 1.2;
-          font-weight: 800;
-          text-align: center;
-          white-space: nowrap;
+          font-size: 9px;
         }
-
-        @media (max-width: 900px) {
-          .nosAdminTopInner {
-            width: calc(100% - 30px);
-          }
-
-          .nosAdminMenuScroll {
-            width: 100%;
-            padding: 0 12px;
-          }
-
-          .nosAdminBrandArea {
-            gap: 10px;
-          }
-
-          .nosAdminBrand {
-            font-size: 20px;
-          }
-
-          .nosViewWebsite {
-            display: none;
-          }
-        }
-
-        @media (max-width: 650px) {
-          .nosAdminTopInner {
-            min-height: 65px;
-          }
-
-          .nosAdminBadge {
-            display: none;
-          }
-
-          .nosAdminUserText {
-            display: none;
-          }
-
-          .nosAdminLogout {
-            min-height: 34px;
-            padding: 0 11px;
-          }
-
-          .nosAdminMenuItem {
-            min-width: 82px;
-          }
-        }
-      `}</style>
-    </>
+      }
+    `}</style>
   );
 }
