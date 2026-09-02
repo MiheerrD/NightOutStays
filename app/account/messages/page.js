@@ -7,46 +7,16 @@ import {
 } from 'react';
 
 import {
-  useSearchParams,
-} from 'next/navigation';
-
-import {
   createClient,
 } from '@supabase/supabase-js';
 
-const supabase =
-  createClient(
-    'https://gxwemplbykjxhezefykh.supabase.co',
-    'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
-  );
-
-function formatDateTime(value) {
-  if (!value) {
-    return '';
-  }
-
-  try {
-    return new Date(
-      value
-    ).toLocaleString(
-      'en-IN',
-      {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }
-    );
-  } catch {
-    return value;
-  }
-}
+const supabase = createClient(
+  'https://gxwemplbykjxhezefykh.supabase.co',
+  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
+);
 
 function formatDate(value) {
-  if (!value) {
-    return '';
-  }
+  if (!value) return '';
 
   try {
     return new Date(
@@ -64,19 +34,29 @@ function formatDate(value) {
   }
 }
 
-export default function GuestMessagesPage() {
-  const searchParams =
-    useSearchParams();
+function formatDateTime(value) {
+  if (!value) return '';
 
-  const requestedBooking =
-    searchParams.get(
-      'booking'
+  try {
+    return new Date(
+      value
+    ).toLocaleString(
+      'en-IN',
+      {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      }
     );
+  } catch {
+    return value;
+  }
+}
 
-  const [
-    session,
-    setSession,
-  ] = useState(null);
+export default function GuestMessagesPage() {
+  const [session, setSession] =
+    useState(null);
 
   const [
     guestProfile,
@@ -84,14 +64,14 @@ export default function GuestMessagesPage() {
   ] = useState(null);
 
   const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
     bookings,
     setBookings,
   ] = useState([]);
+
+  const [
+    properties,
+    setProperties,
+  ] = useState({});
 
   const [
     messages,
@@ -103,15 +83,14 @@ export default function GuestMessagesPage() {
     setSelectedBookingId,
   ] = useState('');
 
-  const [
-    reply,
-    setReply,
-  ] = useState('');
+  const [loading, setLoading] =
+    useState(true);
 
-  const [
-    sending,
-    setSending,
-  ] = useState(false);
+  const [reply, setReply] =
+    useState('');
+
+  const [sending, setSending] =
+    useState(false);
 
   const [
     errorMessage,
@@ -124,7 +103,6 @@ export default function GuestMessagesPage() {
 
   useEffect(() => {
     if (
-      !session?.user ||
       !guestProfile?.id
     ) {
       return;
@@ -133,7 +111,7 @@ export default function GuestMessagesPage() {
     const channel =
       supabase
         .channel(
-          `guest-messages-${guestProfile.id}`
+          `guest-chat-${guestProfile.id}`
         )
         .on(
           'postgres_changes',
@@ -145,6 +123,7 @@ export default function GuestMessagesPage() {
           },
           () => {
             loadInbox(
+              guestProfile,
               selectedBookingId
             );
           }
@@ -157,7 +136,6 @@ export default function GuestMessagesPage() {
       );
     };
   }, [
-    session,
     guestProfile,
     selectedBookingId,
   ]);
@@ -178,9 +156,7 @@ export default function GuestMessagesPage() {
         await supabase.auth
           .getSession();
 
-      if (
-        sessionError
-      ) {
+      if (sessionError) {
         throw sessionError;
       }
 
@@ -200,18 +176,18 @@ export default function GuestMessagesPage() {
       const user =
         currentSession.user;
 
+      let guest = null;
+
       const {
         data:
-          guestRows,
+          userGuests,
         error:
-          guestError,
+          userGuestError,
       } =
         await supabase
-          .from(
-            'guests'
-          )
+          .from('guests')
           .select(
-            'id, user_id, full_name, phone, email'
+            'id, full_name, phone, email, user_id'
           )
           .eq(
             'user_id',
@@ -220,21 +196,13 @@ export default function GuestMessagesPage() {
           .limit(1);
 
       if (
-        guestError
+        !userGuestError &&
+        userGuests?.length
       ) {
-        throw guestError;
+        guest =
+          userGuests[0];
       }
 
-      let guest =
-        guestRows?.[0] ||
-        null;
-
-      /*
-        Older guest profiles may not
-        yet contain user_id.
-
-        Use email as a safe fallback.
-      */
       if (
         !guest &&
         user.email
@@ -246,11 +214,9 @@ export default function GuestMessagesPage() {
             emailError,
         } =
           await supabase
-            .from(
-              'guests'
-            )
+            .from('guests')
             .select(
-              'id, user_id, full_name, phone, email'
+              'id, full_name, phone, email, user_id'
             )
             .eq(
               'email',
@@ -258,9 +224,7 @@ export default function GuestMessagesPage() {
             )
             .limit(1);
 
-        if (
-          emailError
-        ) {
+        if (emailError) {
           throw emailError;
         }
 
@@ -270,11 +234,9 @@ export default function GuestMessagesPage() {
       }
 
       if (!guest) {
-        setErrorMessage(
-          'Guest profile not found for this login.'
+        throw new Error(
+          'Guest profile not found.'
         );
-
-        return;
       }
 
       setGuestProfile(
@@ -282,13 +244,10 @@ export default function GuestMessagesPage() {
       );
 
       await loadInbox(
-        '',
         guest
       );
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
         error.message ||
@@ -300,189 +259,206 @@ export default function GuestMessagesPage() {
   }
 
   async function loadInbox(
-    preferredBookingId = '',
-    profileOverride = null
+    guest,
+    preferredBookingId = ''
   ) {
-    const profile =
-      profileOverride ||
-      guestProfile;
-
-    if (!profile?.id) {
+    if (!guest?.id) {
       return;
     }
 
-    try {
-      setErrorMessage('');
-
-      const {
-        data:
-          bookingRows,
-        error:
-          bookingError,
-      } =
-        await supabase
-          .from(
-            'bookings'
-          )
-          .select(`
-            id,
-            booking_code,
-            property_id,
-            guest_id,
-            check_in,
-            check_out,
-            guests_count,
-            booking_status,
-            payment_status,
-            host_decision,
-            offer_status,
-            total_amount,
-            final_payable_amount,
-            created_at,
-            properties (
-              id,
-              name,
-              location_name
-            )
-          `)
-          .eq(
-            'guest_id',
-            profile.id
-          )
-          .order(
-            'created_at',
-            {
-              ascending:
-                false,
-            }
-          );
-
-      if (
-        bookingError
-      ) {
-        throw bookingError;
-      }
-
-      const rows =
-        bookingRows ||
-        [];
-
-      setBookings(
-        rows
-      );
-
-      if (
-        rows.length ===
-        0
-      ) {
-        setMessages([]);
-        setSelectedBookingId('');
-        return;
-      }
-
-      const bookingIds =
-        rows.map(
-          (booking) =>
-            booking.id
+    const {
+      data:
+        bookingRows,
+      error:
+        bookingError,
+    } =
+      await supabase
+        .from('bookings')
+        .select(`
+          id,
+          booking_code,
+          property_id,
+          guest_id,
+          check_in,
+          check_out,
+          guests_count,
+          booking_status,
+          payment_status,
+          host_decision,
+          offer_status,
+          created_at
+        `)
+        .eq(
+          'guest_id',
+          guest.id
+        )
+        .order(
+          'created_at',
+          {
+            ascending: false,
+          }
         );
 
+    if (bookingError) {
+      throw bookingError;
+    }
+
+    const rows =
+      bookingRows || [];
+
+    setBookings(rows);
+
+    if (!rows.length) {
+      setMessages([]);
+      return;
+    }
+
+    const propertyIds = [
+      ...new Set(
+        rows
+          .map(
+            (item) =>
+              item.property_id
+          )
+          .filter(Boolean)
+      ),
+    ];
+
+    if (
+      propertyIds.length
+    ) {
       const {
         data:
-          messageRows,
-        error:
-          messageError,
+          propertyRows,
       } =
         await supabase
-          .from(
-            'booking_messages'
+          .from('properties')
+          .select(
+            'id, name, location_name'
           )
-          .select(`
-            id,
-            booking_id,
-            sender_type,
-            sender_name,
-            message,
-            message_type,
-            is_read,
-            created_at
-          `)
           .in(
-            'booking_id',
-            bookingIds
-          )
-          .order(
-            'created_at',
-            {
-              ascending:
-                true,
-            }
+            'id',
+            propertyIds
           );
 
-      if (
-        messageError
-      ) {
-        throw messageError;
-      }
+      const propertyMap = {};
 
-      setMessages(
-        messageRows ||
-          []
+      (
+        propertyRows || []
+      ).forEach(
+        (property) => {
+          propertyMap[
+            property.id
+          ] = property;
+        }
       );
 
-      let targetId =
-        preferredBookingId ||
-        selectedBookingId;
+      setProperties(
+        propertyMap
+      );
+    }
 
-      if (
-        requestedBooking
-      ) {
-        const requested =
+    const bookingIds =
+      rows.map(
+        (item) =>
+          item.id
+      );
+
+    const {
+      data:
+        messageRows,
+      error:
+        messageError,
+    } =
+      await supabase
+        .from(
+          'booking_messages'
+        )
+        .select(`
+          id,
+          booking_id,
+          sender_type,
+          sender_name,
+          message,
+          message_type,
+          is_read,
+          created_at
+        `)
+        .in(
+          'booking_id',
+          bookingIds
+        )
+        .order(
+          'created_at',
+          {
+            ascending: true,
+          }
+        );
+
+    if (messageError) {
+      throw messageError;
+    }
+
+    setMessages(
+      messageRows || []
+    );
+
+    let target =
+      preferredBookingId;
+
+    if (
+      typeof window !==
+      'undefined'
+    ) {
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
+
+      const requested =
+        params.get(
+          'booking'
+        );
+
+      if (requested) {
+        const match =
           rows.find(
             (booking) =>
               booking.id ===
-                requestedBooking ||
+                requested ||
               booking.booking_code ===
-                requestedBooking
+                requested
           );
 
-        if (requested) {
-          targetId =
-            requested.id;
+        if (match) {
+          target =
+            match.id;
         }
       }
-
-      if (
-        !targetId ||
-        !rows.some(
-          (booking) =>
-            booking.id ===
-            targetId
-        )
-      ) {
-        targetId =
-          rows[0].id;
-      }
-
-      setSelectedBookingId(
-        targetId
-      );
-
-      await markHostMessagesRead(
-        targetId
-      );
-    } catch (error) {
-      console.error(
-        error
-      );
-
-      setErrorMessage(
-        error.message ||
-          'Unable to load conversations.'
-      );
     }
+
+    if (
+      !target ||
+      !rows.some(
+        (booking) =>
+          booking.id ===
+          target
+      )
+    ) {
+      target =
+        rows[0].id;
+    }
+
+    setSelectedBookingId(
+      target
+    );
+
+    await markRead(
+      target
+    );
   }
 
-  async function markHostMessagesRead(
+  async function markRead(
     bookingId
   ) {
     if (!bookingId) {
@@ -510,8 +486,8 @@ export default function GuestMessagesPage() {
       );
 
     setMessages(
-      (previous) =>
-        previous.map(
+      (old) =>
+        old.map(
           (item) =>
             item.booking_id ===
               bookingId &&
@@ -519,7 +495,8 @@ export default function GuestMessagesPage() {
               'host'
               ? {
                   ...item,
-                  is_read: true,
+                  is_read:
+                    true,
                 }
               : item
         )
@@ -535,7 +512,7 @@ export default function GuestMessagesPage() {
 
     setReply('');
 
-    await markHostMessagesRead(
+    await markRead(
       bookingId
     );
 
@@ -565,23 +542,23 @@ export default function GuestMessagesPage() {
     useMemo(() => {
       return bookings.map(
         (booking) => {
-          const threadMessages =
+          const list =
             messages.filter(
               (message) =>
                 message.booking_id ===
                 booking.id
             );
 
-          const lastMessage =
-            threadMessages.length
-              ? threadMessages[
-                  threadMessages.length -
+          const last =
+            list.length
+              ? list[
+                  list.length -
                     1
                 ]
               : null;
 
           const unread =
-            threadMessages.filter(
+            list.filter(
               (message) =>
                 message.sender_type ===
                   'host' &&
@@ -591,12 +568,9 @@ export default function GuestMessagesPage() {
           return {
             booking,
             messages:
-              threadMessages,
-            lastMessage,
+              list,
+            last,
             unread,
-            displayTime:
-              lastMessage?.created_at ||
-              booking.created_at,
           };
         }
       );
@@ -617,7 +591,7 @@ export default function GuestMessagesPage() {
       selectedBookingId,
     ]);
 
-  async function sendReply() {
+  async function sendMessage() {
     const text =
       reply.trim();
 
@@ -643,8 +617,7 @@ export default function GuestMessagesPage() {
           .insert({
             booking_id:
               selectedThread
-                .booking
-                .id,
+                .booking.id,
 
             sender_type:
               'guest',
@@ -652,8 +625,6 @@ export default function GuestMessagesPage() {
             sender_name:
               guestProfile
                 ?.full_name ||
-              session?.user
-                ?.email ||
               'Guest',
 
             message:
@@ -672,18 +643,16 @@ export default function GuestMessagesPage() {
         throw error;
       }
 
-      setReply('');
-
       setMessages(
-        (previous) => [
-          ...previous,
+        (old) => [
+          ...old,
           data,
         ]
       );
+
+      setReply('');
     } catch (error) {
-      console.error(
-        error
-      );
+      console.error(error);
 
       setErrorMessage(
         error.message ||
@@ -694,35 +663,25 @@ export default function GuestMessagesPage() {
     }
   }
 
-  function getBookingStatus(
+  function bookingStatus(
     booking
   ) {
-    const paid =
-      String(
-        booking.payment_status ||
-          ''
-      ).toLowerCase() ===
-      'paid';
-
-    if (paid) {
+    if (
+      booking.payment_status ===
+      'paid'
+    ) {
       return 'Booking Confirmed';
     }
 
-    const decision =
-      String(
-        booking.host_decision ||
-          ''
-      ).toLowerCase();
-
     if (
-      decision ===
+      booking.host_decision ===
       'approved'
     ) {
       return 'Host Approved';
     }
 
     if (
-      decision ===
+      booking.host_decision ===
       'declined'
     ) {
       return 'Declined';
@@ -732,7 +691,7 @@ export default function GuestMessagesPage() {
       booking.offer_status ===
       'host_offered'
     ) {
-      return 'Special Offer Sent';
+      return 'Special Offer';
     }
 
     return 'Booking Requested';
@@ -761,16 +720,15 @@ export default function GuestMessagesPage() {
           styles.container
         }
       >
-
         <div
           style={
-            styles.headingRow
+            styles.titleRow
           }
         >
           <div>
             <h1
               style={
-                styles.heading
+                styles.title
               }
             >
               Messages
@@ -778,22 +736,23 @@ export default function GuestMessagesPage() {
 
             <p
               style={
-                styles.muted
+                styles.subtitle
               }
             >
-              Chat with the host about your booking requests and stays.
+              Chat with the host about your booking.
             </p>
           </div>
 
           <button
             type="button"
+            style={
+              styles.refresh
+            }
             onClick={() =>
               loadInbox(
+                guestProfile,
                 selectedBookingId
               )
-            }
-            style={
-              styles.refreshButton
             }
           >
             Refresh
@@ -810,33 +769,32 @@ export default function GuestMessagesPage() {
           </div>
         )}
 
-        {threads.length ===
-        0 ? (
+        {!threads.length ? (
           <div
             style={
-              styles.emptyState
+              styles.empty
             }
           >
             <div
-              style={
-                styles.emptyIcon
-              }
+              style={{
+                fontSize: 42,
+              }}
             >
               💬
             </div>
 
             <h2>
-              No conversations yet
+              No conversations
             </h2>
 
             <p>
-              Your booking conversations will appear here after you send a booking request.
+              Booking conversations will appear here.
             </p>
 
             <a
               href="/"
               style={
-                styles.browseButton
+                styles.browse
               }
             >
               Browse Properties
@@ -845,65 +803,64 @@ export default function GuestMessagesPage() {
         ) : (
           <div
             style={
-              styles.messagingLayout
+              styles.layout
             }
           >
-
             <aside
               style={
-                styles.threadList
+                styles.threads
               }
             >
               <div
                 style={
-                  styles.inboxTitle
+                  styles.threadHeading
                 }
               >
                 Conversations
-
-                <span
-                  style={
-                    styles.inboxCount
-                  }
-                >
-                  {threads.length}
-                </span>
               </div>
 
               {threads.map(
                 (thread) => {
+                  const property =
+                    properties[
+                      thread
+                        .booking
+                        .property_id
+                    ];
+
                   const selected =
-                    thread.booking.id ===
+                    thread.booking
+                      .id ===
                     selectedBookingId;
 
                   return (
                     <button
                       key={
-                        thread.booking.id
+                        thread
+                          .booking.id
                       }
                       type="button"
                       onClick={() =>
                         openThread(
-                          thread.booking.id
+                          thread
+                            .booking.id
                         )
                       }
                       style={{
-                        ...styles.threadButton,
+                        ...styles.thread,
 
                         ...(selected
-                          ? styles.selectedThread
+                          ? styles.selected
                           : {}),
                       }}
                     >
-
                       <div
                         style={
                           styles.threadTop
                         }
                       >
                         <strong>
-                          {thread.booking
-                            .properties
+                          {property
                             ?.name ||
                             'Property'}
                         </strong>
@@ -912,7 +869,7 @@ export default function GuestMessagesPage() {
                           0 && (
                           <span
                             style={
-                              styles.unreadBadge
+                              styles.badge
                             }
                           >
                             {
@@ -924,43 +881,35 @@ export default function GuestMessagesPage() {
 
                       <div
                         style={
-                          styles.bookingCode
+                          styles.code
                         }
                       >
-                        {thread.booking
-                          .booking_code ||
-                          'Booking'}
+                        {
+                          thread
+                            .booking
+                            .booking_code
+                        }
                       </div>
 
                       <div
                         style={
-                          styles.threadPreview
+                          styles.preview
                         }
                       >
-                        {thread
-                          .lastMessage
+                        {thread.last
                           ?.message ||
                           'Booking conversation'}
                       </div>
 
                       <div
                         style={
-                          styles.threadBottom
+                          styles.status
                         }
                       >
-                        <span>
-                          {getBookingStatus(
-                            thread.booking
-                          )}
-                        </span>
-
-                        <span>
-                          {formatDateTime(
-                            thread.displayTime
-                          )}
-                        </span>
+                        {bookingStatus(
+                          thread.booking
+                        )}
                       </div>
-
                     </button>
                   );
                 }
@@ -969,36 +918,27 @@ export default function GuestMessagesPage() {
 
             <section
               style={
-                styles.conversation
+                styles.chat
               }
             >
-
-              {!selectedThread ? (
-                <div
-                  style={
-                    styles.noSelection
-                  }
-                >
-                  Select a conversation.
-                </div>
-              ) : (
+              {selectedThread ? (
                 <>
-
                   <div
                     style={
-                      styles.conversationHeader
+                      styles.chatHeader
                     }
                   >
                     <div>
                       <h2
-                        style={
-                          styles.propertyName
-                        }
+                        style={{
+                          margin: 0,
+                        }}
                       >
-                        {selectedThread
-                          .booking
-                          .properties
-                          ?.name ||
+                        {properties[
+                          selectedThread
+                            .booking
+                            .property_id
+                        ]?.name ||
                           'Property'}
                       </h2>
 
@@ -1007,9 +947,11 @@ export default function GuestMessagesPage() {
                           styles.bookingInfo
                         }
                       >
-                        {selectedThread
-                          .booking
-                          .booking_code}
+                        {
+                          selectedThread
+                            .booking
+                            .booking_code
+                        }
 
                         {' · '}
 
@@ -1027,17 +969,6 @@ export default function GuestMessagesPage() {
                             .check_out
                         )}
                       </div>
-
-                      <div
-                        style={
-                          styles.statusPill
-                        }
-                      >
-                        {getBookingStatus(
-                          selectedThread
-                            .booking
-                        )}
-                      </div>
                     </div>
 
                     <a
@@ -1052,16 +983,15 @@ export default function GuestMessagesPage() {
 
                   <div
                     style={
-                      styles.messagesArea
+                      styles.messages
                     }
                   >
-                    {selectedThread
+                    {!selectedThread
                       .messages
-                      .length ===
-                      0 && (
+                      .length && (
                       <div
                         style={
-                          styles.emptyConversation
+                          styles.noMessages
                         }
                       >
                         No messages yet.
@@ -1071,26 +1001,13 @@ export default function GuestMessagesPage() {
                     {selectedThread
                       .messages
                       .map(
-                        (
-                          message
-                        ) => (
-                          <MessageBubble
+                        (message) => (
+                          <Bubble
                             key={
                               message.id
                             }
-                            senderType={
-                              message.sender_type
-                            }
-                            senderName={
-                              message.sender_name
-                            }
                             message={
-                              message.message
-                            }
-                            time={
-                              formatDateTime(
-                                message.created_at
-                              )
+                              message
                             }
                           />
                         )
@@ -1099,7 +1016,7 @@ export default function GuestMessagesPage() {
 
                   <div
                     style={
-                      styles.replyBox
+                      styles.reply
                     }
                   >
                     <textarea
@@ -1115,7 +1032,7 @@ export default function GuestMessagesPage() {
                             .value
                         )
                       }
-                      placeholder="Type your message to the host..."
+                      placeholder="Write a message to the host..."
                       style={
                         styles.textarea
                       }
@@ -1123,20 +1040,20 @@ export default function GuestMessagesPage() {
 
                     <button
                       type="button"
-                      onClick={
-                        sendReply
-                      }
                       disabled={
                         sending ||
                         !reply.trim()
                       }
+                      onClick={
+                        sendMessage
+                      }
                       style={{
-                        ...styles.sendButton,
+                        ...styles.send,
 
                         opacity:
                           sending ||
                           !reply.trim()
-                            ? 0.55
+                            ? 0.5
                             : 1,
                       }}
                     >
@@ -1145,59 +1062,61 @@ export default function GuestMessagesPage() {
                         : 'Send'}
                     </button>
                   </div>
-
                 </>
+              ) : (
+                <div
+                  style={
+                    styles.noMessages
+                  }
+                >
+                  Select a conversation.
+                </div>
               )}
-
             </section>
-
           </div>
         )}
-
       </section>
     </main>
   );
 }
 
-function MessageBubble({
-  senderType,
-  senderName,
+function Bubble({
   message,
-  time,
 }) {
-  if (
-    senderType ===
-    'system'
-  ) {
+  const guest =
+    message.sender_type ===
+    'guest';
+
+  const system =
+    message.sender_type ===
+    'system';
+
+  if (system) {
     return (
       <div
         style={
-          styles.systemBubble
+          styles.systemMessage
         }
       >
-        <div>
-          {message}
-        </div>
+        {message.message}
 
         <div
           style={
-            styles.messageTime
+            styles.time
           }
         >
-          {time}
+          {formatDateTime(
+            message.created_at
+          )}
         </div>
       </div>
     );
   }
 
-  const guest =
-    senderType ===
-    'guest';
-
   return (
     <div
       style={{
-        ...styles.messageRow,
+        ...styles.bubbleRow,
 
         justifyContent:
           guest
@@ -1207,38 +1126,40 @@ function MessageBubble({
     >
       <div
         style={{
-          ...styles.messageBubble,
+          ...styles.bubble,
 
           ...(guest
             ? styles.guestBubble
             : styles.hostBubble),
         }}
       >
-        <div
-          style={
-            styles.senderName
-          }
+        <strong
+          style={{
+            fontSize: 10,
+          }}
         >
-          {senderName ||
-            (guest
-              ? 'You'
-              : 'Host')}
+          {guest
+            ? 'You'
+            : message.sender_name ||
+              'Host'}
+        </strong>
+
+        <div
+          style={{
+            marginTop: 5,
+          }}
+        >
+          {message.message}
         </div>
 
         <div
           style={
-            styles.messageText
+            styles.time
           }
         >
-          {message}
-        </div>
-
-        <div
-          style={
-            styles.messageTime
-          }
-        >
-          {time}
+          {formatDateTime(
+            message.created_at
+          )}
         </div>
       </div>
     </div>
@@ -1247,703 +1168,302 @@ function MessageBubble({
 
 const styles = {
   page: {
-    minHeight:
-      '100vh',
-
-    background:
-      '#f5f7fa',
-
-    color:
-      '#102a43',
-
+    minHeight: '100vh',
+    background: '#f5f7fa',
     fontFamily:
       'Arial, sans-serif',
+    color: '#102a43',
   },
 
   loading: {
-    minHeight:
-      '70vh',
-
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
+    minHeight: '70vh',
+    display: 'flex',
+    alignItems: 'center',
     justifyContent:
       'center',
-
-    fontFamily:
-      'Arial, sans-serif',
-
-    color:
-      '#174f91',
-
-    fontWeight:
-      700,
+    color: '#174f91',
+    fontWeight: 700,
   },
 
   container: {
-    width:
-      '94%',
-
-    maxWidth:
-      1250,
-
-    margin:
-      '0 auto',
-
+    width: '94%',
+    maxWidth: 1250,
+    margin: '0 auto',
     padding:
       '30px 0 70px',
   },
 
-  headingRow: {
-    display:
-      'flex',
-
-    alignItems:
-      'flex-end',
-
+  titleRow: {
+    display: 'flex',
     justifyContent:
       'space-between',
-
-    gap:
-      20,
-
-    flexWrap:
-      'wrap',
-
-    marginBottom:
-      22,
+    alignItems: 'flex-end',
+    gap: 15,
+    flexWrap: 'wrap',
+    marginBottom: 20,
   },
 
-  heading: {
+  title: {
     margin: 0,
-
     fontSize: 30,
   },
 
-  muted: {
+  subtitle: {
+    color: '#667085',
     margin:
       '7px 0 0',
-
-    color:
-      '#667085',
   },
 
-  refreshButton: {
+  refresh: {
+    background: '#fff',
     border:
       '1px solid #174f91',
-
-    background:
-      '#ffffff',
-
-    color:
-      '#174f91',
-
-    borderRadius:
-      9,
-
+    color: '#174f91',
+    borderRadius: 9,
     padding:
       '10px 16px',
-
-    fontWeight:
-      800,
-
-    cursor:
-      'pointer',
+    fontWeight: 800,
+    cursor: 'pointer',
   },
 
   error: {
-    marginBottom:
-      18,
-
-    padding:
-      13,
-
-    background:
-      '#fdeaea',
-
-    color:
-      '#9c2d2d',
-
-    borderRadius:
-      9,
-
-    fontWeight:
-      700,
+    background: '#fdeaea',
+    color: '#9c2d2d',
+    borderRadius: 9,
+    padding: 12,
+    marginBottom: 16,
   },
 
-  messagingLayout: {
-    display:
-      'grid',
-
+  layout: {
+    display: 'grid',
     gridTemplateColumns:
-      '330px minmax(0, 1fr)',
-
-    minHeight:
-      620,
-
-    background:
-      '#ffffff',
-
+      '320px minmax(0, 1fr)',
+    minHeight: 600,
+    background: '#fff',
     border:
       '1px solid #dfe4ea',
-
-    borderRadius:
-      16,
-
-    overflow:
-      'hidden',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
 
-  threadList: {
+  threads: {
     borderRight:
       '1px solid #e4e7ec',
-
-    background:
-      '#fbfcfe',
-
-    overflowY:
-      'auto',
   },
 
-  inboxTitle: {
-    padding:
-      '18px',
-
+  threadHeading: {
+    padding: 18,
+    fontWeight: 800,
     borderBottom:
       '1px solid #e4e7ec',
-
-    fontWeight:
-      800,
-
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    justifyContent:
-      'space-between',
   },
 
-  inboxCount: {
-    background:
-      '#174f91',
-
-    color:
-      '#ffffff',
-
-    borderRadius:
-      999,
-
-    padding:
-      '4px 8px',
-
-    fontSize:
-      11,
-  },
-
-  threadButton: {
-    width:
-      '100%',
-
+  thread: {
+    width: '100%',
     border: 0,
-
     borderBottom:
       '1px solid #edf0f3',
-
-    background:
-      '#ffffff',
-
-    padding:
-      16,
-
-    textAlign:
-      'left',
-
-    cursor:
-      'pointer',
-
-    color:
-      '#102a43',
+    background: '#fff',
+    textAlign: 'left',
+    padding: 15,
+    cursor: 'pointer',
   },
 
-  selectedThread: {
-    background:
-      '#eef5fc',
-
+  selected: {
+    background: '#eef5fc',
     borderLeft:
       '4px solid #174f91',
   },
 
   threadTop: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
+    display: 'flex',
     justifyContent:
       'space-between',
-
-    gap:
-      10,
+    gap: 8,
   },
 
-  unreadBadge: {
-    background:
-      '#d92d20',
-
-    color:
-      '#ffffff',
-
-    minWidth:
-      20,
-
-    height:
-      20,
-
-    borderRadius:
-      999,
-
-    display:
-      'inline-flex',
-
-    alignItems:
-      'center',
-
+  badge: {
+    background: '#d92d20',
+    color: '#fff',
+    borderRadius: 999,
+    minWidth: 20,
+    height: 20,
+    display: 'flex',
+    alignItems: 'center',
     justifyContent:
       'center',
-
-    fontSize:
-      10,
-
-    fontWeight:
-      800,
+    fontSize: 10,
   },
 
-  bookingCode: {
-    marginTop:
-      5,
-
-    fontSize:
-      11,
-
-    color:
-      '#174f91',
-
-    fontWeight:
-      700,
+  code: {
+    marginTop: 5,
+    color: '#174f91',
+    fontSize: 11,
+    fontWeight: 700,
   },
 
-  threadPreview: {
-    marginTop:
-      9,
-
-    color:
-      '#667085',
-
-    fontSize:
-      12,
-
-    whiteSpace:
-      'nowrap',
-
-    overflow:
-      'hidden',
-
+  preview: {
+    marginTop: 8,
+    color: '#667085',
+    fontSize: 12,
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
     textOverflow:
       'ellipsis',
   },
 
-  threadBottom: {
-    marginTop:
-      10,
-
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    gap:
-      10,
-
-    color:
-      '#667085',
-
-    fontSize:
-      9,
+  status: {
+    marginTop: 8,
+    fontSize: 10,
+    fontWeight: 700,
+    color: '#475467',
   },
 
-  conversation: {
+  chat: {
     minWidth: 0,
-
-    display:
-      'flex',
-
+    display: 'flex',
     flexDirection:
       'column',
-
-    background:
-      '#ffffff',
   },
 
-  conversationHeader: {
-    padding:
-      20,
-
+  chatHeader: {
+    padding: 18,
     borderBottom:
       '1px solid #e4e7ec',
-
-    display:
-      'flex',
-
+    display: 'flex',
     justifyContent:
       'space-between',
-
-    alignItems:
-      'flex-start',
-
-    gap:
-      15,
-  },
-
-  propertyName: {
-    margin: 0,
-
-    fontSize:
-      20,
+    gap: 10,
   },
 
   bookingInfo: {
-    marginTop:
-      6,
-
-    color:
-      '#667085',
-
-    fontSize:
-      12,
-  },
-
-  statusPill: {
-    display:
-      'inline-block',
-
-    marginTop:
-      9,
-
-    padding:
-      '6px 10px',
-
-    borderRadius:
-      999,
-
-    background:
-      '#eef5fc',
-
-    color:
-      '#174f91',
-
-    fontSize:
-      11,
-
-    fontWeight:
-      800,
+    marginTop: 6,
+    color: '#667085',
+    fontSize: 12,
   },
 
   bookingLink: {
+    color: '#174f91',
     textDecoration:
       'none',
-
-    color:
-      '#174f91',
-
-    fontWeight:
-      800,
-
-    fontSize:
-      12,
+    fontWeight: 800,
   },
 
-  messagesArea: {
+  messages: {
     flex: 1,
-
-    padding:
-      20,
-
-    overflowY:
-      'auto',
-
-    background:
-      '#f8fafc',
+    padding: 20,
+    background: '#f8fafc',
+    overflowY: 'auto',
   },
 
-  messageRow: {
-    display:
-      'flex',
-
-    marginBottom:
-      12,
+  bubbleRow: {
+    display: 'flex',
+    marginBottom: 12,
   },
 
-  messageBubble: {
-    maxWidth:
-      '75%',
-
+  bubble: {
+    maxWidth: '75%',
     padding:
       '11px 13px',
-
-    borderRadius:
-      14,
-
-    boxShadow:
-      '0 1px 2px rgba(0,0,0,0.05)',
+    borderRadius: 14,
+    fontSize: 13,
+    lineHeight: 1.45,
   },
 
   guestBubble: {
-    background:
-      '#174f91',
-
-    color:
-      '#ffffff',
-
-    borderBottomRightRadius:
-      4,
+    background: '#174f91',
+    color: '#fff',
   },
 
   hostBubble: {
-    background:
-      '#ffffff',
-
+    background: '#fff',
     border:
       '1px solid #dfe4ea',
-
-    color:
-      '#102a43',
-
-    borderBottomLeftRadius:
-      4,
   },
 
-  senderName: {
-    fontSize:
-      9,
-
-    fontWeight:
-      800,
-
-    opacity:
-      0.8,
-
-    marginBottom:
-      4,
-  },
-
-  messageText: {
-    fontSize:
-      13,
-
-    lineHeight:
-      1.45,
-
-    whiteSpace:
-      'pre-wrap',
-  },
-
-  messageTime: {
-    marginTop:
-      6,
-
-    fontSize:
-      8,
-
-    opacity:
-      0.7,
-
-    textAlign:
-      'right',
-  },
-
-  systemBubble: {
+  systemMessage: {
+    maxWidth: '75%',
     margin:
       '10px auto',
-
-    maxWidth:
-      '80%',
-
-    background:
-      '#fff8e7',
-
-    color:
-      '#715b1b',
-
-    padding:
-      '10px 13px',
-
-    borderRadius:
-      10,
-
-    textAlign:
-      'center',
-
-    fontSize:
-      11,
+    padding: 10,
+    background: '#fff8e7',
+    borderRadius: 9,
+    textAlign: 'center',
+    color: '#715b1b',
   },
 
-  replyBox: {
-    padding:
-      16,
+  time: {
+    marginTop: 6,
+    fontSize: 8,
+    opacity: 0.7,
+  },
 
+  reply: {
+    padding: 15,
     borderTop:
       '1px solid #e4e7ec',
-
-    display:
-      'grid',
-
+    display: 'grid',
     gridTemplateColumns:
       '1fr auto',
-
-    gap:
-      10,
-
-    background:
-      '#ffffff',
+    gap: 10,
   },
 
   textarea: {
-    width:
-      '100%',
-
-    minHeight:
-      70,
-
-    resize:
-      'vertical',
-
-    padding:
-      12,
-
+    width: '100%',
+    minHeight: 65,
     border:
-      '1px solid #cfd6df',
-
-    borderRadius:
-      10,
-
-    fontFamily:
-      'Arial, sans-serif',
-
+      '1px solid #ccd4dd',
+    borderRadius: 9,
+    padding: 11,
     boxSizing:
       'border-box',
+    resize: 'vertical',
   },
 
-  sendButton: {
+  send: {
     border: 0,
-
-    background:
-      '#174f91',
-
-    color:
-      '#ffffff',
-
+    background: '#174f91',
+    color: '#fff',
+    borderRadius: 9,
     padding:
-      '0 22px',
-
-    borderRadius:
-      10,
-
-    fontWeight:
-      800,
-
-    cursor:
-      'pointer',
+      '0 20px',
+    fontWeight: 800,
+    cursor: 'pointer',
   },
 
-  noSelection: {
-    minHeight:
-      500,
-
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
+  noMessages: {
+    flex: 1,
+    minHeight: 300,
+    display: 'flex',
+    alignItems: 'center',
     justifyContent:
       'center',
-
-    color:
-      '#667085',
+    color: '#667085',
   },
 
-  emptyConversation: {
-    color:
-      '#667085',
-
-    textAlign:
-      'center',
-
-    marginTop:
-      50,
-  },
-
-  emptyState: {
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #dfe4ea',
-
-    borderRadius:
-      16,
-
-    padding:
-      '60px 25px',
-
-    textAlign:
-      'center',
-
-    maxWidth:
-      650,
-
+  empty: {
+    maxWidth: 650,
     margin:
       '40px auto',
-
-    color:
-      '#475467',
+    background: '#fff',
+    padding: 50,
+    border:
+      '1px solid #dfe4ea',
+    borderRadius: 16,
+    textAlign: 'center',
   },
 
-  emptyIcon: {
-    fontSize:
-      42,
-  },
-
-  browseButton: {
+  browse: {
     display:
       'inline-block',
-
-    marginTop:
-      15,
-
+    marginTop: 12,
     padding:
-      '12px 18px',
-
-    background:
-      '#174f91',
-
-    color:
-      '#ffffff',
-
+      '11px 17px',
+    background: '#174f91',
+    color: '#fff',
+    borderRadius: 9,
     textDecoration:
       'none',
-
-    borderRadius:
-      9,
-
-    fontWeight:
-      800,
+    fontWeight: 800,
   },
 };
