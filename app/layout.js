@@ -1,3 +1,18 @@
 import './globals.css';
-export const metadata={title:'NightOutStays',description:'Book premium stays directly'};
-export default function RootLayout({children}){return <html lang="en"><body>{children}</body></html>}
+import SiteHeader from './components/SiteHeader';
+
+export const metadata = {
+  title: 'NightOutStays',
+  description: 'Book short stays directly with NightOutStays',
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <SiteHeader />
+        {children}
+      </body>
+    </html>
+  );
+}
