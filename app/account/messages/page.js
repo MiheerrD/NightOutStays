@@ -7,81 +7,50 @@ import {
 } from 'react';
 
 import {
+  useSearchParams,
+} from 'next/navigation';
+
+import {
   createClient,
 } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  'https://gxwemplbykjxhezefykh.supabase.co',
-  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
-);
-
-function monthStart(date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    1
-  );
-}
-
-function monthEnd(date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    0
-  );
-}
-
-function toDateString(date) {
-  return [
-    date.getFullYear(),
-    String(
-      date.getMonth() + 1
-    ).padStart(2, '0'),
-    String(
-      date.getDate()
-    ).padStart(2, '0'),
-  ].join('-');
-}
-
-function parseDate(value) {
-  return new Date(
-    `${value}T12:00:00`
-  );
-}
-
-function addDays(
-  value,
-  count
-) {
-  const date =
-    typeof value === 'string'
-      ? parseDate(value)
-      : new Date(value);
-
-  date.setDate(
-    date.getDate() +
-      Number(count || 0)
+const supabase =
+  createClient(
+    'https://gxwemplbykjxhezefykh.supabase.co',
+    'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
   );
 
-  return date;
-}
+function formatDateTime(value) {
+  if (!value) {
+    return '';
+  }
 
-function formatMonth(date) {
-  return date.toLocaleDateString(
-    'en-IN',
-    {
-      month: 'long',
-      year: 'numeric',
-    }
-  );
+  try {
+    return new Date(
+      value
+    ).toLocaleString(
+      'en-IN',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }
+    );
+  } catch {
+    return value;
+  }
 }
 
 function formatDate(value) {
-  if (!value) return '';
+  if (!value) {
+    return '';
+  }
 
   try {
-    return parseDate(
-      value
+    return new Date(
+      `${value}T12:00:00`
     ).toLocaleDateString(
       'en-IN',
       {
@@ -95,129 +64,23 @@ function formatDate(value) {
   }
 }
 
-function guestInitials(name) {
-  const words =
-    String(
-      name || ''
-    )
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
+export default function GuestMessagesPage() {
+  const searchParams =
+    useSearchParams();
 
-  if (!words.length) {
-    return 'G';
-  }
+  const requestedBooking =
+    searchParams.get(
+      'booking'
+    );
 
-  if (words.length === 1) {
-    return words[0]
-      .slice(0, 2)
-      .toUpperCase();
-  }
-
-  return (
-    words[0][0] +
-    words[
-      words.length - 1
-    ][0]
-  ).toUpperCase();
-}
-
-function guestShortName(name) {
-  const words =
-    String(
-      name || ''
-    )
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-  if (!words.length) {
-    return 'Guest';
-  }
-
-  if (words.length === 1) {
-    return words[0];
-  }
-
-  return `${words[0]} ${words[1][0]}.`;
-}
-
-function dateInStay(
-  dateString,
-  checkIn,
-  checkOut
-) {
-  return (
-    dateString >= checkIn &&
-    dateString < checkOut
-  );
-}
-
-function dateInBlock(
-  dateString,
-  startDate,
-  endDate
-) {
-  return (
-    dateString >=
-      startDate &&
-    dateString <=
-      endDate
-  );
-}
-
-function sourceLabel(
-  source
-) {
-  const value =
-    String(
-      source || ''
-    ).toLowerCase();
-
-  if (
-    value ===
-    'airbnb'
-  ) {
-    return 'Airbnb';
-  }
-
-  if (
-    value ===
-      'booking_com' ||
-    value ===
-      'booking.com'
-  ) {
-    return 'Booking.com';
-  }
-
-  if (
-    value ===
-    'manual'
-  ) {
-    return 'Host Blocked';
-  }
-
-  if (
-    value ===
-    'nightoutstays'
-  ) {
-    return 'NightOutStays';
-  }
-
-  return source
-    ? source
-    : 'Other Portal';
-}
-
-export default function AdminCalendarPage() {
   const [
     session,
     setSession,
   ] = useState(null);
 
   const [
-    adminProfile,
-    setAdminProfile,
+    guestProfile,
+    setGuestProfile,
   ] = useState(null);
 
   const [
@@ -226,42 +89,33 @@ export default function AdminCalendarPage() {
   ] = useState(true);
 
   const [
-    error,
-    setError,
-  ] = useState('');
-
-  const [
-    properties,
-    setProperties,
-  ] = useState([]);
-
-  const [
-    selectedPropertyId,
-    setSelectedPropertyId,
-  ] = useState('');
-
-  const [
     bookings,
     setBookings,
   ] = useState([]);
 
   const [
-    blockedDates,
-    setBlockedDates,
+    messages,
+    setMessages,
   ] = useState([]);
 
   const [
-    currentMonth,
-    setCurrentMonth,
-  ] = useState(
-    monthStart(
-      new Date()
-    )
-  );
+    selectedBookingId,
+    setSelectedBookingId,
+  ] = useState('');
 
   const [
-    selectedDate,
-    setSelectedDate,
+    reply,
+    setReply,
+  ] = useState('');
+
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
   ] = useState('');
 
   useEffect(() => {
@@ -270,49 +124,16 @@ export default function AdminCalendarPage() {
 
   useEffect(() => {
     if (
-      selectedPropertyId
-    ) {
-      loadCalendarData(
-        selectedPropertyId
-      );
-    }
-  }, [
-    selectedPropertyId,
-  ]);
-
-  useEffect(() => {
-    if (
-      !selectedPropertyId
+      !session?.user ||
+      !guestProfile?.id
     ) {
       return;
     }
 
-    const bookingChannel =
+    const channel =
       supabase
         .channel(
-          `host-calendar-bookings-${selectedPropertyId}`
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'bookings',
-            filter:
-              `property_id=eq.${selectedPropertyId}`,
-          },
-          () => {
-            loadCalendarData(
-              selectedPropertyId
-            );
-          }
-        )
-        .subscribe();
-
-    const blockedChannel =
-      supabase
-        .channel(
-          `host-calendar-blocks-${selectedPropertyId}`
+          `guest-messages-${guestProfile.id}`
         )
         .on(
           'postgres_changes',
@@ -320,13 +141,11 @@ export default function AdminCalendarPage() {
             event: '*',
             schema: 'public',
             table:
-              'blocked_dates',
-            filter:
-              `property_id=eq.${selectedPropertyId}`,
+              'booking_messages',
           },
           () => {
-            loadCalendarData(
-              selectedPropertyId
+            loadInbox(
+              selectedBookingId
             );
           }
         )
@@ -334,20 +153,18 @@ export default function AdminCalendarPage() {
 
     return () => {
       supabase.removeChannel(
-        bookingChannel
-      );
-
-      supabase.removeChannel(
-        blockedChannel
+        channel
       );
     };
   }, [
-    selectedPropertyId,
+    session,
+    guestProfile,
+    selectedBookingId,
   ]);
 
   async function initialise() {
     setLoading(true);
-    setError('');
+    setErrorMessage('');
 
     try {
       const {
@@ -358,15 +175,20 @@ export default function AdminCalendarPage() {
         error:
           sessionError,
       } =
-        await supabase.auth.getSession();
+        await supabase.auth
+          .getSession();
 
-      if (sessionError) {
+      if (
+        sessionError
+      ) {
         throw sessionError;
       }
 
-      if (!currentSession) {
+      if (
+        !currentSession?.user
+      ) {
         window.location.href =
-          '/admin/bookings';
+          '/';
 
         return;
       }
@@ -375,61 +197,221 @@ export default function AdminCalendarPage() {
         currentSession
       );
 
+      const user =
+        currentSession.user;
+
       const {
         data:
-          profile,
+          guestRows,
         error:
-          profileError,
+          guestError,
       } =
         await supabase
           .from(
-            'admin_profiles'
+            'guests'
           )
           .select(
-            'user_id, full_name, role, is_active'
+            'id, user_id, full_name, phone, email'
           )
           .eq(
             'user_id',
-            currentSession.user.id
+            user.id
           )
-          .eq(
-            'is_active',
-            true
-          )
-          .single();
+          .limit(1);
 
       if (
-        profileError ||
-        !profile
+        guestError
       ) {
-        throw new Error(
-          'Admin access not available.'
-        );
+        throw guestError;
       }
 
-      setAdminProfile(
-        profile
+      let guest =
+        guestRows?.[0] ||
+        null;
+
+      /*
+        Older guest profiles may not
+        yet contain user_id.
+
+        Use email as a safe fallback.
+      */
+      if (
+        !guest &&
+        user.email
+      ) {
+        const {
+          data:
+            emailGuests,
+          error:
+            emailError,
+        } =
+          await supabase
+            .from(
+              'guests'
+            )
+            .select(
+              'id, user_id, full_name, phone, email'
+            )
+            .eq(
+              'email',
+              user.email
+            )
+            .limit(1);
+
+        if (
+          emailError
+        ) {
+          throw emailError;
+        }
+
+        guest =
+          emailGuests?.[0] ||
+          null;
+      }
+
+      if (!guest) {
+        setErrorMessage(
+          'Guest profile not found for this login.'
+        );
+
+        return;
+      }
+
+      setGuestProfile(
+        guest
       );
+
+      await loadInbox(
+        '',
+        guest
+      );
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setErrorMessage(
+        error.message ||
+          'Unable to load messages.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadInbox(
+    preferredBookingId = '',
+    profileOverride = null
+  ) {
+    const profile =
+      profileOverride ||
+      guestProfile;
+
+    if (!profile?.id) {
+      return;
+    }
+
+    try {
+      setErrorMessage('');
 
       const {
         data:
-          propertyRows,
+          bookingRows,
         error:
-          propertyError,
+          bookingError,
       } =
         await supabase
           .from(
-            'properties'
+            'bookings'
           )
-          .select(
-            'id, name, slug, location_name, is_active'
-          )
+          .select(`
+            id,
+            booking_code,
+            property_id,
+            guest_id,
+            check_in,
+            check_out,
+            guests_count,
+            booking_status,
+            payment_status,
+            host_decision,
+            offer_status,
+            total_amount,
+            final_payable_amount,
+            created_at,
+            properties (
+              id,
+              name,
+              location_name
+            )
+          `)
           .eq(
-            'is_active',
-            true
+            'guest_id',
+            profile.id
           )
           .order(
-            'name',
+            'created_at',
+            {
+              ascending:
+                false,
+            }
+          );
+
+      if (
+        bookingError
+      ) {
+        throw bookingError;
+      }
+
+      const rows =
+        bookingRows ||
+        [];
+
+      setBookings(
+        rows
+      );
+
+      if (
+        rows.length ===
+        0
+      ) {
+        setMessages([]);
+        setSelectedBookingId('');
+        return;
+      }
+
+      const bookingIds =
+        rows.map(
+          (booking) =>
+            booking.id
+        );
+
+      const {
+        data:
+          messageRows,
+        error:
+          messageError,
+      } =
+        await supabase
+          .from(
+            'booking_messages'
+          )
+          .select(`
+            id,
+            booking_id,
+            sender_type,
+            sender_name,
+            message,
+            message_type,
+            is_read,
+            created_at
+          `)
+          .in(
+            'booking_id',
+            bookingIds
+          )
+          .order(
+            'created_at',
             {
               ascending:
                 true,
@@ -437,466 +419,323 @@ export default function AdminCalendarPage() {
           );
 
       if (
-        propertyError
+        messageError
       ) {
-        throw propertyError;
+        throw messageError;
       }
 
-      const rows =
-        propertyRows || [];
-
-      setProperties(
-        rows
+      setMessages(
+        messageRows ||
+          []
       );
+
+      let targetId =
+        preferredBookingId ||
+        selectedBookingId;
 
       if (
-        rows.length
+        requestedBooking
       ) {
-        setSelectedPropertyId(
-          rows[0].id
-        );
+        const requested =
+          rows.find(
+            (booking) =>
+              booking.id ===
+                requestedBooking ||
+              booking.booking_code ===
+                requestedBooking
+          );
+
+        if (requested) {
+          targetId =
+            requested.id;
+        }
       }
-    } catch (
-      initError
-    ) {
-      console.error(
-        initError
+
+      if (
+        !targetId ||
+        !rows.some(
+          (booking) =>
+            booking.id ===
+            targetId
+        )
+      ) {
+        targetId =
+          rows[0].id;
+      }
+
+      setSelectedBookingId(
+        targetId
       );
 
-      setError(
-        initError.message ||
-          'Unable to open calendar.'
+      await markHostMessagesRead(
+        targetId
       );
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setErrorMessage(
+        error.message ||
+          'Unable to load conversations.'
+      );
     }
   }
 
-  async function loadCalendarData(
-    propertyId
+  async function markHostMessagesRead(
+    bookingId
   ) {
-    setError('');
+    if (!bookingId) {
+      return;
+    }
 
-    try {
-      const [
-        bookingResult,
-        blockedResult,
-      ] =
-        await Promise.all([
-          supabase
-            .from(
-              'bookings'
-            )
-            .select(`
-              id,
-              booking_code,
-              property_id,
-              guest_id,
-              check_in,
-              check_out,
-              booking_status,
-              payment_status,
-              created_at,
-              guests (
-                id,
-                full_name,
-                phone,
-                email
-              )
-            `)
-            .eq(
-              'property_id',
-              propertyId
-            )
-            .order(
-              'check_in',
-              {
-                ascending:
-                  true,
-              }
-            ),
-
-          supabase
-            .from(
-              'blocked_dates'
-            )
-            .select(`
-              id,
-              property_id,
-              start_date,
-              end_date,
-              reason,
-              source,
-              external_uid,
-              created_at
-            `)
-            .eq(
-              'property_id',
-              propertyId
-            )
-            .order(
-              'start_date',
-              {
-                ascending:
-                  true,
-              }
-            ),
-        ]);
-
-      if (
-        bookingResult.error
-      ) {
-        throw bookingResult.error;
-      }
-
-      if (
-        blockedResult.error
-      ) {
-        throw blockedResult.error;
-      }
-
-      setBookings(
-        bookingResult.data ||
-          []
+    await supabase
+      .from(
+        'booking_messages'
+      )
+      .update({
+        is_read: true,
+      })
+      .eq(
+        'booking_id',
+        bookingId
+      )
+      .eq(
+        'sender_type',
+        'host'
+      )
+      .eq(
+        'is_read',
+        false
       );
 
-      setBlockedDates(
-        blockedResult.data ||
-          []
-      );
-    } catch (
-      loadError
+    setMessages(
+      (previous) =>
+        previous.map(
+          (item) =>
+            item.booking_id ===
+              bookingId &&
+            item.sender_type ===
+              'host'
+              ? {
+                  ...item,
+                  is_read: true,
+                }
+              : item
+        )
+    );
+  }
+
+  async function openThread(
+    bookingId
+  ) {
+    setSelectedBookingId(
+      bookingId
+    );
+
+    setReply('');
+
+    await markHostMessagesRead(
+      bookingId
+    );
+
+    if (
+      typeof window !==
+      'undefined'
     ) {
-      console.error(
-        loadError
+      const url =
+        new URL(
+          window.location.href
+        );
+
+      url.searchParams.set(
+        'booking',
+        bookingId
       );
 
-      setError(
-        loadError.message ||
-          'Unable to load calendar.'
+      window.history.replaceState(
+        {},
+        '',
+        url
       );
     }
   }
 
-  const selectedProperty =
-    useMemo(
-      () =>
-        properties.find(
-          (property) =>
-            property.id ===
-            selectedPropertyId
-        ) || null,
-      [
-        properties,
-        selectedPropertyId,
-      ]
-    );
+  const threads =
+    useMemo(() => {
+      return bookings.map(
+        (booking) => {
+          const threadMessages =
+            messages.filter(
+              (message) =>
+                message.booking_id ===
+                booking.id
+            );
 
-  const calendarDays =
-    useMemo(
-      () => {
-        const first =
-          monthStart(
-            currentMonth
-          );
+          const lastMessage =
+            threadMessages.length
+              ? threadMessages[
+                  threadMessages.length -
+                    1
+                ]
+              : null;
 
-        const last =
-          monthEnd(
-            currentMonth
-          );
+          const unread =
+            threadMessages.filter(
+              (message) =>
+                message.sender_type ===
+                  'host' &&
+                !message.is_read
+            ).length;
 
-        const startOffset =
-          first.getDay();
-
-        const days = [];
-
-        for (
-          let index = 0;
-          index <
-          startOffset;
-          index++
-        ) {
-          days.push(null);
-        }
-
-        for (
-          let day = 1;
-          day <=
-          last.getDate();
-          day++
-        ) {
-          days.push(
-            new Date(
-              currentMonth.getFullYear(),
-              currentMonth.getMonth(),
-              day
-            )
-          );
-        }
-
-        while (
-          days.length %
-            7 !==
-          0
-        ) {
-          days.push(null);
-        }
-
-        return days;
-      },
-      [
-        currentMonth,
-      ]
-    );
-
-  const selectedDayDetails =
-    useMemo(
-      () => {
-        if (
-          !selectedDate
-        ) {
           return {
-            bookings: [],
-            blocks: [],
+            booking,
+            messages:
+              threadMessages,
+            lastMessage,
+            unread,
+            displayTime:
+              lastMessage?.created_at ||
+              booking.created_at,
           };
         }
+      );
+    }, [
+      bookings,
+      messages,
+    ]);
 
-        const dayBookings =
-          bookings.filter(
-            (booking) =>
-              dateInStay(
-                selectedDate,
-                booking.check_in,
-                booking.check_out
-              )
-          );
+  const selectedThread =
+    useMemo(() => {
+      return threads.find(
+        (thread) =>
+          thread.booking.id ===
+          selectedBookingId
+      );
+    }, [
+      threads,
+      selectedBookingId,
+    ]);
 
-        const dayBlocks =
-          blockedDates.filter(
-            (block) =>
-              dateInBlock(
-                selectedDate,
-                block.start_date,
-                block.end_date
-              )
-          );
+  async function sendReply() {
+    const text =
+      reply.trim();
 
-        return {
-          bookings:
-            dayBookings,
-          blocks:
-            dayBlocks,
-        };
-      },
-      [
-        selectedDate,
-        bookings,
-        blockedDates,
-      ]
-    );
+    if (
+      !text ||
+      !selectedThread
+    ) {
+      return;
+    }
 
-  function getDayInfo(
-    dateString
+    setSending(true);
+    setErrorMessage('');
+
+    try {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            'booking_messages'
+          )
+          .insert({
+            booking_id:
+              selectedThread
+                .booking
+                .id,
+
+            sender_type:
+              'guest',
+
+            sender_name:
+              guestProfile
+                ?.full_name ||
+              session?.user
+                ?.email ||
+              'Guest',
+
+            message:
+              text,
+
+            message_type:
+              'message',
+
+            is_read:
+              false,
+          })
+          .select('*')
+          .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setReply('');
+
+      setMessages(
+        (previous) => [
+          ...previous,
+          data,
+        ]
+      );
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      setErrorMessage(
+        error.message ||
+          'Unable to send message.'
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function getBookingStatus(
+    booking
   ) {
-    const dayBookings =
-      bookings.filter(
-        (booking) =>
-          dateInStay(
-            dateString,
-            booking.check_in,
-            booking.check_out
-          )
-      );
+    const paid =
+      String(
+        booking.payment_status ||
+          ''
+      ).toLowerCase() ===
+      'paid';
 
-    const confirmedPaid =
-      dayBookings.find(
-        (booking) =>
-          booking.booking_status ===
-            'confirmed' &&
-          booking.payment_status ===
-            'paid'
-      );
-
-    const confirmedUnpaid =
-      dayBookings.find(
-        (booking) =>
-          booking.booking_status ===
-            'confirmed' &&
-          booking.payment_status !==
-            'paid'
-      );
-
-    const pending =
-      dayBookings.find(
-        (booking) =>
-          booking.booking_status ===
-          'pending'
-      );
-
-    const dayBlocks =
-      blockedDates.filter(
-        (block) =>
-          dateInBlock(
-            dateString,
-            block.start_date,
-            block.end_date
-          )
-      );
-
-    const externalBlock =
-      dayBlocks.find(
-        (block) =>
-          String(
-            block.source ||
-              ''
-          ).toLowerCase() !==
-          'manual'
-      );
-
-    const manualBlock =
-      dayBlocks.find(
-        (block) =>
-          String(
-            block.source ||
-              ''
-          ).toLowerCase() ===
-          'manual'
-      );
-
-    if (confirmedPaid) {
-      return {
-        type:
-          'booked',
-
-        booking:
-          confirmedPaid,
-
-        label:
-          guestShortName(
-            confirmedPaid
-              .guests
-              ?.full_name
-          ),
-
-        initials:
-          guestInitials(
-            confirmedPaid
-              .guests
-              ?.full_name
-          ),
-      };
+    if (paid) {
+      return 'Booking Confirmed';
     }
 
-    if (externalBlock) {
-      return {
-        type:
-          'external',
+    const decision =
+      String(
+        booking.host_decision ||
+          ''
+      ).toLowerCase();
 
-        block:
-          externalBlock,
-
-        label:
-          externalBlock.reason ||
-          'Booked by other portal',
-
-        source:
-          sourceLabel(
-            externalBlock.source
-          ),
-      };
+    if (
+      decision ===
+      'approved'
+    ) {
+      return 'Host Approved';
     }
 
-    if (manualBlock) {
-      return {
-        type:
-          'manual',
-
-        block:
-          manualBlock,
-
-        label:
-          manualBlock.reason ||
-          'Host Blocked',
-      };
+    if (
+      decision ===
+      'declined'
+    ) {
+      return 'Declined';
     }
 
-    if (confirmedUnpaid) {
-      return {
-        type:
-          'accepted',
-
-        booking:
-          confirmedUnpaid,
-
-        label:
-          guestShortName(
-            confirmedUnpaid
-              .guests
-              ?.full_name
-          ),
-      };
+    if (
+      booking.offer_status ===
+      'host_offered'
+    ) {
+      return 'Special Offer Sent';
     }
 
-    if (pending) {
-      return {
-        type:
-          'pending',
-
-        booking:
-          pending,
-
-        label:
-          guestShortName(
-            pending.guests
-              ?.full_name
-          ),
-      };
-    }
-
-    return {
-      type:
-        'available',
-    };
-  }
-
-  function previousMonth() {
-    setCurrentMonth(
-      new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth() -
-          1,
-        1
-      )
-    );
-
-    setSelectedDate('');
-  }
-
-  function nextMonth() {
-    setCurrentMonth(
-      new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth() +
-          1,
-        1
-      )
-    );
-
-    setSelectedDate('');
-  }
-
-  function goToday() {
-    setCurrentMonth(
-      monthStart(
-        new Date()
-      )
-    );
-
-    setSelectedDate(
-      toDateString(
-        new Date()
-      )
-    );
+    return 'Booking Requested';
   }
 
   if (loading) {
@@ -906,7 +745,7 @@ export default function AdminCalendarPage() {
           styles.loading
         }
       >
-        Loading host calendar...
+        Loading messages...
       </main>
     );
   }
@@ -917,1080 +756,491 @@ export default function AdminCalendarPage() {
         styles.page
       }
     >
-      <header
-        style={
-          styles.header
-        }
-      >
-        <div>
-          <div
-            style={
-              styles.brand
-            }
-          >
-            NightOutStays
-          </div>
-
-          <div
-            style={
-              styles.subBrand
-            }
-          >
-            Host Calendar
-          </div>
-        </div>
-
-        <div
-          style={
-            styles.headerRight
-          }
-        >
-          <nav
-            style={
-              styles.nav
-            }
-          >
-            <a
-              href="/admin/bookings"
-              style={
-                styles.navLink
-              }
-            >
-              Bookings
-            </a>
-
-            <a
-              href="/admin/properties"
-              style={
-                styles.navLink
-              }
-            >
-              Properties
-            </a>
-
-            <a
-              href="/admin/calendar"
-              style={
-                styles.activeNavLink
-              }
-            >
-              Calendar
-            </a>
-
-            <a
-              href="/admin/messages"
-              style={
-                styles.navLink
-              }
-            >
-              Messages
-            </a>
-
-            <a
-              href="/admin/notifications"
-              style={
-                styles.navLink
-              }
-            >
-              Notifications
-            </a>
-
-            <a
-              href="/admin/reports"
-              style={
-                styles.navLink
-              }
-            >
-              Reports
-            </a>
-          </nav>
-
-          <div
-            style={
-              styles.adminIdentity
-            }
-          >
-            <strong>
-              {adminProfile
-                ?.full_name ||
-                'Admin'}
-            </strong>
-
-            <div
-              style={
-                styles.adminRole
-              }
-            >
-              {adminProfile
-                ?.role ||
-                'admin'}
-            </div>
-          </div>
-        </div>
-      </header>
-
       <section
         style={
           styles.container
         }
       >
+
         <div
           style={
-            styles.pageHeadingRow
+            styles.headingRow
           }
         >
           <div>
             <h1
               style={
-                styles.pageHeading
+                styles.heading
               }
             >
-              Property Calendar
+              Messages
             </h1>
 
             <p
               style={
-                styles.pageSubheading
+                styles.muted
               }
             >
-              View NightOutStays bookings, host-blocked dates and bookings imported from other portals.
+              Chat with the host about your booking requests and stays.
             </p>
           </div>
 
-          <div
+          <button
+            type="button"
+            onClick={() =>
+              loadInbox(
+                selectedBookingId
+              )
+            }
             style={
-              styles.topActions
+              styles.refreshButton
             }
           >
-            <button
-              type="button"
-              onClick={
-                goToday
-              }
-              style={
-                styles.secondaryButton
-              }
-            >
-              Today
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                loadCalendarData(
-                  selectedPropertyId
-                )
-              }
-              style={
-                styles.primaryButton
-              }
-            >
-              Refresh
-            </button>
-          </div>
+            Refresh
+          </button>
         </div>
 
-        {error && (
+        {errorMessage && (
           <div
             style={
-              styles.errorBox
+              styles.error
             }
           >
-            {error}
+            {errorMessage}
           </div>
         )}
 
-        <div
-          style={
-            styles.propertyToolbar
-          }
-        >
-          <label
-            style={
-              styles.fieldLabel
-            }
-          >
-            PROPERTY
-
-            <select
-              value={
-                selectedPropertyId
-              }
-              onChange={(
-                event
-              ) => {
-                setSelectedPropertyId(
-                  event.target.value
-                );
-
-                setSelectedDate(
-                  ''
-                );
-              }}
-              style={
-                styles.select
-              }
-            >
-              {properties.map(
-                (
-                  property
-                ) => (
-                  <option
-                    key={
-                      property.id
-                    }
-                    value={
-                      property.id
-                    }
-                  >
-                    {
-                      property.name
-                    }
-                    {property.location_name
-                      ? ` — ${property.location_name}`
-                      : ''}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
+        {threads.length ===
+        0 ? (
           <div
             style={
-              styles.selectedPropertyInfo
+              styles.emptyState
             }
           >
-            <strong>
-              {selectedProperty
-                ?.name ||
-                'No property selected'}
-            </strong>
+            <div
+              style={
+                styles.emptyIcon
+              }
+            >
+              💬
+            </div>
 
-            <span>
-              {selectedProperty
-                ?.location_name ||
-                ''}
-            </span>
+            <h2>
+              No conversations yet
+            </h2>
+
+            <p>
+              Your booking conversations will appear here after you send a booking request.
+            </p>
+
+            <a
+              href="/"
+              style={
+                styles.browseButton
+              }
+            >
+              Browse Properties
+            </a>
           </div>
-        </div>
-
-        <div
-          style={
-            styles.legend
-          }
-        >
-          <Legend
-            label="Property Booked"
-            type="booked"
-          />
-
-          <Legend
-            label="Booking Accepted"
-            type="accepted"
-          />
-
-          <Legend
-            label="Booking Requested"
-            type="pending"
-          />
-
-          <Legend
-            label="Booked by Other Portal"
-            type="external"
-          />
-
-          <Legend
-            label="Host Blocked"
-            type="manual"
-          />
-
-          <Legend
-            label="Available"
-            type="available"
-          />
-        </div>
-
-        <div
-          style={
-            styles.calendarLayout
-          }
-        >
-          <section
+        ) : (
+          <div
             style={
-              styles.calendarCard
+              styles.messagingLayout
             }
           >
-            <div
+
+            <aside
               style={
-                styles.calendarHeader
+                styles.threadList
               }
             >
-              <button
-                type="button"
-                onClick={
-                  previousMonth
-                }
+              <div
                 style={
-                  styles.monthButton
+                  styles.inboxTitle
                 }
               >
-                ‹
-              </button>
+                Conversations
 
-              <h2
-                style={
-                  styles.monthTitle
-                }
-              >
-                {formatMonth(
-                  currentMonth
-                )}
-              </h2>
-
-              <button
-                type="button"
-                onClick={
-                  nextMonth
-                }
-                style={
-                  styles.monthButton
-                }
-              >
-                ›
-              </button>
-            </div>
-
-            <div
-              style={
-                styles.weekHeader
-              }
-            >
-              {[
-                'Sun',
-                'Mon',
-                'Tue',
-                'Wed',
-                'Thu',
-                'Fri',
-                'Sat',
-              ].map(
-                (
-                  day
-                ) => (
-                  <div
-                    key={
-                      day
-                    }
-                    style={
-                      styles.weekDay
-                    }
-                  >
-                    {day}
-                  </div>
-                )
-              )}
-            </div>
-
-            <div
-              style={
-                styles.calendarGrid
-              }
-            >
-              {calendarDays.map(
-                (
-                  date,
-                  index
-                ) => {
-                  if (!date) {
-                    return (
-                      <div
-                        key={`empty-${index}`}
-                        style={
-                          styles.emptyDay
-                        }
-                      />
-                    );
+                <span
+                  style={
+                    styles.inboxCount
                   }
+                >
+                  {threads.length}
+                </span>
+              </div>
 
-                  const dateString =
-                    toDateString(
-                      date
-                    );
-
-                  const info =
-                    getDayInfo(
-                      dateString
-                    );
-
-                  const isPast =
-                    dateString <
-                    toDateString(
-                      new Date()
-                    );
-
-                  const isSelected =
-                    selectedDate ===
-                    dateString;
+              {threads.map(
+                (thread) => {
+                  const selected =
+                    thread.booking.id ===
+                    selectedBookingId;
 
                   return (
                     <button
                       key={
-                        dateString
+                        thread.booking.id
                       }
                       type="button"
                       onClick={() =>
-                        setSelectedDate(
-                          dateString
+                        openThread(
+                          thread.booking.id
                         )
                       }
                       style={{
-                        ...styles.dayCell,
+                        ...styles.threadButton,
 
-                        ...(isSelected
-                          ? styles.selectedDay
-                          : {}),
-
-                        ...(info.type ===
-                        'booked'
-                          ? styles.bookedDay
-                          : {}),
-
-                        ...(info.type ===
-                        'accepted'
-                          ? styles.acceptedDay
-                          : {}),
-
-                        ...(info.type ===
-                        'pending'
-                          ? styles.pendingDay
-                          : {}),
-
-                        ...(info.type ===
-                        'external'
-                          ? styles.externalDay
-                          : {}),
-
-                        ...(info.type ===
-                        'manual'
-                          ? styles.manualDay
+                        ...(selected
+                          ? styles.selectedThread
                           : {}),
                       }}
                     >
+
                       <div
                         style={
-                          styles.dayTop
+                          styles.threadTop
                         }
                       >
-                        <span
-                          style={
-                            styles.dayNumber
-                          }
-                        >
-                          {
-                            date.getDate()
-                          }
-                        </span>
+                        <strong>
+                          {thread.booking
+                            .properties
+                            ?.name ||
+                            'Property'}
+                        </strong>
 
-                        {info.type ===
-                          'booked' && (
+                        {thread.unread >
+                          0 && (
                           <span
                             style={
-                              styles.initialBadge
+                              styles.unreadBadge
                             }
                           >
                             {
-                              info.initials
+                              thread.unread
                             }
                           </span>
                         )}
                       </div>
 
-                      {info.type !==
-                        'available' && (
-                        <div
-                          style={
-                            styles.dayBookingLine
-                          }
-                        >
-                          {info.type ===
-                          'external'
-                            ? info.source
-                            : info.label}
-                        </div>
-                      )}
+                      <div
+                        style={
+                          styles.bookingCode
+                        }
+                      >
+                        {thread.booking
+                          .booking_code ||
+                          'Booking'}
+                      </div>
 
-                      {isPast &&
-                        info.type ===
-                          'available' && (
-                          <div
-                            style={
-                              styles.pastEmpty
-                            }
-                          >
-                            &nbsp;
-                          </div>
-                        )}
+                      <div
+                        style={
+                          styles.threadPreview
+                        }
+                      >
+                        {thread
+                          .lastMessage
+                          ?.message ||
+                          'Booking conversation'}
+                      </div>
+
+                      <div
+                        style={
+                          styles.threadBottom
+                        }
+                      >
+                        <span>
+                          {getBookingStatus(
+                            thread.booking
+                          )}
+                        </span>
+
+                        <span>
+                          {formatDateTime(
+                            thread.displayTime
+                          )}
+                        </span>
+                      </div>
+
                     </button>
                   );
                 }
               )}
-            </div>
-          </section>
-          <aside
-            style={
-              styles.detailsColumn
-            }
-          >
+            </aside>
+
             <section
               style={
-                styles.detailsCard
+                styles.conversation
               }
             >
-              <h3
-                style={
-                  styles.detailsTitle
-                }
-              >
-                Date Details
-              </h3>
 
-              {!selectedDate ? (
+              {!selectedThread ? (
                 <div
                   style={
-                    styles.detailsEmpty
+                    styles.noSelection
                   }
                 >
-                  Select any date on the calendar to view booking details.
+                  Select a conversation.
                 </div>
               ) : (
                 <>
+
                   <div
                     style={
-                      styles.selectedDateTitle
+                      styles.conversationHeader
                     }
                   >
-                    {formatDate(
-                      selectedDate
-                    )}
+                    <div>
+                      <h2
+                        style={
+                          styles.propertyName
+                        }
+                      >
+                        {selectedThread
+                          .booking
+                          .properties
+                          ?.name ||
+                          'Property'}
+                      </h2>
+
+                      <div
+                        style={
+                          styles.bookingInfo
+                        }
+                      >
+                        {selectedThread
+                          .booking
+                          .booking_code}
+
+                        {' · '}
+
+                        {formatDate(
+                          selectedThread
+                            .booking
+                            .check_in
+                        )}
+
+                        {' → '}
+
+                        {formatDate(
+                          selectedThread
+                            .booking
+                            .check_out
+                        )}
+                      </div>
+
+                      <div
+                        style={
+                          styles.statusPill
+                        }
+                      >
+                        {getBookingStatus(
+                          selectedThread
+                            .booking
+                        )}
+                      </div>
+                    </div>
+
+                    <a
+                      href="/account/bookings"
+                      style={
+                        styles.bookingLink
+                      }
+                    >
+                      My Bookings
+                    </a>
                   </div>
 
-                  {selectedDayDetails.bookings.length ===
-                    0 &&
-                    selectedDayDetails.blocks.length ===
+                  <div
+                    style={
+                      styles.messagesArea
+                    }
+                  >
+                    {selectedThread
+                      .messages
+                      .length ===
                       0 && (
                       <div
                         style={
-                          styles.availableDetails
+                          styles.emptyConversation
                         }
                       >
-                        Available
+                        No messages yet.
                       </div>
                     )}
 
-                  {selectedDayDetails.bookings.map(
-                    (booking) => {
-                      const guestName =
-                        booking.guests
-                          ?.full_name ||
-                        'Guest';
-
-                      const isPaid =
-                        booking.payment_status ===
-                        'paid';
-
-                      const isConfirmed =
-                        booking.booking_status ===
-                        'confirmed';
-
-                      let displayStatus =
-                        'Booking Requested';
-
-                      if (
-                        isConfirmed &&
-                        isPaid
-                      ) {
-                        displayStatus =
-                          'Property Booked';
-                      } else if (
-                        isConfirmed
-                      ) {
-                        displayStatus =
-                          'Booking Accepted';
-                      }
-
-                      return (
-                        <div
-                          key={
-                            booking.id
-                          }
-                          style={
-                            styles.bookingDetailCard
-                          }
-                        >
-                          <div
-                            style={
-                              styles.detailStatus
+                    {selectedThread
+                      .messages
+                      .map(
+                        (
+                          message
+                        ) => (
+                          <MessageBubble
+                            key={
+                              message.id
                             }
-                          >
-                            {
-                              displayStatus
+                            senderType={
+                              message.sender_type
                             }
-                          </div>
-
-                          <DetailRow
-                            label="Guest"
-                            value={
-                              guestName
+                            senderName={
+                              message.sender_name
+                            }
+                            message={
+                              message.message
+                            }
+                            time={
+                              formatDateTime(
+                                message.created_at
+                              )
                             }
                           />
-
-                          <DetailRow
-                            label="Booking ID"
-                            value={
-                              booking.booking_code
-                            }
-                          />
-
-                          <DetailRow
-                            label="Check-in"
-                            value={formatDate(
-                              booking.check_in
-                            )}
-                          />
-
-                          <DetailRow
-                            label="Check-out"
-                            value={formatDate(
-                              booking.check_out
-                            )}
-                          />
-
-                          <DetailRow
-                            label="Payment"
-                            value={
-                              booking.payment_status ||
-                              'pending'
-                            }
-                          />
-
-                          <DetailRow
-                            label="Source"
-                            value="NightOutStays"
-                          />
-
-                          {booking.guests
-                            ?.phone && (
-                            <DetailRow
-                              label="Phone"
-                              value={
-                                booking.guests.phone
-                              }
-                            />
-                          )}
-                        </div>
-                      );
-                    }
-                  )}
-
-                  {selectedDayDetails.blocks.map(
-                    (block) => (
-                      <div
-                        key={
-                          block.id
-                        }
-                        style={
-                          styles.blockDetailCard
-                        }
-                      >
-                        <div
-                          style={
-                            styles.blockStatus
-                          }
-                        >
-                          {String(
-                            block.source ||
-                              ''
-                          ).toLowerCase() ===
-                          'manual'
-                            ? 'Host Blocked'
-                            : 'Booked by Other Portal'}
-                        </div>
-
-                        <DetailRow
-                          label="Source"
-                          value={sourceLabel(
-                            block.source
-                          )}
-                        />
-
-                        <DetailRow
-                          label="From"
-                          value={formatDate(
-                            block.start_date
-                          )}
-                        />
-
-                        <DetailRow
-                          label="To"
-                          value={formatDate(
-                            block.end_date
-                          )}
-                        />
-
-                        <DetailRow
-                          label="Remark"
-                          value={
-                            block.reason ||
-                            (String(
-                              block.source ||
-                                ''
-                            ).toLowerCase() ===
-                            'manual'
-                              ? 'Blocked by host'
-                              : 'Booked by other portal')
-                          }
-                        />
-
-                        {block.external_uid && (
-                          <DetailRow
-                            label="External Reference"
-                            value={
-                              block.external_uid
-                            }
-                          />
-                        )}
-                      </div>
-                    )
-                  )}
-                </>
-              )}
-            </section>
-
-            <section
-              style={
-                styles.syncCard
-              }
-            >
-              <div
-                style={
-                  styles.syncHeader
-                }
-              >
-                <div>
-                  <h3
-                    style={
-                      styles.detailsTitle
-                    }
-                  >
-                    Calendar Sync
-                  </h3>
-
-                  <div
-                    style={
-                      styles.syncDescription
-                    }
-                  >
-                    Connect this property calendar with Airbnb, Booking.com and other portals.
+                        )
+                      )}
                   </div>
-                </div>
-              </div>
 
-              <div
-                style={
-                  styles.syncProperty
-                }
-              >
-                <span>
-                  Property
-                </span>
-
-                <strong>
-                  {selectedProperty
-                    ?.name ||
-                    'Select property'}
-                </strong>
-              </div>
-
-              <div
-                style={
-                  styles.syncSection
-                }
-              >
-                <div
-                  style={
-                    styles.syncSectionTitle
-                  }
-                >
-                  NightOutStays Export Calendar
-                </div>
-
-                <p
-                  style={
-                    styles.syncHelp
-                  }
-                >
-                  This will be the calendar link you can add to Airbnb, Booking.com or another website.
-                </p>
-
-                {selectedPropertyId ? (
                   <div
                     style={
-                      styles.exportBox
+                      styles.replyBox
                     }
                   >
-                    <input
-                      readOnly
+                    <textarea
                       value={
-                        typeof window !==
-                        'undefined'
-                          ? `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`
-                          : `/api/calendar/${selectedPropertyId}.ics`
+                        reply
                       }
+                      onChange={(
+                        event
+                      ) =>
+                        setReply(
+                          event
+                            .target
+                            .value
+                        )
+                      }
+                      placeholder="Type your message to the host..."
                       style={
-                        styles.exportInput
+                        styles.textarea
                       }
                     />
 
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          const url =
-                            `${window.location.origin}/api/calendar/${selectedPropertyId}.ics`;
-
-                          await navigator.clipboard.writeText(
-                            url
-                          );
-
-                          alert(
-                            'Calendar link copied.'
-                          );
-                        } catch (
-                          copyError
-                        ) {
-                          console.error(
-                            copyError
-                          );
-
-                          alert(
-                            'Unable to copy calendar link.'
-                          );
-                        }
-                      }}
-                      style={
-                        styles.copyButton
+                      onClick={
+                        sendReply
                       }
+                      disabled={
+                        sending ||
+                        !reply.trim()
+                      }
+                      style={{
+                        ...styles.sendButton,
+
+                        opacity:
+                          sending ||
+                          !reply.trim()
+                            ? 0.55
+                            : 1,
+                      }}
                     >
-                      Copy Link
+                      {sending
+                        ? 'Sending...'
+                        : 'Send'}
                     </button>
                   </div>
-                ) : (
-                  <div
-                    style={
-                      styles.syncDisabled
-                    }
-                  >
-                    Select a property first.
-                  </div>
-                )}
 
-                <div
-                  style={
-                    styles.syncNote
-                  }
-                >
-                  We will activate this export link in the next step. Do not add it to Airbnb yet.
-                </div>
-              </div>
+                </>
+              )}
 
-              <div
-                style={
-                  styles.syncDivider
-                }
-              />
-
-              <div
-                style={
-                  styles.syncSection
-                }
-              >
-                <div
-                  style={
-                    styles.syncSectionTitle
-                  }
-                >
-                  Import External Calendar
-                </div>
-
-                <p
-                  style={
-                    styles.syncHelp
-                  }
-                >
-                  Airbnb or another portal's iCal URL will be added here so externally booked dates automatically appear on this calendar.
-                </p>
-
-                <div
-                  style={
-                    styles.importPreview
-                  }
-                >
-                  <select
-                    disabled
-                    style={
-                      styles.disabledInput
-                    }
-                  >
-                    <option>
-                      Airbnb
-                    </option>
-
-                    <option>
-                      Booking.com
-                    </option>
-
-                    <option>
-                      Other Portal
-                    </option>
-                  </select>
-
-                  <input
-                    disabled
-                    placeholder="Paste external iCal URL"
-                    style={
-                      styles.disabledInput
-                    }
-                  />
-
-                  <button
-                    type="button"
-                    disabled
-                    style={
-                      styles.disabledButton
-                    }
-                  >
-                    Add Calendar
-                  </button>
-                </div>
-
-                <div
-                  style={
-                    styles.syncNote
-                  }
-                >
-                  External calendar import will be activated after the internal calendar is tested.
-                </div>
-              </div>
             </section>
-          </aside>
-        </div>
+
+          </div>
+        )}
+
       </section>
     </main>
   );
 }
 
-function DetailRow({
-  label,
-  value,
+function MessageBubble({
+  senderType,
+  senderName,
+  message,
+  time,
 }) {
-  return (
-    <div
-      style={
-        styles.detailRow
-      }
-    >
-      <span
+  if (
+    senderType ===
+    'system'
+  ) {
+    return (
+      <div
         style={
-          styles.detailLabel
+          styles.systemBubble
         }
       >
-        {label}
-      </span>
+        <div>
+          {message}
+        </div>
 
-      <strong
-        style={
-          styles.detailValue
-        }
-      >
-        {value || '—'}
-      </strong>
-    </div>
-  );
-}
+        <div
+          style={
+            styles.messageTime
+          }
+        >
+          {time}
+        </div>
+      </div>
+    );
+  }
 
-function Legend({
-  label,
-  type,
-}) {
-  const typeStyles = {
-    booked: {
-      background:
-        '#dff4e5',
-      border:
-        '#76b68a',
-    },
-
-    accepted: {
-      background:
-        '#e8f1ff',
-      border:
-        '#7da7df',
-    },
-
-    pending: {
-      background:
-        '#fff4d9',
-      border:
-        '#d5ad4c',
-    },
-
-    external: {
-      background:
-        '#f0e9ff',
-      border:
-        '#9d7bd1',
-    },
-
-    manual: {
-      background:
-        '#fbe7e7',
-      border:
-        '#d98d8d',
-    },
-
-    available: {
-      background:
-        '#ffffff',
-      border:
-        '#d7dce2',
-    },
-  };
-
-  const current =
-    typeStyles[type] ||
-    typeStyles.available;
+  const guest =
+    senderType ===
+    'guest';
 
   return (
     <div
-      style={
-        styles.legendItem
-      }
+      style={{
+        ...styles.messageRow,
+
+        justifyContent:
+          guest
+            ? 'flex-end'
+            : 'flex-start',
+      }}
     >
-      <span
+      <div
         style={{
-          ...styles.legendDot,
+          ...styles.messageBubble,
 
-          background:
-            current.background,
-
-          borderColor:
-            current.border,
+          ...(guest
+            ? styles.guestBubble
+            : styles.hostBubble),
         }}
-      />
+      >
+        <div
+          style={
+            styles.senderName
+          }
+        >
+          {senderName ||
+            (guest
+              ? 'You'
+              : 'Host')}
+        </div>
 
-      <span>
-        {label}
-      </span>
+        <div
+          style={
+            styles.messageText
+          }
+        >
+          {message}
+        </div>
+
+        <div
+          style={
+            styles.messageTime
+          }
+        >
+          {time}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2012,7 +1262,7 @@ const styles = {
 
   loading: {
     minHeight:
-      '100vh',
+      '70vh',
 
     display:
       'flex',
@@ -2022,165 +1272,15 @@ const styles = {
 
     justifyContent:
       'center',
-
-    background:
-      '#f5f7fa',
-
-    color:
-      '#174f91',
 
     fontFamily:
       'Arial, sans-serif',
 
-    fontWeight:
-      700,
-  },
-
-  header: {
-    minHeight:
-      72,
-
-    background:
-      '#ffffff',
-
-    borderBottom:
-      '1px solid #e4e7ec',
-
-    padding:
-      '10px 4%',
-
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    justifyContent:
-      'space-between',
-
-    gap:
-      20,
-
-    position:
-      'sticky',
-
-    top:
-      0,
-
-    zIndex:
-      50,
-  },
-
-  brand: {
     color:
       '#174f91',
-
-    fontWeight:
-      800,
-
-    fontSize:
-      21,
-  },
-
-  subBrand: {
-    color:
-      '#667085',
-
-    fontSize:
-      10,
-
-    marginTop:
-      2,
-  },
-
-  headerRight: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap:
-      20,
-  },
-
-  nav: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap:
-      8,
-
-    flexWrap:
-      'wrap',
-  },
-
-  navLink: {
-    color:
-      '#174f91',
-
-    textDecoration:
-      'none',
-
-    fontSize:
-      12,
 
     fontWeight:
       700,
-
-    padding:
-      '8px 10px',
-
-    borderRadius:
-      7,
-  },
-
-  activeNavLink: {
-    color:
-      '#ffffff',
-
-    background:
-      '#174f91',
-
-    textDecoration:
-      'none',
-
-    fontSize:
-      12,
-
-    fontWeight:
-      800,
-
-    padding:
-      '8px 12px',
-
-    borderRadius:
-      7,
-  },
-
-  adminIdentity: {
-    textAlign:
-      'right',
-
-    fontSize:
-      11,
-  },
-
-  adminRole: {
-    color:
-      '#667085',
-
-    fontSize:
-      9,
-
-    marginTop:
-      2,
-
-    textTransform:
-      'uppercase',
   },
 
   container: {
@@ -2188,16 +1288,16 @@ const styles = {
       '94%',
 
     maxWidth:
-      1450,
+      1250,
 
     margin:
       '0 auto',
 
     padding:
-      '28px 0 70px',
+      '30px 0 70px',
   },
 
-  pageHeadingRow: {
+  headingRow: {
     display:
       'flex',
 
@@ -2212,61 +1312,28 @@ const styles = {
 
     flexWrap:
       'wrap',
+
+    marginBottom:
+      22,
   },
 
-  pageHeading: {
-    margin:
-      0,
+  heading: {
+    margin: 0,
 
-    fontSize:
-      27,
+    fontSize: 30,
   },
 
-  pageSubheading: {
+  muted: {
     margin:
       '7px 0 0',
 
     color:
       '#667085',
-
-    fontSize:
-      12,
   },
 
-  topActions: {
-    display:
-      'flex',
-
-    gap:
-      8,
-  },
-
-  primaryButton: {
+  refreshButton: {
     border:
-      0,
-
-    background:
-      '#174f91',
-
-    color:
-      '#ffffff',
-
-    padding:
-      '9px 14px',
-
-    borderRadius:
-      8,
-
-    fontWeight:
-      700,
-
-    cursor:
-      'pointer',
-  },
-
-  secondaryButton: {
-    border:
-      '1px solid #cfd6df',
+      '1px solid #174f91',
 
     background:
       '#ffffff',
@@ -2274,308 +1341,124 @@ const styles = {
     color:
       '#174f91',
 
-    padding:
-      '9px 14px',
-
     borderRadius:
-      8,
+      9,
+
+    padding:
+      '10px 16px',
 
     fontWeight:
-      700,
+      800,
 
     cursor:
       'pointer',
   },
 
-  errorBox: {
-    marginTop:
-      15,
+  error: {
+    marginBottom:
+      18,
+
+    padding:
+      13,
 
     background:
       '#fdeaea',
 
     color:
-      '#a12828',
-
-    padding:
-      11,
+      '#9c2d2d',
 
     borderRadius:
-      8,
-
-    fontSize:
-      12,
-  },
-
-  propertyToolbar: {
-    marginTop:
-      22,
-
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #e0e5eb',
-
-    borderRadius:
-      12,
-
-    padding:
-      14,
-
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      'minmax(260px, 430px) 1fr',
-
-    gap:
-      20,
-
-    alignItems:
-      'end',
-  },
-
-  fieldLabel: {
-    display:
-      'grid',
-
-    gap:
-      6,
-
-    fontSize:
       9,
 
     fontWeight:
-      800,
-
-    color:
-      '#475467',
+      700,
   },
 
-  select: {
-    width:
-      '100%',
-
-    padding:
-      '10px 11px',
-
-    border:
-      '1px solid #cfd6df',
-
-    borderRadius:
-      8,
-
-    background:
-      '#ffffff',
-
-    color:
-      '#102a43',
-  },
-
-  selectedPropertyInfo: {
-    display:
-      'grid',
-
-    gap:
-      3,
-
-    fontSize:
-      13,
-  },
-
-  legend: {
-    margin:
-      '14px 0',
-
-    display:
-      'flex',
-
-    gap:
-      14,
-
-    alignItems:
-      'center',
-
-    flexWrap:
-      'wrap',
-
-    fontSize:
-      10,
-
-    color:
-      '#475467',
-  },
-
-  legendItem: {
-    display:
-      'flex',
-
-    alignItems:
-      'center',
-
-    gap:
-      5,
-  },
-
-  legendDot: {
-    width:
-      12,
-
-    height:
-      12,
-
-    borderRadius:
-      3,
-
-    border:
-      '1px solid',
-  },
-
-  calendarLayout: {
+  messagingLayout: {
     display:
       'grid',
 
     gridTemplateColumns:
-      'minmax(0, 1fr) 340px',
+      '330px minmax(0, 1fr)',
 
-    gap:
-      18,
+    minHeight:
+      620,
 
-    alignItems:
-      'start',
-  },
-
-  calendarCard: {
     background:
       '#ffffff',
 
     border:
-      '1px solid #e0e5eb',
+      '1px solid #dfe4ea',
 
     borderRadius:
-      14,
+      16,
 
     overflow:
       'hidden',
   },
 
-  calendarHeader: {
-    minHeight:
-      60,
-
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      '50px 1fr 50px',
-
-    alignItems:
-      'center',
-
-    borderBottom:
-      '1px solid #e5e7eb',
-  },
-
-  monthTitle: {
-    textAlign:
-      'center',
-
-    margin:
-      0,
-
-    fontSize:
-      20,
-  },
-
-  monthButton: {
-    border:
-      0,
+  threadList: {
+    borderRight:
+      '1px solid #e4e7ec',
 
     background:
-      'transparent',
+      '#fbfcfe',
 
-    color:
-      '#174f91',
-
-    fontSize:
-      30,
-
-    cursor:
-      'pointer',
+    overflowY:
+      'auto',
   },
 
-  weekHeader: {
-    display:
-      'grid',
-
-    gridTemplateColumns:
-      'repeat(7, minmax(0, 1fr))',
-
-    background:
-      '#f8fafc',
-
-    borderBottom:
-      '1px solid #e5e7eb',
-  },
-
-  weekDay: {
+  inboxTitle: {
     padding:
-      '10px 5px',
+      '18px',
 
-    textAlign:
-      'center',
-
-    fontSize:
-      10,
+    borderBottom:
+      '1px solid #e4e7ec',
 
     fontWeight:
       800,
 
-    color:
-      '#667085',
-  },
-
-  calendarGrid: {
     display:
-      'grid',
+      'flex',
 
-    gridTemplateColumns:
-      'repeat(7, minmax(0, 1fr))',
+    alignItems:
+      'center',
+
+    justifyContent:
+      'space-between',
   },
 
-  emptyDay: {
-    minHeight:
-      105,
-
+  inboxCount: {
     background:
-      '#fafbfc',
+      '#174f91',
 
-    borderRight:
-      '1px solid #edf0f3',
+    color:
+      '#ffffff',
+
+    borderRadius:
+      999,
+
+    padding:
+      '4px 8px',
+
+    fontSize:
+      11,
+  },
+
+  threadButton: {
+    width:
+      '100%',
+
+    border: 0,
 
     borderBottom:
       '1px solid #edf0f3',
-  },
-
-  dayCell: {
-    minHeight:
-      105,
-
-    padding:
-      8,
 
     background:
       '#ffffff',
 
-    border:
-      0,
-
-    borderRight:
-      '1px solid #edf0f3',
-
-    borderBottom:
-      '1px solid #edf0f3',
+    padding:
+      16,
 
     textAlign:
       'left',
@@ -2583,106 +1466,90 @@ const styles = {
     cursor:
       'pointer',
 
-    overflow:
-      'hidden',
+    color:
+      '#102a43',
   },
 
-  selectedDay: {
-    outline:
-      '2px solid #174f91',
-
-    outlineOffset:
-      '-2px',
-  },
-
-  bookedDay: {
+  selectedThread: {
     background:
-      '#e5f6ea',
+      '#eef5fc',
+
+    borderLeft:
+      '4px solid #174f91',
   },
 
-  acceptedDay: {
-    background:
-      '#eaf2ff',
-  },
-
-  pendingDay: {
-    background:
-      '#fff6dd',
-  },
-
-  externalDay: {
-    background:
-      '#f3edff',
-  },
-
-  manualDay: {
-    background:
-      '#fdecec',
-  },
-
-  dayTop: {
+  threadTop: {
     display:
       'flex',
-
-    justifyContent:
-      'space-between',
 
     alignItems:
       'center',
 
+    justifyContent:
+      'space-between',
+
     gap:
-      4,
+      10,
   },
 
-  dayNumber: {
-    fontSize:
-      12,
-
-    fontWeight:
-      800,
-
-    color:
-      '#344054',
-  },
-
-  initialBadge: {
+  unreadBadge: {
     background:
-      '#24723a',
+      '#d92d20',
 
     color:
       '#ffffff',
 
-    borderRadius:
+    minWidth:
       20,
 
-    padding:
-      '3px 6px',
+    height:
+      20,
+
+    borderRadius:
+      999,
+
+    display:
+      'inline-flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'center',
 
     fontSize:
-      8,
+      10,
 
     fontWeight:
       800,
   },
 
-  dayBookingLine: {
+  bookingCode: {
     marginTop:
-      14,
-
-    borderLeft:
-      '3px solid #174f91',
-
-    paddingLeft:
-      6,
+      5,
 
     fontSize:
-      9,
+      11,
+
+    color:
+      '#174f91',
 
     fontWeight:
       700,
+  },
 
-    lineHeight:
-      1.35,
+  threadPreview: {
+    marginTop:
+      9,
+
+    color:
+      '#667085',
+
+    fontSize:
+      12,
+
+    whiteSpace:
+      'nowrap',
 
     overflow:
       'hidden',
@@ -2691,139 +1558,93 @@ const styles = {
       'ellipsis',
   },
 
-  pastEmpty: {
-    minHeight:
-      25,
-  },
+  threadBottom: {
+    marginTop:
+      10,
 
-  detailsColumn: {
     display:
-      'grid',
+      'flex',
+
+    justifyContent:
+      'space-between',
 
     gap:
-      15,
-  },
-
-  detailsCard: {
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #e0e5eb',
-
-    borderRadius:
-      14,
-
-    padding:
-      15,
-  },
-
-  detailsTitle: {
-    margin:
-      0,
-
-    fontSize:
-      16,
-  },
-
-  detailsEmpty: {
-    marginTop:
-      14,
+      10,
 
     color:
       '#667085',
 
     fontSize:
-      11,
-
-    lineHeight:
-      1.5,
+      9,
   },
 
-  selectedDateTitle: {
-    marginTop:
-      12,
+  conversation: {
+    minWidth: 0,
 
-    paddingBottom:
-      9,
+    display:
+      'flex',
+
+    flexDirection:
+      'column',
+
+    background:
+      '#ffffff',
+  },
+
+  conversationHeader: {
+    padding:
+      20,
 
     borderBottom:
-      '1px solid #edf0f3',
+      '1px solid #e4e7ec',
 
-    fontWeight:
-      800,
+    display:
+      'flex',
+
+    justifyContent:
+      'space-between',
+
+    alignItems:
+      'flex-start',
+
+    gap:
+      15,
   },
 
-  availableDetails: {
-    marginTop:
-      12,
-
-    background:
-      '#edf8f0',
-
-    color:
-      '#24723a',
-
-    borderRadius:
-      8,
-
-    padding:
-      10,
-
-    fontWeight:
-      800,
+  propertyName: {
+    margin: 0,
 
     fontSize:
-      11,
+      20,
   },
 
-  bookingDetailCard: {
+  bookingInfo: {
     marginTop:
+      6,
+
+    color:
+      '#667085',
+
+    fontSize:
       12,
+  },
 
-    background:
-      '#f8fafc',
+  statusPill: {
+    display:
+      'inline-block',
 
-    border:
-      '1px solid #e1e6eb',
-
-    borderRadius:
+    marginTop:
       9,
 
     padding:
-      11,
-
-    display:
-      'grid',
-
-    gap:
-      7,
-  },
-
-  blockDetailCard: {
-    marginTop:
-      12,
-
-    background:
-      '#faf7ff',
-
-    border:
-      '1px solid #ded2f1',
+      '6px 10px',
 
     borderRadius:
-      9,
+      999,
 
-    padding:
-      11,
+    background:
+      '#eef5fc',
 
-    display:
-      'grid',
-
-    gap:
-      7,
-  },
-
-  detailStatus: {
     color:
       '#174f91',
 
@@ -2832,139 +1653,154 @@ const styles = {
 
     fontWeight:
       800,
-
-    marginBottom:
-      3,
   },
 
-  blockStatus: {
-    color:
-      '#7047a6',
+  bookingLink: {
+    textDecoration:
+      'none',
 
-    fontSize:
-      11,
+    color:
+      '#174f91',
 
     fontWeight:
       800,
 
-    marginBottom:
-      3,
+    fontSize:
+      12,
   },
 
-  detailRow: {
+  messagesArea: {
+    flex: 1,
+
+    padding:
+      20,
+
+    overflowY:
+      'auto',
+
+    background:
+      '#f8fafc',
+  },
+
+  messageRow: {
     display:
       'flex',
 
-    justifyContent:
-      'space-between',
-
-    gap:
-      10,
-
-    fontSize:
-      10,
+    marginBottom:
+      12,
   },
 
-  detailLabel: {
-    color:
-      '#667085',
-  },
+  messageBubble: {
+    maxWidth:
+      '75%',
 
-  detailValue: {
-    textAlign:
-      'right',
-
-    wordBreak:
-      'break-word',
-  },
-
-  syncCard: {
-    background:
-      '#ffffff',
-
-    border:
-      '1px solid #e0e5eb',
+    padding:
+      '11px 13px',
 
     borderRadius:
       14,
 
-    padding:
-      15,
+    boxShadow:
+      '0 1px 2px rgba(0,0,0,0.05)',
   },
 
-  syncHeader: {
-    display:
-      'flex',
-
-    justifyContent:
-      'space-between',
-
-    gap:
-      10,
-  },
-
-  syncDescription: {
-    color:
-      '#667085',
-
-    fontSize:
-      10,
-
-    marginTop:
-      5,
-
-    lineHeight:
-      1.45,
-  },
-
-  syncProperty: {
-    marginTop:
-      13,
-
-    display:
-      'grid',
-
-    gap:
-      3,
-
+  guestBubble: {
     background:
-      '#f7f9fc',
+      '#174f91',
 
-    padding:
+    color:
+      '#ffffff',
+
+    borderBottomRightRadius:
+      4,
+  },
+
+  hostBubble: {
+    background:
+      '#ffffff',
+
+    border:
+      '1px solid #dfe4ea',
+
+    color:
+      '#102a43',
+
+    borderBottomLeftRadius:
+      4,
+  },
+
+  senderName: {
+    fontSize:
       9,
-
-    borderRadius:
-      7,
-
-    fontSize:
-      10,
-  },
-
-  syncSection: {
-    marginTop:
-      15,
-  },
-
-  syncSectionTitle: {
-    fontSize:
-      11,
 
     fontWeight:
       800,
+
+    opacity:
+      0.8,
+
+    marginBottom:
+      4,
   },
 
-  syncHelp: {
+  messageText: {
     fontSize:
-      9,
+      13,
 
     lineHeight:
       1.45,
 
-    color:
-      '#667085',
+    whiteSpace:
+      'pre-wrap',
   },
 
-  exportBox: {
+  messageTime: {
+    marginTop:
+      6,
+
+    fontSize:
+      8,
+
+    opacity:
+      0.7,
+
+    textAlign:
+      'right',
+  },
+
+  systemBubble: {
+    margin:
+      '10px auto',
+
+    maxWidth:
+      '80%',
+
+    background:
+      '#fff8e7',
+
+    color:
+      '#715b1b',
+
+    padding:
+      '10px 13px',
+
+    borderRadius:
+      10,
+
+    textAlign:
+      'center',
+
+    fontSize:
+      11,
+  },
+
+  replyBox: {
+    padding:
+      16,
+
+    borderTop:
+      '1px solid #e4e7ec',
+
     display:
       'grid',
 
@@ -2972,35 +1808,40 @@ const styles = {
       '1fr auto',
 
     gap:
-      6,
-  },
-
-  exportInput: {
-    minWidth:
-      0,
-
-    border:
-      '1px solid #d5dae1',
-
-    borderRadius:
-      7,
-
-    padding:
-      8,
-
-    fontSize:
-      9,
-
-    color:
-      '#475467',
+      10,
 
     background:
-      '#fafafa',
+      '#ffffff',
   },
 
-  copyButton: {
+  textarea: {
+    width:
+      '100%',
+
+    minHeight:
+      70,
+
+    resize:
+      'vertical',
+
+    padding:
+      12,
+
     border:
-      0,
+      '1px solid #cfd6df',
+
+    borderRadius:
+      10,
+
+    fontFamily:
+      'Arial, sans-serif',
+
+    boxSizing:
+      'border-box',
+  },
+
+  sendButton: {
+    border: 0,
 
     background:
       '#174f91',
@@ -3008,109 +1849,101 @@ const styles = {
     color:
       '#ffffff',
 
-    borderRadius:
-      7,
-
     padding:
-      '8px 10px',
+      '0 22px',
 
-    fontSize:
-      9,
+    borderRadius:
+      10,
 
     fontWeight:
-      700,
+      800,
 
     cursor:
       'pointer',
   },
 
-  syncNote: {
-    marginTop:
-      7,
+  noSelection: {
+    minHeight:
+      500,
+
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    justifyContent:
+      'center',
 
     color:
-      '#8a6d1f',
-
-    background:
-      '#fff8e7',
-
-    padding:
-      7,
-
-    borderRadius:
-      6,
-
-    fontSize:
-      8,
-
-    lineHeight:
-      1.4,
+      '#667085',
   },
 
-  syncDivider: {
-    height:
-      1,
+  emptyConversation: {
+    color:
+      '#667085',
 
+    textAlign:
+      'center',
+
+    marginTop:
+      50,
+  },
+
+  emptyState: {
     background:
-      '#edf0f3',
+      '#ffffff',
+
+    border:
+      '1px solid #dfe4ea',
+
+    borderRadius:
+      16,
+
+    padding:
+      '60px 25px',
+
+    textAlign:
+      'center',
+
+    maxWidth:
+      650,
 
     margin:
-      '16px 0',
-  },
-
-  importPreview: {
-    display:
-      'grid',
-
-    gap:
-      6,
-  },
-
-  disabledInput: {
-    border:
-      '1px solid #d8dde4',
-
-    borderRadius:
-      7,
-
-    padding:
-      8,
-
-    background:
-      '#f4f5f7',
+      '40px auto',
 
     color:
-      '#98a2b3',
-
-    fontSize:
-      9,
+      '#475467',
   },
 
-  disabledButton: {
-    border:
-      0,
+  emptyIcon: {
+    fontSize:
+      42,
+  },
+
+  browseButton: {
+    display:
+      'inline-block',
+
+    marginTop:
+      15,
+
+    padding:
+      '12px 18px',
 
     background:
-      '#d0d5dd',
+      '#174f91',
 
     color:
       '#ffffff',
 
+    textDecoration:
+      'none',
+
     borderRadius:
-      7,
-
-    padding:
-      8,
-
-    fontSize:
       9,
-  },
 
-  syncDisabled: {
-    color:
-      '#98a2b3',
-
-    fontSize:
-      9,
+    fontWeight:
+      800,
   },
 };
