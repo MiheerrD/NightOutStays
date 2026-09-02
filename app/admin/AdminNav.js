@@ -102,16 +102,21 @@ export default function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [adminProfile, setAdminProfile] = useState(null);
-  const [permissions, setPermissions] = useState({});
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [adminProfile, setAdminProfile] =
+    useState(null);
+
+  const [permissions, setPermissions] =
+    useState({});
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    loadAdminAccess();
+    loadAdmin();
   }, []);
 
-  async function loadAdminAccess() {
-    setLoadingProfile(true);
+  async function loadAdmin() {
+    setLoading(true);
 
     try {
       const {
@@ -133,16 +138,14 @@ export default function AdminNav() {
         error: profileError,
       } = await supabase
         .from('admin_profiles')
-        .select(
-          `
-            user_id,
-            full_name,
-            email,
-            role,
-            is_active,
-            full_access
-          `
-        )
+        .select(`
+          user_id,
+          full_name,
+          email,
+          role,
+          is_active,
+          full_access
+        `)
         .eq('user_id', session.user.id)
         .maybeSingle();
 
@@ -150,17 +153,15 @@ export default function AdminNav() {
         throw profileError;
       }
 
-      if (!profile || !profile.is_active) {
-        await supabase.auth.signOut();
-        router.replace('/admin/login');
-        return;
-      }
-
       if (
-        profile.role !== 'super_admin' &&
-        profile.role !== 'admin'
+        !profile ||
+        !profile.is_active ||
+        !['super_admin', 'admin'].includes(
+          profile.role
+        )
       ) {
         await supabase.auth.signOut();
+
         router.replace('/admin/login');
         return;
       }
@@ -176,12 +177,10 @@ export default function AdminNav() {
           error: permissionsError,
         } = await supabase
           .from('admin_permissions')
-          .select(
-            `
-              module,
-              can_view
-            `
-          )
+          .select(`
+            module,
+            can_view
+          `)
           .eq(
             'admin_user_id',
             session.user.id
@@ -201,16 +200,14 @@ export default function AdminNav() {
         );
 
         setPermissions(permissionMap);
-      } else {
-        setPermissions({});
       }
     } catch (error) {
       console.error(
-        'Admin navigation access error:',
+        'Admin navigation error:',
         error
       );
     } finally {
-      setLoadingProfile(false);
+      setLoading(false);
     }
   }
 
@@ -220,14 +217,15 @@ export default function AdminNav() {
     }
 
     if (
-      adminProfile.role === 'super_admin' ||
-      adminProfile.full_access
+      adminProfile.role ===
+      'super_admin'
     ) {
+      return ALL_MENU_ITEMS;
+    }
+
+    if (adminProfile.full_access) {
       return ALL_MENU_ITEMS.filter(
-        (item) =>
-          !item.superAdminOnly ||
-          adminProfile.role ===
-            'super_admin'
+        (item) => !item.superAdminOnly
       );
     }
 
@@ -237,14 +235,22 @@ export default function AdminNav() {
           return false;
         }
 
-        if (item.module === 'dashboard') {
+        if (
+          item.module === 'dashboard'
+        ) {
           return true;
         }
 
-        return permissions[item.module] === true;
+        return (
+          permissions[item.module] ===
+          true
+        );
       }
     );
-  }, [adminProfile, permissions]);
+  }, [
+    adminProfile,
+    permissions,
+  ]);
 
   function isActive(href) {
     if (href === '/admin') {
@@ -255,19 +261,17 @@ export default function AdminNav() {
   }
 
   async function handleLogout() {
-    try {
-      await supabase.auth.signOut();
-    } finally {
-      router.replace('/admin/login');
-      router.refresh();
-    }
+    await supabase.auth.signOut();
+
+    router.replace('/admin/login');
+    router.refresh();
   }
 
-  if (loadingProfile) {
+  if (loading) {
     return (
       <>
-        <div className="nosAdminHeaderLoading">
-          Loading Admin...
+        <div className="nosAdminMenuLoading">
+          Loading...
         </div>
 
         <Styles />
@@ -284,66 +288,12 @@ export default function AdminNav() {
 
   return (
     <>
-      <header className="nosAdminHeader">
-        <div className="nosAdminIdentityRow">
-          <div className="nosAdminIdentityInner">
-            <div className="nosAdminPortalInfo">
-              <div className="nosAdminPortalTitle">
-                Admin Portal
-              </div>
+      <header className="nosAdminNavigation">
 
-              <span
-                className={
-                  isSuperAdmin
-                    ? 'nosAdminRoleBadge super'
-                    : 'nosAdminRoleBadge'
-                }
-              >
-                {isSuperAdmin
-                  ? 'SUPER ADMIN'
-                  : adminProfile.full_access
-                    ? 'ADMIN · FULL ACCESS'
-                    : 'ADMIN · LIMITED ACCESS'}
-              </span>
-
-              <Link
-                href="/"
-                target="_blank"
-                className="nosAdminViewSite"
-              >
-                ↗ View Website
-              </Link>
-            </div>
-
-            <div className="nosAdminAccount">
-              <div className="nosAdminAccountText">
-                <strong>
-                  {adminProfile.full_name ||
-                    'Administrator'}
-                </strong>
-
-                <span>
-                  {isSuperAdmin
-                    ? 'Super Admin'
-                    : adminProfile.full_access
-                      ? 'Admin · Full Access'
-                      : 'Admin · Limited Access'}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                className="nosAdminLogoutButton"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-
+        {/* DARK BLUE MENU ONLY */}
         <nav className="nosAdminMenuBar">
           <div className="nosAdminMenuInner">
+
             {visibleMenuItems.map(
               (item) => {
                 const active =
@@ -370,8 +320,72 @@ export default function AdminNav() {
                 );
               }
             )}
+
           </div>
         </nav>
+
+        {/* WHITE ADMIN DETAILS BELOW MENU */}
+        <div className="nosAdminInfoRow">
+
+          <div className="nosAdminInfoInner">
+
+            <div className="nosAdminRoleArea">
+
+              <span
+                className={
+                  isSuperAdmin
+                    ? 'nosAdminRoleBadge super'
+                    : 'nosAdminRoleBadge'
+                }
+              >
+                {isSuperAdmin
+                  ? 'SUPER ADMIN'
+                  : adminProfile.full_access
+                    ? 'ADMIN · FULL ACCESS'
+                    : 'ADMIN · LIMITED ACCESS'}
+              </span>
+
+              <div className="nosAdminName">
+                <strong>
+                  {adminProfile.full_name ||
+                    'Administrator'}
+                </strong>
+
+                <span>
+                  {isSuperAdmin
+                    ? 'Super Admin'
+                    : adminProfile.full_access
+                      ? 'Admin · Full Access'
+                      : 'Admin · Limited Access'}
+                </span>
+              </div>
+
+            </div>
+
+            <div className="nosAdminActions">
+
+              <Link
+                href="/"
+                target="_blank"
+                className="nosAdminWebsiteButton"
+              >
+                ↗ View Website
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="nosAdminLogoutButton"
+              >
+                Logout
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </header>
 
       <Styles />
@@ -382,138 +396,30 @@ export default function AdminNav() {
 function Styles() {
   return (
     <style jsx global>{`
+
       * {
         box-sizing: border-box;
       }
 
-      .nosAdminHeader {
-        position: sticky;
-        top: 0;
+      /*
+      ==============================
+      COMPLETE ADMIN NAVIGATION
+      ==============================
+      */
+
+      .nosAdminNavigation {
+        width: 100%;
+        background: #ffffff;
+        position: relative;
         z-index: 1000;
-        width: 100%;
-        background: #ffffff;
-        border-bottom: 1px solid #dfe5ec;
       }
 
-      .nosAdminIdentityRow {
-        width: 100%;
-        background: #ffffff;
-      }
 
-      .nosAdminIdentityInner {
-        width: calc(100% - 64px);
-        max-width: 1600px;
-        min-height: 64px;
-        margin: 0 auto;
-
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-
-        gap: 24px;
-      }
-
-      .nosAdminPortalInfo {
-        display: flex;
-        align-items: center;
-        gap: 13px;
-        min-width: 0;
-      }
-
-      .nosAdminPortalTitle {
-        color: #0a4b89;
-        font-size: 20px;
-        font-weight: 900;
-        letter-spacing: -0.5px;
-        white-space: nowrap;
-      }
-
-      .nosAdminRoleBadge {
-        min-height: 25px;
-
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-
-        padding: 0 11px;
-
-        border-radius: 999px;
-
-        background: #eaf2fb;
-        color: #0b579e;
-
-        font-size: 9px;
-        font-weight: 900;
-        letter-spacing: 0.6px;
-
-        white-space: nowrap;
-      }
-
-      .nosAdminRoleBadge.super {
-        background: #0a315d;
-        color: #ffffff;
-      }
-
-      .nosAdminViewSite {
-        color: #0a579f;
-        font-size: 11px;
-        font-weight: 800;
-        text-decoration: none;
-        white-space: nowrap;
-      }
-
-      .nosAdminViewSite:hover {
-        text-decoration: underline;
-      }
-
-      .nosAdminAccount {
-        display: flex;
-        align-items: center;
-        gap: 13px;
-        flex-shrink: 0;
-      }
-
-      .nosAdminAccountText {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-      }
-
-      .nosAdminAccountText strong {
-        color: #101828;
-        font-size: 12px;
-        font-weight: 900;
-      }
-
-      .nosAdminAccountText span {
-        margin-top: 2px;
-
-        color: #667085;
-
-        font-size: 9px;
-        font-weight: 700;
-      }
-
-      .nosAdminLogoutButton {
-        min-height: 36px;
-
-        padding: 0 14px;
-
-        border: 1px solid #ccd5df;
-        border-radius: 8px;
-
-        background: #ffffff;
-        color: #26384c;
-
-        font-size: 11px;
-        font-weight: 800;
-
-        cursor: pointer;
-      }
-
-      .nosAdminLogoutButton:hover {
-        background: #f5f7fa;
-      }
+      /*
+      ==============================
+      DARK BLUE MENU
+      ==============================
+      */
 
       .nosAdminMenuBar {
         width: 100%;
@@ -530,7 +436,7 @@ function Styles() {
 
         scrollbar-width: thin;
         scrollbar-color:
-          rgba(255, 255, 255, 0.35)
+          rgba(255,255,255,0.35)
           transparent;
       }
 
@@ -543,14 +449,18 @@ function Styles() {
       }
 
       .nosAdminMenuInner::-webkit-scrollbar-thumb {
+        background:
+          rgba(255,255,255,0.30);
+
         border-radius: 999px;
-        background: rgba(
-          255,
-          255,
-          255,
-          0.32
-        );
       }
+
+
+      /*
+      ==============================
+      MENU ITEMS
+      ==============================
+      */
 
       .nosAdminMenuItem {
         position: relative;
@@ -558,21 +468,22 @@ function Styles() {
         flex: 1 0 92px;
 
         min-width: 92px;
-        min-height: 72px;
+        min-height: 74px;
 
         display: flex;
         flex-direction: column;
+
         align-items: center;
         justify-content: center;
 
-        gap: 6px;
+        gap: 7px;
 
-        padding: 9px 10px;
+        padding: 10px 9px;
 
         color: #ffffff !important;
         text-decoration: none !important;
 
-        opacity: 0.86;
+        opacity: 0.88;
 
         transition:
           background 0.15s ease,
@@ -580,24 +491,20 @@ function Styles() {
       }
 
       .nosAdminMenuItem:hover {
-        background: rgba(
-          255,
-          255,
-          255,
-          0.09
-        );
-
-        color: #ffffff !important;
+        background:
+          rgba(255,255,255,0.10);
 
         opacity: 1;
+
+        color: #ffffff !important;
       }
 
       .nosAdminMenuItem.active {
-        background: #315b85;
-
-        color: #ffffff !important;
+        background: #35618c;
 
         opacity: 1;
+
+        color: #ffffff !important;
       }
 
       .nosAdminMenuItem.active::after {
@@ -605,8 +512,9 @@ function Styles() {
 
         position: absolute;
 
-        left: 18px;
-        right: 18px;
+        left: 16px;
+        right: 16px;
+
         bottom: 0;
 
         height: 4px;
@@ -621,7 +529,7 @@ function Styles() {
         color: #ffffff !important;
 
         font-size: 18px;
-        font-weight: 400;
+
         line-height: 1;
       }
 
@@ -629,87 +537,286 @@ function Styles() {
         color: #ffffff !important;
 
         font-size: 10px;
+
         font-weight: 900;
-        line-height: 1.15;
+
+        line-height: 1.2;
 
         text-align: center;
 
         white-space: nowrap;
       }
 
-      .nosAdminHeaderLoading {
-        width: 100%;
-        min-height: 64px;
 
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      /*
+      ==============================
+      WHITE INFORMATION ROW
+      BELOW MENU
+      ==============================
+      */
+
+      .nosAdminInfoRow {
+        width: 100%;
 
         background: #ffffff;
-        border-bottom: 1px solid #dfe5ec;
+
+        border-bottom:
+          1px solid #dfe5ec;
+      }
+
+      .nosAdminInfoInner {
+        width: calc(100% - 64px);
+
+        max-width: 1500px;
+
+        min-height: 66px;
+
+        margin: 0 auto;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: space-between;
+
+        gap: 20px;
+      }
+
+
+      /*
+      ==============================
+      ADMIN ROLE + NAME
+      ==============================
+      */
+
+      .nosAdminRoleArea {
+        display: flex;
+
+        align-items: center;
+
+        gap: 14px;
+      }
+
+      .nosAdminRoleBadge {
+        display: inline-flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        min-height: 27px;
+
+        padding: 0 12px;
+
+        border-radius: 999px;
+
+        background: #e8f1fb;
+
+        color: #0a569d;
+
+        font-size: 9px;
+
+        font-weight: 900;
+
+        letter-spacing: 0.7px;
+
+        white-space: nowrap;
+      }
+
+      .nosAdminRoleBadge.super {
+        background: #082f5a;
+
+        color: #ffffff;
+      }
+
+      .nosAdminName {
+        display: flex;
+
+        flex-direction: column;
+      }
+
+      .nosAdminName strong {
+        color: #101828;
+
+        font-size: 13px;
+
+        font-weight: 900;
+      }
+
+      .nosAdminName span {
+        margin-top: 2px;
 
         color: #667085;
 
+        font-size: 10px;
+
+        font-weight: 700;
+      }
+
+
+      /*
+      ==============================
+      WEBSITE + LOGOUT
+      ==============================
+      */
+
+      .nosAdminActions {
+        display: flex;
+
+        align-items: center;
+
+        gap: 10px;
+      }
+
+      .nosAdminWebsiteButton {
+        display: inline-flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        min-height: 37px;
+
+        padding: 0 15px;
+
+        border: 1px solid #cdd7e2;
+
+        border-radius: 8px;
+
+        background: #ffffff;
+
+        color: #0a579f;
+
         font-size: 11px;
+
+        font-weight: 900;
+
+        text-decoration: none;
+      }
+
+      .nosAdminWebsiteButton:hover {
+        background: #f5f8fb;
+      }
+
+      .nosAdminLogoutButton {
+        min-height: 37px;
+
+        padding: 0 16px;
+
+        border: 1px solid #cdd7e2;
+
+        border-radius: 8px;
+
+        background: #ffffff;
+
+        color: #26384c;
+
+        font-size: 11px;
+
+        font-weight: 900;
+
+        cursor: pointer;
+      }
+
+      .nosAdminLogoutButton:hover {
+        background: #f5f8fb;
+      }
+
+
+      /*
+      ==============================
+      LOADING
+      ==============================
+      */
+
+      .nosAdminMenuLoading {
+        width: 100%;
+
+        min-height: 74px;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+
+        background: #082f5a;
+
+        color: #ffffff;
+
+        font-size: 11px;
+
         font-weight: 800;
       }
 
-      @media (min-width: 1500px) {
-        .nosAdminMenuItem {
-          flex-basis: 100px;
-        }
-      }
+
+      /*
+      ==============================
+      RESPONSIVE
+      ==============================
+      */
 
       @media (max-width: 1000px) {
-        .nosAdminIdentityInner {
-          width: calc(100% - 30px);
-        }
 
         .nosAdminMenuItem {
           flex: 0 0 92px;
         }
+
+        .nosAdminInfoInner {
+          width: calc(100% - 30px);
+        }
+
       }
 
-      @media (max-width: 750px) {
-        .nosAdminIdentityInner {
+
+      @media (max-width: 650px) {
+
+        .nosAdminInfoInner {
           min-height: 60px;
-        }
-
-        .nosAdminPortalInfo {
-          gap: 9px;
-        }
-
-        .nosAdminPortalTitle {
-          font-size: 18px;
-        }
-
-        .nosAdminViewSite {
-          display: none;
-        }
-
-        .nosAdminAccountText {
-          display: none;
         }
 
         .nosAdminRoleBadge {
           display: none;
         }
-      }
 
-      @media (max-width: 500px) {
-        .nosAdminIdentityInner {
-          width: calc(100% - 20px);
+        .nosAdminName span {
+          display: none;
+        }
+
+        .nosAdminWebsiteButton {
+          display: none;
         }
 
         .nosAdminMenuItem {
-          flex-basis: 84px;
           min-width: 84px;
+          flex-basis: 84px;
+        }
+
+      }
+
+
+      @media (max-width: 450px) {
+
+        .nosAdminInfoInner {
+          width: calc(100% - 20px);
+        }
+
+        .nosAdminName strong {
+          max-width: 150px;
+
+          overflow: hidden;
+
+          white-space: nowrap;
+
+          text-overflow: ellipsis;
         }
 
         .nosAdminMenuLabel {
           font-size: 9px;
         }
+
       }
+
     `}</style>
   );
 }
