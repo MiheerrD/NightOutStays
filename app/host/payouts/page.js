@@ -81,15 +81,6 @@ export default function HostPayoutsPage() {
           <h1>Payouts</h1>
           <p>Financial overview of your paid NightOutStays bookings.</p>
         </div>
-        <div className="phase">
-          <strong>Phase 1</strong>
-          <span>Read-only financial dashboard</span>
-        </div>
-      </section>
-
-      <section className="notice">
-        <strong>Payout processing is coming in Phase 2.</strong>
-        <span>No money transfer, automatic settlement or payment-hold action is performed from this page.</span>
       </section>
 
       <section className="cards">
@@ -198,8 +189,6 @@ function Styles() {
     .hero,.sectionHead,.bank{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
     h1{font-size:36px;margin:5px 0 8px;color:#082f5a} h2{margin:5px 0 8px;color:#082f5a}
     p{margin:0;color:#65788a}.eyebrow{font-size:12px;font-weight:800;letter-spacing:1.4px;color:#35618c}
-    .phase{background:#082f5a;color:white;border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:4px}
-    .phase span{font-size:12px;opacity:.8}.notice{margin:22px 0;padding:16px 18px;border:1px solid #d9e2ec;background:white;border-radius:14px;display:flex;gap:12px;flex-wrap:wrap}
     .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}.card,.panel{background:white;border:1px solid #dde5ed;border-radius:16px}
     .card{padding:18px}.card span,.info span{display:block;font-size:12px;color:#718396;margin-bottom:8px}.card strong{font-size:22px;color:#082f5a}
     .panel{padding:22px;margin-bottom:20px}.bank{flex-wrap:wrap}.bankGrid{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
