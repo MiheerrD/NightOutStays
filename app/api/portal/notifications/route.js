@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-const URL='https://gxwemplbykjxhezefykh.supabase.co';
-function admin(){ const key=process.env.SUPABASE_SERVICE_ROLE_KEY; if(!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.'); return createClient(URL,key,{auth:{persistSession:false,autoRefreshToken:false}}); }
+const SUPABASE_URL='https://gxwemplbykjxhezefykh.supabase.co';
+function admin(){ const key=process.env.SUPABASE_SERVICE_ROLE_KEY; if(!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.'); return createClient(SUPABASE_URL,key,{auth:{persistSession:false,autoRefreshToken:false}}); }
 function bearer(req){ return String(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim(); }
 async function auth(req,portal){ const db=admin(); const token=bearer(req); const {data:u,error:e}=await db.auth.getUser(token); if(e||!u?.user) throw new Error('AUTH'); const user=u.user;
  if(portal==='host'){ const {data:p}=await db.from('host_profiles').select('id,user_id').eq('user_id',user.id).maybeSingle(); if(!p) throw new Error('ACCESS'); return {db,user,profile:p}; }
