@@ -403,7 +403,12 @@ export async function POST(req) {
 
       if (messageError) throw messageError;
 
-      const nextStatus = ticket.status === "resolved" ? "open" : ticket.status;
+      const nextStatus =
+        ticket.status === "waiting"
+          ? "in_progress"
+          : ticket.status === "resolved"
+            ? "open"
+            : ticket.status;
 
       const { error: updateError } = await sb
         .from("support_tickets")
