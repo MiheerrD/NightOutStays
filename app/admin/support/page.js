@@ -51,6 +51,7 @@ export default function AdminSupport() {
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState("");
   const [liveState, setLiveState] = useState("connecting");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [faq, setFaq] = useState({ category: "general", question: "", answer: "", keywords: "", sortOrder: 0 });
 
   const selectedRef = useRef("");
@@ -88,6 +89,17 @@ export default function AdminSupport() {
 
       setData(json);
       setMessages(json.messages || []);
+
+      try {
+        const notificationResponse = await fetch("/api/admin/notifications", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        });
+        const notificationJson = await notificationResponse.json();
+        if (notificationResponse.ok) {
+          setUnreadNotifications(notificationJson?.summary?.unread || 0);
+        }
+      } catch {}
     } catch (err) {
       if (!silent) setError(err?.message || "Unable to load support.");
     } finally {
@@ -225,7 +237,7 @@ export default function AdminSupport() {
           <span style={{ ...s.live, ...(liveState === "live" ? s.liveOn : {}) }}>
             {liveState === "live" ? "● Live" : "● Auto refresh"}
           </span>
-          <a href="/admin/notifications" style={s.linkBtn}>Notifications</a>
+          <a href="/admin/notifications" style={s.linkBtn}>Notifications{unreadNotifications > 0 ? ` (${unreadNotifications})` : ""}</a>
         </div>
       </div>
 

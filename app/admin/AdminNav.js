@@ -87,7 +87,7 @@ const ALL_MENU_ITEMS = [
   {
     label: 'Notifications',
     href: '/admin/notifications',
-    icon: '♢',
+    icon: '◈',
     module: 'messages',
   },
   {
@@ -117,10 +117,60 @@ export default function AdminNav() {
   const [adminProfile, setAdminProfile] = useState(null);
   const [permissions, setPermissions] = useState({});
   const [loading, setLoading] = useState(true);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     loadAdmin();
   }, []);
+
+  useEffect(() => {
+    if (!adminProfile?.user_id) return;
+
+    let active = true;
+
+    async function loadUnreadCount() {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_type', 'admin')
+        .eq('recipient_user_id', adminProfile.user_id)
+        .eq('is_read', false);
+
+      if (!error && active) {
+        setUnreadNotifications(count || 0);
+      }
+    }
+
+    loadUnreadCount();
+
+    const channel = supabase
+      .channel(`admin-notification-badge-${adminProfile.user_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_user_id=eq.${adminProfile.user_id}`,
+        },
+        () => loadUnreadCount()
+      )
+      .subscribe();
+
+    const timer = setInterval(loadUnreadCount, 5000);
+
+    function syncWhenVisible() {
+      if (document.visibilityState === 'visible') loadUnreadCount();
+    }
+    document.addEventListener('visibilitychange', syncWhenVisible);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', syncWhenVisible);
+      supabase.removeChannel(channel);
+    };
+  }, [adminProfile?.user_id]);
 
   async function loadAdmin() {
     setLoading(true);
@@ -297,6 +347,11 @@ export default function AdminNav() {
     <>
       <div className="nosAdminNavRoot">
 
+        {/* =====================================
+            ROW 1
+            ONLY BLUE ADMIN MENU
+        ====================================== */}
+
         <div className="nosBlueMenuRow">
 
           <div
@@ -328,6 +383,12 @@ export default function AdminNav() {
                     <span className="nosBlueMenuLabel">
                       {item.label}
                     </span>
+
+                    {item.href === '/admin/notifications' && unreadNotifications > 0 && (
+                      <span className="nosNotificationBadge">
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </span>
+                    )}
                   </Link>
                 );
               }
@@ -335,6 +396,12 @@ export default function AdminNav() {
           </div>
 
         </div>
+
+
+        {/* =====================================
+            ROW 2
+            ADMIN DETAILS BELOW MENU
+        ====================================== */}
 
         <div className="nosAdminDetailRow">
 
@@ -373,6 +440,7 @@ export default function AdminNav() {
 
             </div>
 
+
             <div className="nosAdminDetailRight">
 
               <Link
@@ -408,6 +476,12 @@ function Styles() {
   return (
     <style jsx global>{`
 
+      /*
+      ==========================================
+      IMPORTANT RESET FOR ADMIN HEADER
+      ==========================================
+      */
+
       .nosAdminNavRoot,
       .nosAdminNavRoot * {
         box-sizing: border-box;
@@ -415,50 +489,115 @@ function Styles() {
 
       .nosAdminNavRoot {
         display: block !important;
+
         position: relative !important;
+
         width: 100% !important;
+
         max-width: none !important;
+
         margin: 0 !important;
         padding: 0 !important;
+
         overflow: visible !important;
+
         background: #ffffff;
+
         z-index: 1000;
       }
 
+
+      /*
+      ==========================================
+      ROW 1
+      BLUE MENU ONLY
+      ==========================================
+      */
+
       .nosBlueMenuRow {
         display: block !important;
+
         width: 100% !important;
+
         margin: 0 !important;
         padding: 0 !important;
+
         background: #082f5a !important;
+
         overflow: hidden !important;
       }
+
 
       .nosBlueMenuGrid {
         display: grid !important;
+
         width: 100% !important;
+
         margin: 0 !important;
         padding: 0 !important;
+
         align-items: stretch;
+
         background: #082f5a;
+
         overflow: hidden !important;
       }
 
+
+      /*
+      ==========================================
+      INDIVIDUAL MENU ITEM
+      ==========================================
+      */
+
       .nosBlueMenuItem {
         position: relative;
+
         min-width: 0 !important;
+
         min-height: 70px;
-        padding: 8px 2px;
+
+        padding: 8px 3px;
+
         display: flex !important;
+
         flex-direction: column;
+
         align-items: center;
+
         justify-content: center;
+
         gap: 5px;
+
         background: transparent;
+
         color: #ffffff !important;
+
         text-decoration: none !important;
+
         overflow: hidden;
       }
+
+
+      .nosNotificationBadge {
+        position: absolute;
+        top: 6px;
+        right: 12%;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        border: 2px solid #082f5a;
+      }
+
 
       .nosBlueMenuItem:hover {
         background:
@@ -470,165 +609,287 @@ function Styles() {
           ) !important;
       }
 
+
       .nosBlueMenuItem.active {
         background: #35618c !important;
       }
 
+
       .nosBlueMenuItem.active::after {
         content: '';
+
         position: absolute;
+
         left: 20%;
         right: 20%;
+
         bottom: 0;
+
         height: 4px;
+
         background: #ffffff;
+
         border-radius:
           4px 4px 0 0;
       }
 
+
       .nosBlueMenuIcon {
         display: block;
+
         color: #ffffff !important;
-        font-size: 15px;
+
+        font-size: 16px;
+
         line-height: 1;
       }
 
+
       .nosBlueMenuLabel {
         display: block;
+
         width: 100%;
+
         color: #ffffff !important;
-        font-size: 8px;
+
+        font-size: 9px;
+
         font-weight: 900;
+
         line-height: 1.15;
+
         text-align: center;
+
         white-space: normal;
+
         overflow-wrap: normal;
+
         word-break: normal;
       }
 
+
+      /*
+      ==========================================
+      ROW 2
+      WHITE ADMIN DETAILS
+      ==========================================
+      */
+
       .nosAdminDetailRow {
         display: block !important;
+
         width: 100% !important;
+
         margin: 0 !important;
+
         background: #ffffff !important;
+
         border-bottom:
           1px solid #dfe5ec;
       }
 
+
       .nosAdminDetailInner {
         width:
           calc(100% - 64px);
+
         max-width: 1500px;
+
         min-height: 62px;
+
         margin: 0 auto;
+
         display: flex !important;
+
         flex-direction: row !important;
+
         align-items: center !important;
+
         justify-content:
           space-between !important;
+
         gap: 20px;
+
         background: #ffffff;
       }
 
+
+      /*
+      ==========================================
+      LEFT SIDE
+      ==========================================
+      */
+
       .nosAdminDetailLeft {
         display: flex;
+
         align-items: center;
+
         gap: 14px;
       }
 
+
       .nosRoleBadge {
         min-height: 27px;
+
         padding: 0 12px;
+
         display: inline-flex;
+
         align-items: center;
+
         justify-content: center;
+
         border-radius: 999px;
+
         background: #eaf2fb;
+
         color: #0b579e;
+
         font-size: 9px;
+
         font-weight: 900;
+
         letter-spacing: 0.6px;
+
         white-space: nowrap;
       }
 
+
       .nosRoleBadge.super {
         background: #082f5a;
+
         color: #ffffff;
       }
 
+
       .nosAdminIdentity {
         display: flex;
+
         flex-direction: column;
       }
 
+
       .nosAdminIdentity strong {
         color: #101828;
+
         font-size: 13px;
+
         font-weight: 900;
       }
 
+
       .nosAdminIdentity span {
         margin-top: 2px;
+
         color: #667085;
+
         font-size: 10px;
+
         font-weight: 700;
       }
 
+
+      /*
+      ==========================================
+      RIGHT SIDE
+      ==========================================
+      */
+
       .nosAdminDetailRight {
         display: flex;
+
         align-items: center;
+
         gap: 10px;
       }
+
 
       .nosWebsiteButton,
       .nosLogoutButton {
         min-height: 36px;
+
         padding: 0 14px;
+
         display: inline-flex;
+
         align-items: center;
+
         justify-content: center;
+
         border: 1px solid #ccd6e1;
+
         border-radius: 8px;
+
         background: #ffffff;
+
         font-size: 10px;
+
         font-weight: 900;
+
         cursor: pointer;
       }
 
+
       .nosWebsiteButton {
         color: #0b579e;
+
         text-decoration: none;
       }
+
 
       .nosLogoutButton {
         color: #25364a;
       }
+
 
       .nosWebsiteButton:hover,
       .nosLogoutButton:hover {
         background: #f5f7fa;
       }
 
+
+      /*
+      ==========================================
+      LOADING
+      ==========================================
+      */
+
       .nosNavLoading {
         width: 100%;
+
         min-height: 70px;
+
         display: flex;
+
         align-items: center;
+
         justify-content: center;
+
         background: #082f5a;
+
         color: #ffffff;
+
         font-size: 11px;
+
         font-weight: 900;
       }
 
-      @media (max-width: 1100px) {
+
+      /*
+      ==========================================
+      TABLET
+      ==========================================
+      */
+
+      @media (max-width: 1000px) {
 
         .nosBlueMenuLabel {
-          font-size: 7px;
+          font-size: 8px;
         }
 
         .nosBlueMenuIcon {
-          font-size: 13px;
+          font-size: 14px;
         }
 
         .nosAdminDetailInner {
@@ -637,6 +898,17 @@ function Styles() {
         }
 
       }
+
+
+      /*
+      ==========================================
+      MOBILE
+
+      We DO NOT create a horizontal scrollbar.
+
+      Menu wraps to multiple rows instead.
+      ==========================================
+      */
 
       @media (max-width: 750px) {
 
@@ -672,6 +944,7 @@ function Styles() {
 
       }
 
+
       @media (max-width: 450px) {
 
         .nosBlueMenuGrid {
@@ -687,16 +960,27 @@ function Styles() {
 
         .nosAdminIdentity strong {
           max-width: 160px;
+
           overflow: hidden;
+
           text-overflow: ellipsis;
+
           white-space: nowrap;
         }
 
       }
 
+
+      /*
+      ==========================================
+      REMOVE HORIZONTAL SCROLL CAUSED BY HEADER
+      ==========================================
+      */
+
       html,
       body {
         max-width: 100%;
+
         overflow-x: hidden !important;
       }
 
