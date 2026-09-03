@@ -921,6 +921,36 @@ export async function POST(request) {
         );
 
       /*
+        Razorpay payment entity:
+        - fee includes GST
+        - tax is the GST portion
+
+        Store them separately so GST is
+        never deducted twice.
+      */
+
+      const razorpayFeeIncludingGst =
+        Number.isFinite(
+          Number(payment.fee)
+        )
+          ? Number(payment.fee) / 100
+          : 0;
+
+      const razorpayFeeGst =
+        Number.isFinite(
+          Number(payment.tax)
+        )
+          ? Number(payment.tax) / 100
+          : 0;
+
+      const razorpayFeeBeforeGst =
+        Math.max(
+          razorpayFeeIncludingGst -
+            razorpayFeeGst,
+          0
+        );
+
+      /*
         GST is not treated as Host
         earnings.
 
@@ -992,6 +1022,12 @@ export async function POST(request) {
               host_gross_amount:
                 hostGrossAmount,
 
+              guest_payment_gateway_fee:
+                razorpayFeeBeforeGst,
+
+              guest_payment_gateway_fee_gst:
+                razorpayFeeGst,
+
               razorpay_payment_id:
                 razorpay_payment_id,
 
@@ -1017,6 +1053,33 @@ export async function POST(request) {
               'Settlement creation failed.'
             )
           );
+        }
+
+        /*
+          Calculate deductions and net
+          Host payout immediately.
+
+          Because is_on_hold is true, the
+          database function leaves this
+          settlement in on_hold status.
+        */
+
+        const {
+          error:
+            calculationError,
+        } =
+          await supabase.rpc(
+            'calculate_host_settlement',
+            {
+              p_settlement_id:
+                newSettlement.id,
+            }
+          );
+
+        if (
+          calculationError
+        ) {
+          throw calculationError;
         }
 
         settlementCreated =
