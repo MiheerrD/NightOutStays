@@ -1,0 +1,9 @@
+import { createClient } from '@supabase/supabase-js';
+const URL='https://gxwemplbykjxhezefykh.supabase.co';
+function admin(){ const key=process.env.SUPABASE_SERVICE_ROLE_KEY; if(!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.'); return createClient(URL,key,{auth:{persistSession:false,autoRefreshToken:false}}); }
+export async function GET(req){ try{ const db=admin(); const token=String(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim(); const {data:u,error:e}=await db.auth.getUser(token); if(e||!u?.user) return Response.json({success:false,error:'Authentication required.'},{status:401}); const user=u.user;
+ const {data:h}=await db.from('host_profiles').select('id,user_id,full_name,business_name,status').eq('user_id',user.id).maybeSingle(); if(!h||h.status!=='active') return Response.json({success:false,error:'Active Host account required.'},{status:403});
+ const {data:props,error:pe}=await db.from('properties').select('id,name,location_name').eq('host_id',h.id); if(pe) throw pe; const p=props||[]; const ids=p.map(x=>x.id); if(!ids.length) return Response.json({success:true,host:h,bookings:[]});
+ const {data:rows,error:be}=await db.from('bookings').select('*').in('property_id',ids).order('created_at',{ascending:false}); if(be) throw be; const gids=[...new Set((rows||[]).map(x=>x.guest_id).filter(Boolean))]; let guests=[]; if(gids.length){ const {data}=await db.from('guests').select('id,full_name,phone,email').in('id',gids); guests=data||[]; }
+ const pm=Object.fromEntries(p.map(x=>[x.id,x])); const gm=Object.fromEntries(guests.map(x=>[x.id,x])); return Response.json({success:true,host:h,bookings:(rows||[]).map(b=>({...b,property:pm[b.property_id]||null,guest:gm[b.guest_id]||null}))});
+ }catch(err){ return Response.json({success:false,error:err?.message||'Unable to load Host bookings.'},{status:500}); } }

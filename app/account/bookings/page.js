@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-import GuestNav from '../GuestNav';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -241,7 +240,6 @@ export default function GuestBookingsPage() {
     <>
       <PageStyles />
 
-      <GuestNav guest={guest} />
 
       <main className="guest-page">
         <div className="guest-shell">
