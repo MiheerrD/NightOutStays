@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import GuestNav from '../GuestNav';
 
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
@@ -132,12 +133,6 @@ export default function GuestBookingsPage() {
     }
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.replace('/login');
-    router.refresh();
-  }
-
   const today = useMemo(() => {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
@@ -246,48 +241,26 @@ export default function GuestBookingsPage() {
     <>
       <PageStyles />
 
+      <GuestNav guest={guest} />
+
       <main className="guest-page">
         <div className="guest-shell">
 
-          <header className="guest-header">
-            <div>
-              <button
-                type="button"
-                className="brand-button"
-                onClick={() => router.push('/')}
-              >
-                NightOutStays
-              </button>
+          <section className="guest-page-heading">
+            <p className="guest-eyebrow">
+              GUEST PORTAL
+            </p>
 
-              <h1>My Bookings</h1>
+            <h1>
+              My Bookings
+            </h1>
 
-              <p className="welcome-text">
-                {guest?.full_name
-                  ? `Welcome, ${guest.full_name}`
-                  : 'Manage your stays, payments and booking requests.'}
-              </p>
-            </div>
-
-            <div className="header-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() =>
-                  router.push('/account/messages')
-                }
-              >
-                Messages
-              </button>
-
-              <button
-                type="button"
-                className="logout-button"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </div>
-          </header>
+            <p className="welcome-text">
+              {guest?.full_name
+                ? `Welcome, ${guest.full_name}. Manage your stays, payments and booking requests.`
+                : 'Manage your stays, payments and booking requests.'}
+            </p>
+          </section>
 
           {error ? (
             <div className="error-box">
@@ -856,6 +829,7 @@ function ApprovalNotice({
           : `Complete payment before ${formatDateTime(
               deadline
             )}. Host approval is valid for 24 hours.`}
+            )}. Host approval is valid for 24 hours.`}
       </span>
     </div>
   );
@@ -880,81 +854,64 @@ function getBookingDisplayStatus(
     booking.offer_status || ''
   ).toLowerCase();
 
-  const verificationStatus = String(
-    booking.verification_status || ''
-  ).toLowerCase();
-
-  if (bookingStatus === 'cancelled') {
-    if (
-      hostDecision === 'approved' &&
-      paymentStatus !== 'paid'
-    ) {
-      return 'Approval Expired / Cancelled';
-    }
-
-    return 'Booking Cancelled';
-  }
-
-  if (
-    bookingStatus === 'declined' ||
-    hostDecision === 'declined'
-  ) {
-    return 'Booking Declined';
-  }
-
-  if (paymentStatus === 'refunded') {
-    return 'Payment Refunded';
-  }
-
   if (paymentStatus === 'paid') {
     if (
-      verificationStatus === 'pending' ||
-      verificationStatus === 'submitted'
+      booking.verification_status ===
+      'pending'
     ) {
-      return 'Paid – ID Verification Pending';
-    }
-
-    if (
-      verificationStatus === 'rejected'
-    ) {
-      return 'ID Verification Required';
+      return 'Paid – Verification Pending';
     }
 
     return 'Property Booked';
   }
 
-  if (offerStatus === 'host_offered') {
-    return 'Special Offer Sent';
-  }
-
-  if (offerStatus === 'accepted') {
-    return 'Special Offer Accepted – Payment Pending';
-  }
-
-  if (booking.guest_discount_requested) {
-    return 'Asking for Extra Discount';
+  if (
+    bookingStatus.includes('cancel')
+  ) {
+    return 'Cancelled';
   }
 
   if (
-    hostDecision === 'approved' ||
-    bookingStatus === 'approved'
+    bookingStatus.includes('declin') ||
+    hostDecision.includes('declin') ||
+    hostDecision.includes('reject')
   ) {
-    if (isApprovalExpired(booking)) {
-      return 'Approval Expired';
-    }
+    return 'Declined';
+  }
 
+  if (isApprovalExpired(booking)) {
+    return 'Approval Expired';
+  }
+
+  if (
+    offerStatus === 'host_offered'
+  ) {
+    return 'Special Offer Received';
+  }
+
+  if (
+    hostDecision === 'approved'
+  ) {
     return 'Host Approved – Payment Pending';
   }
 
   if (
-    bookingStatus === 'confirmed' &&
-    paymentStatus !== 'paid'
+    booking.guest_discount_requested
   ) {
-    return 'Guest Accepted – Payment Pending';
+    return 'Discount Requested';
   }
 
-  if (bookingStatus === 'completed') {
-    return 'Stay Completed';
+  if (
+    bookingStatus === 'confirmed' ||
+    bookingStatus === 'booked'
+  ) {
+    return 'Confirmed';
+  }
+
+  if (
+    bookingStatus === 'completed'
+  ) {
+    return 'Completed';
   }
 
   return 'Booking Requested';
@@ -963,24 +920,44 @@ function getBookingDisplayStatus(
 function getApprovalDeadline(
   booking
 ) {
-  if (!booking?.host_decided_at) {
+  if (
+    booking.payment_due_at
+  ) {
+    const deadline =
+      new Date(
+        booking.payment_due_at
+      );
+
+    if (
+      !Number.isNaN(
+        deadline.getTime()
+      )
+    ) {
+      return deadline;
+    }
+  }
+
+  const approvedAt =
+    booking.host_decision_at ||
+    booking.updated_at;
+
+  if (!approvedAt) {
     return null;
   }
 
-  const approvedAt = new Date(
-    booking.host_decided_at
-  );
+  const approvedDate =
+    new Date(approvedAt);
 
   if (
     Number.isNaN(
-      approvedAt.getTime()
+      approvedDate.getTime()
     )
   ) {
     return null;
   }
 
   return new Date(
-    approvedAt.getTime() +
+    approvedDate.getTime() +
       24 * 60 * 60 * 1000
   );
 }
@@ -1012,7 +989,8 @@ function isApprovalExpired(
   }
 
   return (
-    deadline.getTime() <= Date.now()
+    deadline.getTime() <=
+    Date.now()
   );
 }
 
@@ -1025,9 +1003,14 @@ function parseDateOnly(value) {
     String(value).split('-');
 
   if (parts.length === 3) {
-    const year = Number(parts[0]);
-    const month = Number(parts[1]);
-    const day = Number(parts[2]);
+    const year =
+      Number(parts[0]);
+
+    const month =
+      Number(parts[1]);
+
+    const day =
+      Number(parts[2]);
 
     return new Date(
       year,
@@ -1036,7 +1019,8 @@ function parseDateOnly(value) {
     );
   }
 
-  const date = new Date(value);
+  const date =
+    new Date(value);
 
   if (
     Number.isNaN(
@@ -1147,7 +1131,10 @@ function PageStyles() {
         margin: 0;
         background: #f5f7fb;
         color: #172033;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family:
+          Arial,
+          Helvetica,
+          sans-serif;
       }
 
       button {
@@ -1165,27 +1152,27 @@ function PageStyles() {
         margin: 0 auto;
       }
 
-      .guest-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 24px;
+      /*
+      ==========================================
+      PAGE HEADING
+      ==========================================
+      */
+
+      .guest-page-heading {
         margin-bottom: 26px;
       }
 
-      .brand-button {
-        border: 0;
-        padding: 0;
-        margin: 0 0 8px;
-        background: transparent;
-        color: #0d3d78;
-        font-size: 18px;
-        font-weight: 800;
-        cursor: pointer;
+      .guest-eyebrow {
+        margin: 0 0 7px;
+        color: #667085;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 1px;
       }
 
-      .guest-header h1 {
+      .guest-page-heading h1 {
         margin: 0;
+        color: #101828;
         font-size: 34px;
         line-height: 1.15;
       }
@@ -1196,15 +1183,14 @@ function PageStyles() {
         font-size: 15px;
       }
 
-      .header-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
+      /*
+      ==========================================
+      BUTTONS
+      ==========================================
+      */
 
       .primary-button,
-      .secondary-button,
-      .logout-button {
+      .secondary-button {
         min-height: 44px;
         border-radius: 10px;
         padding: 10px 16px;
@@ -1224,16 +1210,19 @@ function PageStyles() {
         color: #344054;
       }
 
-      .logout-button {
-        border: 1px solid #e6e9ef;
-        background: transparent;
-        color: #667085;
-      }
+      /*
+      ==========================================
+      SUMMARY
+      ==========================================
+      */
 
       .summary-grid {
         display: grid;
         grid-template-columns:
-          repeat(3, minmax(0, 1fr));
+          repeat(
+            3,
+            minmax(0, 1fr)
+          );
         gap: 14px;
         margin-bottom: 20px;
       }
@@ -1243,7 +1232,8 @@ function PageStyles() {
         align-items: center;
         gap: 15px;
         padding: 18px;
-        border: 1px solid #e5e7eb;
+        border:
+          1px solid #e5e7eb;
         border-radius: 16px;
         background: white;
       }
@@ -1273,6 +1263,12 @@ function PageStyles() {
         line-height: 1.4;
       }
 
+      /*
+      ==========================================
+      BOOKING TABS
+      ==========================================
+      */
+
       .booking-tabs {
         display: flex;
         gap: 8px;
@@ -1288,7 +1284,8 @@ function PageStyles() {
         flex: 0 0 auto;
         min-height: 44px;
         padding: 9px 14px;
-        border: 1px solid #dfe3ea;
+        border:
+          1px solid #dfe3ea;
         border-radius: 999px;
         background: white;
         color: #475467;
@@ -1312,9 +1309,21 @@ function PageStyles() {
       }
 
       .tab-button.active span {
-        background: rgba(255,255,255,0.18);
+        background:
+          rgba(
+            255,
+            255,
+            255,
+            0.18
+          );
         color: white;
       }
+
+      /*
+      ==========================================
+      BOOKING LIST
+      ==========================================
+      */
 
       .booking-list {
         display: grid;
@@ -1323,15 +1332,28 @@ function PageStyles() {
 
       .booking-card {
         display: grid;
-        grid-template-columns: 250px 1fr;
+        grid-template-columns:
+          250px 1fr;
         overflow: hidden;
-        border: 1px solid #e4e7ec;
+        border:
+          1px solid #e4e7ec;
         border-radius: 18px;
         background: white;
         box-shadow:
           0 5px 18px
-          rgba(16,24,40,0.04);
+          rgba(
+            16,
+            24,
+            40,
+            0.04
+          );
       }
+
+      /*
+      ==========================================
+      PROPERTY IMAGE
+      ==========================================
+      */
 
       .booking-image-wrap {
         min-height: 100%;
@@ -1364,6 +1386,12 @@ function PageStyles() {
         font-weight: 800;
       }
 
+      /*
+      ==========================================
+      BOOKING CONTENT
+      ==========================================
+      */
+
       .booking-main {
         min-width: 0;
         padding: 20px;
@@ -1371,8 +1399,10 @@ function PageStyles() {
 
       .booking-top {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
+        justify-content:
+          space-between;
+        align-items:
+          flex-start;
         gap: 15px;
       }
 
@@ -1394,6 +1424,12 @@ function PageStyles() {
         color: #667085;
         font-size: 13px;
       }
+
+      /*
+      ==========================================
+      STATUS
+      ==========================================
+      */
 
       .status-badge {
         display: inline-flex;
@@ -1429,10 +1465,19 @@ function PageStyles() {
         color: #175cd3;
       }
 
+      /*
+      ==========================================
+      STAY DETAILS
+      ==========================================
+      */
+
       .stay-details {
         display: grid;
         grid-template-columns:
-          repeat(4, minmax(0, 1fr));
+          repeat(
+            4,
+            minmax(0, 1fr)
+          );
         gap: 10px;
         margin-top: 18px;
       }
@@ -1454,14 +1499,22 @@ function PageStyles() {
         font-size: 13px;
       }
 
+      /*
+      ==========================================
+      FINANCE
+      ==========================================
+      */
+
       .booking-finance {
         display: flex;
-        justify-content: space-between;
+        justify-content:
+          space-between;
         align-items: flex-end;
         gap: 20px;
         margin-top: 16px;
         padding-top: 16px;
-        border-top: 1px solid #eef0f3;
+        border-top:
+          1px solid #eef0f3;
       }
 
       .finance-label {
@@ -1502,6 +1555,12 @@ function PageStyles() {
         color: #475467;
       }
 
+      /*
+      ==========================================
+      NOTICES
+      ==========================================
+      */
+
       .approval-notice,
       .offer-notice,
       .verification-notice {
@@ -1515,7 +1574,8 @@ function PageStyles() {
       }
 
       .approval-notice {
-        border: 1px solid #fedf89;
+        border:
+          1px solid #fedf89;
         background: #fffaeb;
         color: #7a2e0e;
       }
@@ -1527,16 +1587,24 @@ function PageStyles() {
       }
 
       .offer-notice {
-        border: 1px solid #b2ddff;
+        border:
+          1px solid #b2ddff;
         background: #eff8ff;
         color: #1849a9;
       }
 
       .verification-notice {
-        border: 1px solid #d6bbfb;
+        border:
+          1px solid #d6bbfb;
         background: #f9f5ff;
         color: #6941c6;
       }
+
+      /*
+      ==========================================
+      ACTIONS
+      ==========================================
+      */
 
       .booking-actions {
         display: flex;
@@ -1545,12 +1613,19 @@ function PageStyles() {
         margin-top: 17px;
       }
 
+      /*
+      ==========================================
+      EMPTY / LOADING
+      ==========================================
+      */
+
       .empty-card,
       .loading-card {
         max-width: 650px;
         margin: 60px auto;
         padding: 42px 24px;
-        border: 1px solid #e5e7eb;
+        border:
+          1px solid #e5e7eb;
         border-radius: 18px;
         background: white;
         text-align: center;
@@ -1576,25 +1651,40 @@ function PageStyles() {
       .loader {
         width: 36px;
         height: 36px;
-        margin: 0 auto 18px;
-        border: 4px solid #e5e7eb;
-        border-top-color: #154f91;
+        margin:
+          0 auto 18px;
+        border:
+          4px solid #e5e7eb;
+        border-top-color:
+          #154f91;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation:
+          spin
+          0.8s
+          linear
+          infinite;
       }
 
       @keyframes spin {
         to {
-          transform: rotate(360deg);
+          transform:
+            rotate(360deg);
         }
       }
+
+      /*
+      ==========================================
+      ERROR
+      ==========================================
+      */
 
       .error-box {
         display: grid;
         gap: 8px;
         margin-top: 20px;
         padding: 18px;
-        border: 1px solid #fecdca;
+        border:
+          1px solid #fecdca;
         border-radius: 14px;
         background: #fef3f2;
         color: #912018;
@@ -1613,41 +1703,50 @@ function PageStyles() {
         cursor: pointer;
       }
 
-      @media (max-width: 900px) {
+      /*
+      ==========================================
+      TABLET
+      ==========================================
+      */
+
+      @media (
+        max-width: 900px
+      ) {
         .summary-grid {
-          grid-template-columns: 1fr;
+          grid-template-columns:
+            1fr;
         }
 
         .booking-card {
-          grid-template-columns: 210px 1fr;
+          grid-template-columns:
+            210px 1fr;
         }
 
         .stay-details {
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
       }
 
-      @media (max-width: 700px) {
+      /*
+      ==========================================
+      MOBILE
+      ==========================================
+      */
+
+      @media (
+        max-width: 700px
+      ) {
         .guest-page {
-          padding: 18px 12px 40px;
+          padding:
+            18px 12px 40px;
         }
 
-        .guest-header {
-          flex-direction: column;
-          gap: 15px;
-        }
-
-        .guest-header h1 {
+        .guest-page-heading h1 {
           font-size: 28px;
-        }
-
-        .header-actions {
-          width: 100%;
-        }
-
-        .header-actions button {
-          flex: 1;
         }
 
         .booking-card {
@@ -1675,8 +1774,10 @@ function PageStyles() {
         }
 
         .booking-finance {
-          align-items: flex-start;
-          flex-direction: column;
+          align-items:
+            flex-start;
+          flex-direction:
+            column;
         }
 
         .payment-info {
@@ -1686,7 +1787,10 @@ function PageStyles() {
         .booking-actions {
           display: grid;
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
 
         .booking-actions button {
@@ -1694,14 +1798,20 @@ function PageStyles() {
         }
       }
 
-      @media (max-width: 430px) {
+      @media (
+        max-width: 430px
+      ) {
         .stay-details {
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
         }
 
         .booking-actions {
-          grid-template-columns: 1fr;
+          grid-template-columns:
+            1fr;
         }
 
         .summary-card {

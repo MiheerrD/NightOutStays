@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+
 import {
   usePathname,
   useRouter,
@@ -17,67 +18,42 @@ const supabase = createClient(
 );
 
 
-const HOST_MENU_ITEMS = [
+const GUEST_MENU_ITEMS = [
   {
-    label: 'Dashboard',
-    href: '/host',
+    label: 'Browse Stays',
+    href: '/',
     icon: '⌂',
   },
   {
-    label: 'My Properties',
-    href: '/host/properties',
-    icon: '▥',
-  },
-  {
-    label: 'Bookings',
-    href: '/host/bookings',
+    label: 'My Bookings',
+    href: '/account/bookings',
     icon: '▣',
   },
   {
-    label: 'Calendar',
-    href: '/host/calendar',
-    icon: '▦',
-  },
-  {
     label: 'Messages',
-    href: '/host/messages',
+    href: '/account/messages',
     icon: '▭',
   },
   {
-    label: 'Offers',
-    href: '/host/offers',
-    icon: '◇',
+    label: 'Notifications',
+    href: '/account/notifications',
+    icon: '◈',
   },
   {
     label: 'Reviews',
-    href: '/host/reviews',
+    href: '/account/reviews',
     icon: '★',
   },
   {
-    label: 'Subscription',
-    href: '/host/subscription',
-    icon: '▤',
-  },
-  {
-    label: 'Promotions',
-    href: '/host/promotions',
-    icon: '◆',
-  },
-  {
-    label: 'Payouts',
-    href: '/host/payouts',
-    icon: '▰',
-  },
-  {
     label: 'Profile',
-    href: '/host/profile',
+    href: '/account/profile',
     icon: '♙',
   },
 ];
 
 
-export default function HostNav({
-  host,
+export default function GuestNav({
+  guest,
 }) {
 
   const pathname =
@@ -91,11 +67,9 @@ export default function HostNav({
     href
   ) {
 
-    if (
-      href === '/host'
-    ) {
+    if (href === '/') {
 
-      return pathname === '/host';
+      return pathname === '/';
     }
 
 
@@ -118,41 +92,31 @@ export default function HostNav({
   }
 
 
-  const hostName =
-    host?.business_name ||
-    host?.full_name ||
-    'Host';
-
-
-  const hostPerson =
-    host?.full_name &&
-    host?.business_name &&
-    host.full_name !==
-      host.business_name
-      ? host.full_name
-      : 'Host Account';
+  const guestName =
+    guest?.full_name ||
+    'Guest';
 
 
   return (
     <>
-      <div className="nosHostNavRoot">
+      <div className="nosGuestNavRoot">
 
         {/* =====================================
             ROW 1
-            BLUE HOST MENU
+            BLUE GUEST MENU
         ====================================== */}
 
-        <div className="nosHostBlueMenuRow">
+        <div className="nosGuestBlueMenuRow">
 
           <div
-            className="nosHostBlueMenuGrid"
+            className="nosGuestBlueMenuGrid"
             style={{
               gridTemplateColumns:
-                `repeat(${HOST_MENU_ITEMS.length}, minmax(0, 1fr))`,
+                `repeat(${GUEST_MENU_ITEMS.length}, minmax(0, 1fr))`,
             }}
           >
 
-            {HOST_MENU_ITEMS.map(
+            {GUEST_MENU_ITEMS.map(
               (item) => {
 
                 const active =
@@ -168,16 +132,16 @@ export default function HostNav({
                     href={item.href}
                     className={
                       active
-                        ? 'nosHostBlueMenuItem active'
-                        : 'nosHostBlueMenuItem'
+                        ? 'nosGuestBlueMenuItem active'
+                        : 'nosGuestBlueMenuItem'
                     }
                   >
 
-                    <span className="nosHostBlueMenuIcon">
+                    <span className="nosGuestBlueMenuIcon">
                       {item.icon}
                     </span>
 
-                    <span className="nosHostBlueMenuLabel">
+                    <span className="nosGuestBlueMenuLabel">
                       {item.label}
                     </span>
 
@@ -194,28 +158,28 @@ export default function HostNav({
 
         {/* =====================================
             ROW 2
-            HOST DETAILS
+            GUEST DETAILS
         ====================================== */}
 
-        <div className="nosHostDetailRow">
+        <div className="nosGuestDetailRow">
 
-          <div className="nosHostDetailInner">
+          <div className="nosGuestDetailInner">
 
-            <div className="nosHostDetailLeft">
+            <div className="nosGuestDetailLeft">
 
-              <span className="nosHostRoleBadge">
-                HOST
+              <span className="nosGuestRoleBadge">
+                GUEST
               </span>
 
 
-              <div className="nosHostIdentity">
+              <div className="nosGuestIdentity">
 
                 <strong>
-                  {hostName}
+                  {guestName}
                 </strong>
 
                 <span>
-                  {hostPerson}
+                  Guest Account
                 </span>
 
               </div>
@@ -223,14 +187,13 @@ export default function HostNav({
             </div>
 
 
-            <div className="nosHostDetailRight">
+            <div className="nosGuestDetailRight">
 
               <Link
                 href="/"
-                target="_blank"
-                className="nosHostWebsiteButton"
+                className="nosGuestWebsiteButton"
               >
-                ↗ View Website
+                ↗ Browse Stays
               </Link>
 
 
@@ -239,7 +202,7 @@ export default function HostNav({
                 onClick={
                   handleLogout
                 }
-                className="nosHostLogoutButton"
+                className="nosGuestLogoutButton"
               >
                 Logout
               </button>
@@ -275,15 +238,15 @@ function Styles() {
       ==========================================
       */
 
-      .nosHostNavRoot,
-      .nosHostNavRoot * {
+      .nosGuestNavRoot,
+      .nosGuestNavRoot * {
 
         box-sizing:
           border-box;
       }
 
 
-      .nosHostNavRoot {
+      .nosGuestNavRoot {
 
         display:
           block !important;
@@ -321,7 +284,7 @@ function Styles() {
       ==========================================
       */
 
-      .nosHostBlueMenuRow {
+      .nosGuestBlueMenuRow {
 
         display:
           block !important;
@@ -343,7 +306,7 @@ function Styles() {
       }
 
 
-      .nosHostBlueMenuGrid {
+      .nosGuestBlueMenuGrid {
 
         display:
           grid !important;
@@ -374,7 +337,7 @@ function Styles() {
       ==========================================
       */
 
-      .nosHostBlueMenuItem {
+      .nosGuestBlueMenuItem {
 
         position:
           relative;
@@ -417,7 +380,7 @@ function Styles() {
       }
 
 
-      .nosHostBlueMenuItem:hover {
+      .nosGuestBlueMenuItem:hover {
 
         background:
           rgba(
@@ -429,14 +392,14 @@ function Styles() {
       }
 
 
-      .nosHostBlueMenuItem.active {
+      .nosGuestBlueMenuItem.active {
 
         background:
           #35618c !important;
       }
 
 
-      .nosHostBlueMenuItem.active::after {
+      .nosGuestBlueMenuItem.active::after {
 
         content:
           '';
@@ -464,7 +427,7 @@ function Styles() {
       }
 
 
-      .nosHostBlueMenuIcon {
+      .nosGuestBlueMenuIcon {
 
         display:
           block;
@@ -480,7 +443,7 @@ function Styles() {
       }
 
 
-      .nosHostBlueMenuLabel {
+      .nosGuestBlueMenuLabel {
 
         display:
           block;
@@ -517,11 +480,11 @@ function Styles() {
       /*
       ==========================================
       ROW 2
-      WHITE HOST DETAILS
+      WHITE GUEST DETAILS
       ==========================================
       */
 
-      .nosHostDetailRow {
+      .nosGuestDetailRow {
 
         display:
           block !important;
@@ -540,7 +503,7 @@ function Styles() {
       }
 
 
-      .nosHostDetailInner {
+      .nosGuestDetailInner {
 
         width:
           calc(
@@ -582,7 +545,7 @@ function Styles() {
       ==========================================
       */
 
-      .nosHostDetailLeft {
+      .nosGuestDetailLeft {
 
         display:
           flex;
@@ -595,7 +558,7 @@ function Styles() {
       }
 
 
-      .nosHostRoleBadge {
+      .nosGuestRoleBadge {
 
         min-height:
           27px;
@@ -635,7 +598,7 @@ function Styles() {
       }
 
 
-      .nosHostIdentity {
+      .nosGuestIdentity {
 
         display:
           flex;
@@ -645,7 +608,7 @@ function Styles() {
       }
 
 
-      .nosHostIdentity strong {
+      .nosGuestIdentity strong {
 
         color:
           #101828;
@@ -658,7 +621,7 @@ function Styles() {
       }
 
 
-      .nosHostIdentity span {
+      .nosGuestIdentity span {
 
         margin-top:
           2px;
@@ -680,7 +643,7 @@ function Styles() {
       ==========================================
       */
 
-      .nosHostDetailRight {
+      .nosGuestDetailRight {
 
         display:
           flex;
@@ -693,8 +656,8 @@ function Styles() {
       }
 
 
-      .nosHostWebsiteButton,
-      .nosHostLogoutButton {
+      .nosGuestWebsiteButton,
+      .nosGuestLogoutButton {
 
         min-height:
           36px;
@@ -731,7 +694,7 @@ function Styles() {
       }
 
 
-      .nosHostWebsiteButton {
+      .nosGuestWebsiteButton {
 
         color:
           #0b579e;
@@ -741,15 +704,15 @@ function Styles() {
       }
 
 
-      .nosHostLogoutButton {
+      .nosGuestLogoutButton {
 
         color:
           #25364a;
       }
 
 
-      .nosHostWebsiteButton:hover,
-      .nosHostLogoutButton:hover {
+      .nosGuestWebsiteButton:hover,
+      .nosGuestLogoutButton:hover {
 
         background:
           #f5f7fa;
@@ -766,21 +729,21 @@ function Styles() {
         max-width: 1000px
       ) {
 
-        .nosHostBlueMenuLabel {
+        .nosGuestBlueMenuLabel {
 
           font-size:
             8px;
         }
 
 
-        .nosHostBlueMenuIcon {
+        .nosGuestBlueMenuIcon {
 
           font-size:
             14px;
         }
 
 
-        .nosHostDetailInner {
+        .nosGuestDetailInner {
 
           width:
             calc(
@@ -794,7 +757,6 @@ function Styles() {
       /*
       ==========================================
       MOBILE
-      NO HORIZONTAL SCROLL
       ==========================================
       */
 
@@ -802,7 +764,7 @@ function Styles() {
         max-width: 750px
       ) {
 
-        .nosHostBlueMenuGrid {
+        .nosGuestBlueMenuGrid {
 
           grid-template-columns:
             repeat(
@@ -812,42 +774,42 @@ function Styles() {
         }
 
 
-        .nosHostBlueMenuItem {
+        .nosGuestBlueMenuItem {
 
           min-height:
             60px;
         }
 
 
-        .nosHostBlueMenuLabel {
+        .nosGuestBlueMenuLabel {
 
           font-size:
             9px;
         }
 
 
-        .nosHostDetailInner {
+        .nosGuestDetailInner {
 
           min-height:
             58px;
         }
 
 
-        .nosHostRoleBadge {
+        .nosGuestRoleBadge {
 
           display:
             none;
         }
 
 
-        .nosHostIdentity span {
+        .nosGuestIdentity span {
 
           display:
             none;
         }
 
 
-        .nosHostWebsiteButton {
+        .nosGuestWebsiteButton {
 
           display:
             none;
@@ -860,7 +822,7 @@ function Styles() {
         max-width: 450px
       ) {
 
-        .nosHostBlueMenuGrid {
+        .nosGuestBlueMenuGrid {
 
           grid-template-columns:
             repeat(
@@ -870,7 +832,7 @@ function Styles() {
         }
 
 
-        .nosHostDetailInner {
+        .nosGuestDetailInner {
 
           width:
             calc(
@@ -879,7 +841,7 @@ function Styles() {
         }
 
 
-        .nosHostIdentity strong {
+        .nosGuestIdentity strong {
 
           max-width:
             160px;
@@ -899,7 +861,7 @@ function Styles() {
 
       /*
       ==========================================
-      PREVENT HEADER HORIZONTAL SCROLL
+      PREVENT HORIZONTAL SCROLL
       ==========================================
       */
 
