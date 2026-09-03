@@ -52,6 +52,19 @@ export async function POST(request) {
     }
 
     const now = new Date().toISOString();
+    const pendingCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+    // Abandoned Razorpay promotion orders must not block a property forever.
+    // A pending payment older than 30 minutes is treated as failed; the Host
+    // can then start a fresh promotion checkout.
+    await supabase
+      .from('property_promotions')
+      .update({ status: 'failed', updated_at: now })
+      .eq('property_id', property.id)
+      .eq('host_id', host.id)
+      .eq('status', 'pending_payment')
+      .lte('created_at', pendingCutoff);
+
     await supabase.from('property_promotions').update({ status: 'expired', updated_at: now })
       .eq('property_id', property.id).eq('host_id', host.id).eq('status', 'active').lte('expires_at', now);
 
