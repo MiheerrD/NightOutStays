@@ -21,6 +21,9 @@ import {
 import GuestAvailabilityCalendar
   from './GuestAvailabilityCalendar';
 
+import PropertyViewTracker
+  from './PropertyViewTracker';
+
 const supabase = createClient(
   'https://gxwemplbykjxhezefykh.supabase.co',
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
@@ -3014,6 +3017,12 @@ export default function PropertyPage() {
         styles.page
       }
     >
+      <PropertyViewTracker
+        propertyId={property.id}
+        guestProfile={guestProfile}
+        session={session}
+      />
+
       <header
         style={
           styles.header
