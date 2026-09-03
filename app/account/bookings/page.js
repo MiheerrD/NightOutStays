@@ -829,7 +829,6 @@ function ApprovalNotice({
           : `Complete payment before ${formatDateTime(
               deadline
             )}. Host approval is valid for 24 hours.`}
-            )}. Host approval is valid for 24 hours.`}
       </span>
     </div>
   );
