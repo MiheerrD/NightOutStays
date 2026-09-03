@@ -170,6 +170,9 @@ export async function POST(request) {
           total_amount,
           amount_including_gst,
           final_payable_amount,
+          taxable_amount,
+          gst_amount,
+          security_deposit,
           offer_status,
           razorpay_order_id,
           payment_status,
@@ -851,6 +854,195 @@ export async function POST(request) {
 
     /*
       =================================
+      CREATE HOST SETTLEMENT
+      =================================
+
+      Successful payment creates one
+      permanent Host settlement row.
+
+      The settlement starts on hold.
+      Actual Razorpay/payment/Route
+      charges will be recorded as Host
+      deductions before payout.
+    */
+
+    let settlementCreated =
+      false;
+
+    try {
+      const {
+        data: propertyForSettlement,
+        error: propertySettlementError,
+      } =
+        await supabase
+          .from('properties')
+          .select('id, host_id')
+          .eq(
+            'id',
+            booking.property_id
+          )
+          .single();
+
+      if (
+        propertySettlementError ||
+        !propertyForSettlement?.host_id
+      ) {
+        throw new Error(
+          'Unable to identify Host for settlement.'
+        );
+      }
+
+      const guestPaidAmount =
+        Number(
+          payment.amount || 0
+        ) / 100;
+
+      const gstCollected =
+        Number(
+          booking.gst_amount || 0
+        );
+
+      const bookingValueBeforeGst =
+        Number(
+          booking.taxable_amount || 0
+        ) > 0
+          ? Number(
+              booking.taxable_amount
+            )
+          : Math.max(
+              guestPaidAmount -
+                gstCollected,
+              0
+            );
+
+      const securityDeposit =
+        Number(
+          booking.security_deposit || 0
+        );
+
+      /*
+        GST is not treated as Host
+        earnings.
+
+        Security deposit is tracked
+        separately and excluded from
+        Host gross payout here.
+      */
+
+      const hostGrossAmount =
+        Math.max(
+          bookingValueBeforeGst -
+            securityDeposit,
+          0
+        );
+
+      const {
+        data: existingSettlement,
+        error: existingSettlementError,
+      } =
+        await supabase
+          .from('host_settlements')
+          .select('id')
+          .eq(
+            'booking_id',
+            booking.id
+          )
+          .maybeSingle();
+
+      if (
+        existingSettlementError
+      ) {
+        throw existingSettlementError;
+      }
+
+      if (
+        existingSettlement?.id
+      ) {
+        settlementCreated =
+          true;
+      } else {
+        const {
+          data: newSettlement,
+          error: settlementError,
+        } =
+          await supabase
+            .from('host_settlements')
+            .insert({
+              booking_id:
+                booking.id,
+
+              property_id:
+                booking.property_id,
+
+              host_id:
+                propertyForSettlement.host_id,
+
+              guest_paid_amount:
+                guestPaidAmount,
+
+              booking_value_before_gst:
+                bookingValueBeforeGst,
+
+              gst_collected:
+                gstCollected,
+
+              security_deposit:
+                securityDeposit,
+
+              host_gross_amount:
+                hostGrossAmount,
+
+              razorpay_payment_id:
+                razorpay_payment_id,
+
+              payout_status:
+                'pending_calculation',
+
+              is_on_hold:
+                true,
+
+              hold_reason:
+                'Awaiting payout eligibility and final charge calculation.',
+            })
+            .select('id')
+            .single();
+
+        if (
+          settlementError ||
+          !newSettlement
+        ) {
+          throw (
+            settlementError ||
+            new Error(
+              'Settlement creation failed.'
+            )
+          );
+        }
+
+        settlementCreated =
+          true;
+      }
+    } catch (
+      settlementError
+    ) {
+      /*
+        Payment and booking confirmation
+        have already succeeded.
+
+        An internal settlement-ledger
+        problem must never turn a valid
+        guest payment into a failed
+        payment response.
+      */
+
+      console.error(
+        'Payment succeeded but Host settlement creation failed:',
+        settlementError
+      );
+    }
+
+    /*
+      =================================
       PAYMENT SYSTEM MESSAGE
       =================================
     */
@@ -1060,6 +1252,8 @@ export async function POST(request) {
 
       identityVerificationRequired:
         true,
+
+      settlementCreated,
     });
   } catch (error) {
     console.error(
