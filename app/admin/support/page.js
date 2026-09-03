@@ -52,6 +52,7 @@ export default function AdminSupport() {
   const [busy, setBusy] = useState("");
   const [liveState, setLiveState] = useState("connecting");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [ticketFilter, setTicketFilter] = useState("all");
   const [faq, setFaq] = useState({ category: "general", question: "", answer: "", keywords: "", sortOrder: 0 });
 
   const selectedRef = useRef("");
@@ -217,6 +218,21 @@ export default function AdminSupport() {
     };
   }, []);
 
+  const filteredTickets = useMemo(() => {
+    const tickets = data?.tickets || [];
+
+    if (ticketFilter === "all") return tickets;
+    if (ticketFilter === "urgent") return tickets.filter((item) => item.priority === "urgent");
+    if (ticketFilter === "important") return tickets.filter((item) => item.priority === "important");
+    if (ticketFilter === "waiting") return tickets.filter((item) => ["waiting", "waiting_user"].includes(String(item.status || "").toLowerCase()));
+    if (ticketFilter === "in_progress") return tickets.filter((item) => String(item.status || "").toLowerCase() === "in_progress");
+    if (ticketFilter === "open") return tickets.filter((item) => String(item.status || "").toLowerCase() === "open");
+    if (ticketFilter === "resolved") return tickets.filter((item) => String(item.status || "").toLowerCase() === "resolved");
+    if (ticketFilter === "closed") return tickets.filter((item) => String(item.status || "").toLowerCase() === "closed");
+
+    return tickets;
+  }, [data, ticketFilter]);
+
   const ticket = useMemo(
     () => data?.tickets?.find((item) => item.id === selected) || null,
     [data, selected]
@@ -259,7 +275,28 @@ export default function AdminSupport() {
       {tab === "tickets" && (
         <div style={s.layout}>
           <section style={s.list}>
-            {(data?.tickets || []).map((item) => (
+            <div style={s.filterWrap}>
+              <div style={s.filterLabel}>Filter Tickets</div>
+              <select
+                style={s.filterSelect}
+                value={ticketFilter}
+                onChange={(e) => setTicketFilter(e.target.value)}
+              >
+                <option value="all">All Tickets</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="waiting">Waiting</option>
+                <option value="urgent">Urgent</option>
+                <option value="important">Important</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              <small style={s.filterCount}>Showing {filteredTickets.length} of {data?.tickets?.length || 0}</small>
+            </div>
+
+            {filteredTickets.length === 0 ? (
+              <div style={s.noFilterResults}>No tickets found for this filter.</div>
+            ) : filteredTickets.map((item) => (
               <button
                 onClick={() => choose(item.id)}
                 key={item.id}
@@ -492,6 +529,11 @@ const s = {
   tabOn: { background: "#082f5a", color: "#fff" },
   layout: { display: "grid", gridTemplateColumns: "360px 1fr", gap: 16 },
   list: { background: "#fff", border: "1px solid #e1e7ee", borderRadius: 14, padding: 8, maxHeight: "72vh", overflow: "auto" },
+  filterWrap: { position: "sticky", top: 0, zIndex: 2, background: "#fff", padding: "8px 6px 12px", borderBottom: "1px solid #e5e7eb" },
+  filterLabel: { fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 6 },
+  filterSelect: { width: "100%", padding: "10px 11px", border: "1px solid #cbd5e1", borderRadius: 8, background: "#fff", color: "#17324d", fontWeight: 700, cursor: "pointer" },
+  filterCount: { display: "block", marginTop: 6, color: "#64748b" },
+  noFilterResults: { padding: 24, textAlign: "center", color: "#64748b", fontSize: 13 },
   ticket: { width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid #edf1f4", background: "#fff", padding: 13, cursor: "pointer", display: "grid", gap: 5, color: "#17324d" },
   ticketOn: { background: "#edf5fc" },
   ticketTop: { display: "flex", justifyContent: "space-between" },
