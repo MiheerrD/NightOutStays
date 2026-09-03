@@ -1,4 +1,4 @@
-\'use client\';
+'use client';
 import { useEffect,useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 const supabase=createClient('https://gxwemplbykjxhezefykh.supabase.co','sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS');
