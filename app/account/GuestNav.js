@@ -45,6 +45,11 @@ const GUEST_MENU_ITEMS = [
     icon: '★',
   },
   {
+    label: 'Support',
+    href: '/account/help',
+    icon: '?',
+  },
+  {
     label: 'Profile',
     href: '/account/profile',
     icon: '♙',
@@ -67,7 +72,9 @@ export default function GuestNav({
     href
   ) {
 
-    if (href === '/') {
+    if (
+      href === '/'
+    ) {
 
       return pathname === '/';
     }
@@ -100,11 +107,6 @@ export default function GuestNav({
   return (
     <>
       <div className="nosGuestNavRoot">
-
-        {/* =====================================
-            ROW 1
-            BLUE GUEST MENU
-        ====================================== */}
 
         <div className="nosGuestBlueMenuRow">
 
@@ -155,11 +157,6 @@ export default function GuestNav({
 
         </div>
 
-
-        {/* =====================================
-            ROW 2
-            GUEST DETAILS
-        ====================================== */}
 
         <div className="nosGuestDetailRow">
 
@@ -222,137 +219,53 @@ export default function GuestNav({
 }
 
 
-// ============================================================
-// STYLES
-// ============================================================
-
 function Styles() {
 
   return (
 
     <style jsx global>{`
 
-      /*
-      ==========================================
-      RESET
-      ==========================================
-      */
-
       .nosGuestNavRoot,
       .nosGuestNavRoot * {
-
-        box-sizing:
-          border-box;
+        box-sizing: border-box;
       }
 
 
       .nosGuestNavRoot {
 
-        display:
-          block !important;
-
-        position:
-          relative !important;
-
-        width:
-          100% !important;
-
-        max-width:
-          none !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        overflow:
-          visible !important;
-
-        background:
-          #ffffff;
-
-        z-index:
-          1000;
+        display: block !important;
+        position: relative !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff;
+        z-index: 1000;
       }
 
 
-      /*
-      ==========================================
-      ROW 1
-      BLUE MENU
-      ==========================================
-      */
-
       .nosGuestBlueMenuRow {
 
-        display:
-          block !important;
-
-        width:
-          100% !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        background:
-          #082f5a !important;
-
-        overflow:
-          hidden !important;
+        width: 100% !important;
+        background: #082f5a !important;
       }
 
 
       .nosGuestBlueMenuGrid {
 
-        display:
-          grid !important;
-
-        width:
-          100% !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        align-items:
-          stretch;
-
-        background:
-          #082f5a;
-
-        overflow:
-          hidden !important;
+        display: grid !important;
+        width: 100% !important;
+        align-items: stretch;
+        background: #082f5a;
       }
 
 
-      /*
-      ==========================================
-      MENU ITEM
-      ==========================================
-      */
-
       .nosGuestBlueMenuItem {
 
-        position:
-          relative;
+        position: relative;
+        min-height: 70px;
 
-        min-width:
-          0 !important;
-
-        min-height:
-          70px;
-
-        padding:
-          8px 3px;
-
-        display:
-          flex !important;
+        display: flex !important;
 
         flex-direction:
           column;
@@ -366,29 +279,22 @@ function Styles() {
         gap:
           5px;
 
-        background:
-          transparent;
+        padding:
+          8px 2px;
 
         color:
           #ffffff !important;
 
         text-decoration:
           none !important;
-
-        overflow:
-          hidden;
       }
 
 
       .nosGuestBlueMenuItem:hover {
 
         background:
-          rgba(
-            255,
-            255,
-            255,
-            0.10
-          ) !important;
+          rgba(255,255,255,.10)
+          !important;
       }
 
 
@@ -401,8 +307,7 @@ function Styles() {
 
       .nosGuestBlueMenuItem.active::after {
 
-        content:
-          '';
+        content: '';
 
         position:
           absolute;
@@ -421,38 +326,23 @@ function Styles() {
 
         background:
           #ffffff;
-
-        border-radius:
-          4px 4px 0 0;
       }
 
 
       .nosGuestBlueMenuIcon {
 
-        display:
-          block;
+        font-size:
+          15px;
 
         color:
-          #ffffff !important;
-
-        font-size:
-          16px;
-
-        line-height:
-          1;
+          #ffffff;
       }
 
 
       .nosGuestBlueMenuLabel {
 
-        display:
-          block;
-
         width:
           100%;
-
-        color:
-          #ffffff !important;
 
         font-size:
           9px;
@@ -460,43 +350,21 @@ function Styles() {
         font-weight:
           900;
 
-        line-height:
-          1.15;
-
         text-align:
           center;
 
-        white-space:
-          normal;
-
-        overflow-wrap:
-          normal;
-
-        word-break:
-          normal;
+        color:
+          #ffffff;
       }
 
 
-      /*
-      ==========================================
-      ROW 2
-      WHITE GUEST DETAILS
-      ==========================================
-      */
-
       .nosGuestDetailRow {
 
-        display:
-          block !important;
-
         width:
-          100% !important;
-
-        margin:
-          0 !important;
+          100%;
 
         background:
-          #ffffff !important;
+          #ffffff;
 
         border-bottom:
           1px solid #dfe5ec;
@@ -506,9 +374,7 @@ function Styles() {
       .nosGuestDetailInner {
 
         width:
-          calc(
-            100% - 64px
-          );
+          calc(100% - 64px);
 
         max-width:
           1500px;
@@ -517,33 +383,18 @@ function Styles() {
           62px;
 
         margin:
-          0 auto;
+          auto;
 
         display:
-          flex !important;
-
-        flex-direction:
-          row !important;
+          flex;
 
         align-items:
-          center !important;
+          center;
 
         justify-content:
-          space-between !important;
-
-        gap:
-          20px;
-
-        background:
-          #ffffff;
+          space-between;
       }
 
-
-      /*
-      ==========================================
-      LEFT SIDE
-      ==========================================
-      */
 
       .nosGuestDetailLeft {
 
@@ -560,20 +411,8 @@ function Styles() {
 
       .nosGuestRoleBadge {
 
-        min-height:
-          27px;
-
         padding:
-          0 12px;
-
-        display:
-          inline-flex;
-
-        align-items:
-          center;
-
-        justify-content:
-          center;
+          7px 14px;
 
         border-radius:
           999px;
@@ -589,12 +428,6 @@ function Styles() {
 
         font-weight:
           900;
-
-        letter-spacing:
-          0.6px;
-
-        white-space:
-          nowrap;
       }
 
 
@@ -610,14 +443,14 @@ function Styles() {
 
       .nosGuestIdentity strong {
 
-        color:
-          #101828;
-
         font-size:
           13px;
 
         font-weight:
           900;
+
+        color:
+          #101828;
       }
 
 
@@ -626,22 +459,13 @@ function Styles() {
         margin-top:
           2px;
 
-        color:
-          #667085;
-
         font-size:
           10px;
 
-        font-weight:
-          700;
+        color:
+          #667085;
       }
 
-
-      /*
-      ==========================================
-      RIGHT SIDE
-      ==========================================
-      */
 
       .nosGuestDetailRight {
 
@@ -665,15 +489,6 @@ function Styles() {
         padding:
           0 14px;
 
-        display:
-          inline-flex;
-
-        align-items:
-          center;
-
-        justify-content:
-          center;
-
         border:
           1px solid #ccd6e1;
 
@@ -683,11 +498,23 @@ function Styles() {
         background:
           #ffffff;
 
+        display:
+          inline-flex;
+
+        align-items:
+          center;
+
+        justify-content:
+          center;
+
         font-size:
           10px;
 
         font-weight:
           900;
+
+        text-decoration:
+          none;
 
         cursor:
           pointer;
@@ -698,9 +525,6 @@ function Styles() {
 
         color:
           #0b579e;
-
-        text-decoration:
-          none;
       }
 
 
@@ -711,87 +535,13 @@ function Styles() {
       }
 
 
-      .nosGuestWebsiteButton:hover,
-      .nosGuestLogoutButton:hover {
-
-        background:
-          #f5f7fa;
-      }
-
-
-      /*
-      ==========================================
-      TABLET
-      ==========================================
-      */
-
-      @media (
-        max-width: 1000px
-      ) {
-
-        .nosGuestBlueMenuLabel {
-
-          font-size:
-            8px;
-        }
-
-
-        .nosGuestBlueMenuIcon {
-
-          font-size:
-            14px;
-        }
-
-
-        .nosGuestDetailInner {
-
-          width:
-            calc(
-              100% - 30px
-            );
-        }
-
-      }
-
-
-      /*
-      ==========================================
-      MOBILE
-      ==========================================
-      */
-
-      @media (
-        max-width: 750px
-      ) {
+      @media (max-width: 750px) {
 
         .nosGuestBlueMenuGrid {
 
           grid-template-columns:
-            repeat(
-              4,
-              1fr
-            ) !important;
-        }
-
-
-        .nosGuestBlueMenuItem {
-
-          min-height:
-            60px;
-        }
-
-
-        .nosGuestBlueMenuLabel {
-
-          font-size:
-            9px;
-        }
-
-
-        .nosGuestDetailInner {
-
-          min-height:
-            58px;
+            repeat(4,1fr)
+            !important;
         }
 
 
@@ -818,52 +568,24 @@ function Styles() {
       }
 
 
-      @media (
-        max-width: 450px
-      ) {
+      @media (max-width: 450px) {
 
         .nosGuestBlueMenuGrid {
 
           grid-template-columns:
-            repeat(
-              3,
-              1fr
-            ) !important;
+            repeat(3,1fr)
+            !important;
         }
 
 
         .nosGuestDetailInner {
 
           width:
-            calc(
-              100% - 20px
-            );
-        }
-
-
-        .nosGuestIdentity strong {
-
-          max-width:
-            160px;
-
-          overflow:
-            hidden;
-
-          text-overflow:
-            ellipsis;
-
-          white-space:
-            nowrap;
+            calc(100% - 20px);
         }
 
       }
 
-
-      /*
-      ==========================================
-      PREVENT HORIZONTAL SCROLL
-      ==========================================
-      */
 
       html,
       body {

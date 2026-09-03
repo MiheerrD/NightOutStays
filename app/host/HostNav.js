@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+
 import {
   usePathname,
   useRouter,
@@ -67,6 +68,11 @@ const HOST_MENU_ITEMS = [
     label: 'Payouts',
     href: '/host/payouts',
     icon: '▰',
+  },
+  {
+    label: 'Support',
+    href: '/host/help',
+    icon: '?',
   },
   {
     label: 'Profile',
@@ -137,11 +143,6 @@ export default function HostNav({
     <>
       <div className="nosHostNavRoot">
 
-        {/* =====================================
-            ROW 1
-            BLUE HOST MENU
-        ====================================== */}
-
         <div className="nosHostBlueMenuRow">
 
           <div
@@ -191,11 +192,6 @@ export default function HostNav({
 
         </div>
 
-
-        {/* =====================================
-            ROW 2
-            HOST DETAILS
-        ====================================== */}
 
         <div className="nosHostDetailRow">
 
@@ -259,173 +255,82 @@ export default function HostNav({
 }
 
 
-// ============================================================
-// STYLES
-// ============================================================
-
 function Styles() {
 
   return (
 
     <style jsx global>{`
 
-      /*
-      ==========================================
-      RESET
-      ==========================================
-      */
-
       .nosHostNavRoot,
       .nosHostNavRoot * {
-
-        box-sizing:
-          border-box;
+        box-sizing: border-box;
       }
 
 
       .nosHostNavRoot {
 
-        display:
-          block !important;
-
-        position:
-          relative !important;
-
-        width:
-          100% !important;
-
-        max-width:
-          none !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        overflow:
-          visible !important;
-
-        background:
-          #ffffff;
-
-        z-index:
-          1000;
+        display: block !important;
+        position: relative !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #ffffff;
+        z-index: 1000;
       }
 
 
-      /*
-      ==========================================
-      ROW 1
-      BLUE MENU
-      ==========================================
-      */
-
       .nosHostBlueMenuRow {
 
-        display:
-          block !important;
-
-        width:
-          100% !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        background:
-          #082f5a !important;
-
-        overflow:
-          hidden !important;
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #082f5a !important;
+        overflow: hidden !important;
       }
 
 
       .nosHostBlueMenuGrid {
 
-        display:
-          grid !important;
-
-        width:
-          100% !important;
-
-        margin:
-          0 !important;
-
-        padding:
-          0 !important;
-
-        align-items:
-          stretch;
-
-        background:
-          #082f5a;
-
-        overflow:
-          hidden !important;
+        display: grid !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        align-items: stretch;
+        background: #082f5a;
       }
 
 
-      /*
-      ==========================================
-      MENU ITEM
-      ==========================================
-      */
-
       .nosHostBlueMenuItem {
 
-        position:
-          relative;
+        position: relative;
+        min-width: 0 !important;
+        min-height: 70px;
+        padding: 8px 2px;
 
-        min-width:
-          0 !important;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
 
-        min-height:
-          70px;
+        gap: 5px;
 
-        padding:
-          8px 3px;
+        color: #ffffff !important;
+        background: transparent;
 
-        display:
-          flex !important;
+        text-decoration: none !important;
 
-        flex-direction:
-          column;
-
-        align-items:
-          center;
-
-        justify-content:
-          center;
-
-        gap:
-          5px;
-
-        background:
-          transparent;
-
-        color:
-          #ffffff !important;
-
-        text-decoration:
-          none !important;
-
-        overflow:
-          hidden;
+        overflow: hidden;
       }
 
 
       .nosHostBlueMenuItem:hover {
 
         background:
-          rgba(
-            255,
-            255,
-            255,
-            0.10
-          ) !important;
+          rgba(255,255,255,0.10)
+          !important;
       }
 
 
@@ -438,23 +343,15 @@ function Styles() {
 
       .nosHostBlueMenuItem.active::after {
 
-        content:
-          '';
+        content: '';
 
-        position:
-          absolute;
+        position: absolute;
 
-        left:
-          20%;
+        left: 20%;
+        right: 20%;
+        bottom: 0;
 
-        right:
-          20%;
-
-        bottom:
-          0;
-
-        height:
-          4px;
+        height: 4px;
 
         background:
           #ffffff;
@@ -466,14 +363,13 @@ function Styles() {
 
       .nosHostBlueMenuIcon {
 
-        display:
-          block;
+        display: block;
 
         color:
           #ffffff !important;
 
         font-size:
-          16px;
+          15px;
 
         line-height:
           1;
@@ -482,17 +378,15 @@ function Styles() {
 
       .nosHostBlueMenuLabel {
 
-        display:
-          block;
+        display: block;
 
-        width:
-          100%;
+        width: 100%;
 
         color:
           #ffffff !important;
 
         font-size:
-          9px;
+          8px;
 
         font-weight:
           900;
@@ -505,32 +399,15 @@ function Styles() {
 
         white-space:
           normal;
-
-        overflow-wrap:
-          normal;
-
-        word-break:
-          normal;
       }
 
 
-      /*
-      ==========================================
-      ROW 2
-      WHITE HOST DETAILS
-      ==========================================
-      */
-
       .nosHostDetailRow {
 
-        display:
-          block !important;
+        display: block !important;
 
         width:
           100% !important;
-
-        margin:
-          0 !important;
 
         background:
           #ffffff !important;
@@ -543,9 +420,7 @@ function Styles() {
       .nosHostDetailInner {
 
         width:
-          calc(
-            100% - 64px
-          );
+          calc(100% - 64px);
 
         max-width:
           1500px;
@@ -570,17 +445,8 @@ function Styles() {
 
         gap:
           20px;
-
-        background:
-          #ffffff;
       }
 
-
-      /*
-      ==========================================
-      LEFT SIDE
-      ==========================================
-      */
 
       .nosHostDetailLeft {
 
@@ -628,10 +494,7 @@ function Styles() {
           900;
 
         letter-spacing:
-          0.6px;
-
-        white-space:
-          nowrap;
+          .6px;
       }
 
 
@@ -673,12 +536,6 @@ function Styles() {
           700;
       }
 
-
-      /*
-      ==========================================
-      RIGHT SIDE
-      ==========================================
-      */
 
       .nosHostDetailRight {
 
@@ -756,152 +613,68 @@ function Styles() {
       }
 
 
-      /*
-      ==========================================
-      TABLET
-      ==========================================
-      */
-
-      @media (
-        max-width: 1000px
-      ) {
+      @media (max-width: 1100px) {
 
         .nosHostBlueMenuLabel {
-
-          font-size:
-            8px;
+          font-size: 7px;
         }
-
 
         .nosHostBlueMenuIcon {
-
-          font-size:
-            14px;
+          font-size: 13px;
         }
 
-
         .nosHostDetailInner {
-
-          width:
-            calc(
-              100% - 30px
-            );
+          width: calc(100% - 30px);
         }
 
       }
 
 
-      /*
-      ==========================================
-      MOBILE
-      NO HORIZONTAL SCROLL
-      ==========================================
-      */
-
-      @media (
-        max-width: 750px
-      ) {
+      @media (max-width: 750px) {
 
         .nosHostBlueMenuGrid {
-
           grid-template-columns:
-            repeat(
-              4,
-              1fr
-            ) !important;
+            repeat(4,1fr)
+            !important;
         }
-
 
         .nosHostBlueMenuItem {
-
-          min-height:
-            60px;
+          min-height: 60px;
         }
-
 
         .nosHostBlueMenuLabel {
-
-          font-size:
-            9px;
+          font-size: 9px;
         }
-
-
-        .nosHostDetailInner {
-
-          min-height:
-            58px;
-        }
-
 
         .nosHostRoleBadge {
-
-          display:
-            none;
+          display: none;
         }
-
 
         .nosHostIdentity span {
-
-          display:
-            none;
+          display: none;
         }
-
 
         .nosHostWebsiteButton {
-
-          display:
-            none;
+          display: none;
         }
 
       }
 
 
-      @media (
-        max-width: 450px
-      ) {
+      @media (max-width: 450px) {
 
         .nosHostBlueMenuGrid {
-
           grid-template-columns:
-            repeat(
-              3,
-              1fr
-            ) !important;
+            repeat(3,1fr)
+            !important;
         }
-
 
         .nosHostDetailInner {
-
-          width:
-            calc(
-              100% - 20px
-            );
-        }
-
-
-        .nosHostIdentity strong {
-
-          max-width:
-            160px;
-
-          overflow:
-            hidden;
-
-          text-overflow:
-            ellipsis;
-
-          white-space:
-            nowrap;
+          width: calc(100% - 20px);
         }
 
       }
 
-
-      /*
-      ==========================================
-      PREVENT HEADER HORIZONTAL SCROLL
-      ==========================================
-      */
 
       html,
       body {
