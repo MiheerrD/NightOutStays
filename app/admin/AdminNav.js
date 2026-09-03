@@ -85,6 +85,18 @@ const ALL_MENU_ITEMS = [
     module: 'messages',
   },
   {
+    label: 'Notifications',
+    href: '/admin/notifications',
+    icon: '♢',
+    module: 'messages',
+  },
+  {
+    label: 'Support',
+    href: '/admin/support',
+    icon: '?',
+    module: 'messages',
+  },
+  {
     label: 'Reports',
     href: '/admin/reports',
     icon: '≣',
@@ -285,11 +297,6 @@ export default function AdminNav() {
     <>
       <div className="nosAdminNavRoot">
 
-        {/* =====================================
-            ROW 1
-            ONLY BLUE ADMIN MENU
-        ====================================== */}
-
         <div className="nosBlueMenuRow">
 
           <div
@@ -329,12 +336,6 @@ export default function AdminNav() {
 
         </div>
 
-
-        {/* =====================================
-            ROW 2
-            ADMIN DETAILS BELOW MENU
-        ====================================== */}
-
         <div className="nosAdminDetailRow">
 
           <div className="nosAdminDetailInner">
@@ -372,7 +373,6 @@ export default function AdminNav() {
 
             </div>
 
-
             <div className="nosAdminDetailRight">
 
               <Link
@@ -408,12 +408,6 @@ function Styles() {
   return (
     <style jsx global>{`
 
-      /*
-      ==========================================
-      IMPORTANT RESET FOR ADMIN HEADER
-      ==========================================
-      */
-
       .nosAdminNavRoot,
       .nosAdminNavRoot * {
         box-sizing: border-box;
@@ -421,95 +415,50 @@ function Styles() {
 
       .nosAdminNavRoot {
         display: block !important;
-
         position: relative !important;
-
         width: 100% !important;
-
         max-width: none !important;
-
         margin: 0 !important;
         padding: 0 !important;
-
         overflow: visible !important;
-
         background: #ffffff;
-
         z-index: 1000;
       }
 
-
-      /*
-      ==========================================
-      ROW 1
-      BLUE MENU ONLY
-      ==========================================
-      */
-
       .nosBlueMenuRow {
         display: block !important;
-
         width: 100% !important;
-
         margin: 0 !important;
         padding: 0 !important;
-
         background: #082f5a !important;
-
         overflow: hidden !important;
       }
-
 
       .nosBlueMenuGrid {
         display: grid !important;
-
         width: 100% !important;
-
         margin: 0 !important;
         padding: 0 !important;
-
         align-items: stretch;
-
         background: #082f5a;
-
         overflow: hidden !important;
       }
 
-
-      /*
-      ==========================================
-      INDIVIDUAL MENU ITEM
-      ==========================================
-      */
-
       .nosBlueMenuItem {
         position: relative;
-
         min-width: 0 !important;
-
         min-height: 70px;
-
-        padding: 8px 3px;
-
+        padding: 8px 2px;
         display: flex !important;
-
         flex-direction: column;
-
         align-items: center;
-
         justify-content: center;
-
         gap: 5px;
-
         background: transparent;
-
         color: #ffffff !important;
-
         text-decoration: none !important;
-
         overflow: hidden;
       }
-
 
       .nosBlueMenuItem:hover {
         background:
@@ -521,287 +470,165 @@ function Styles() {
           ) !important;
       }
 
-
       .nosBlueMenuItem.active {
         background: #35618c !important;
       }
 
-
       .nosBlueMenuItem.active::after {
         content: '';
-
         position: absolute;
-
         left: 20%;
         right: 20%;
-
         bottom: 0;
-
         height: 4px;
-
         background: #ffffff;
-
         border-radius:
           4px 4px 0 0;
       }
 
-
       .nosBlueMenuIcon {
         display: block;
-
         color: #ffffff !important;
-
-        font-size: 16px;
-
+        font-size: 15px;
         line-height: 1;
       }
 
-
       .nosBlueMenuLabel {
         display: block;
-
         width: 100%;
-
         color: #ffffff !important;
-
-        font-size: 9px;
-
+        font-size: 8px;
         font-weight: 900;
-
         line-height: 1.15;
-
         text-align: center;
-
         white-space: normal;
-
         overflow-wrap: normal;
-
         word-break: normal;
       }
 
-
-      /*
-      ==========================================
-      ROW 2
-      WHITE ADMIN DETAILS
-      ==========================================
-      */
-
       .nosAdminDetailRow {
         display: block !important;
-
         width: 100% !important;
-
         margin: 0 !important;
-
         background: #ffffff !important;
-
         border-bottom:
           1px solid #dfe5ec;
       }
 
-
       .nosAdminDetailInner {
         width:
           calc(100% - 64px);
-
         max-width: 1500px;
-
         min-height: 62px;
-
         margin: 0 auto;
-
         display: flex !important;
-
         flex-direction: row !important;
-
         align-items: center !important;
-
         justify-content:
           space-between !important;
-
         gap: 20px;
-
         background: #ffffff;
       }
 
-
-      /*
-      ==========================================
-      LEFT SIDE
-      ==========================================
-      */
-
       .nosAdminDetailLeft {
         display: flex;
-
         align-items: center;
-
         gap: 14px;
       }
 
-
       .nosRoleBadge {
         min-height: 27px;
-
         padding: 0 12px;
-
         display: inline-flex;
-
         align-items: center;
-
         justify-content: center;
-
         border-radius: 999px;
-
         background: #eaf2fb;
-
         color: #0b579e;
-
         font-size: 9px;
-
         font-weight: 900;
-
         letter-spacing: 0.6px;
-
         white-space: nowrap;
       }
 
-
       .nosRoleBadge.super {
         background: #082f5a;
-
         color: #ffffff;
       }
 
-
       .nosAdminIdentity {
         display: flex;
-
         flex-direction: column;
       }
 
-
       .nosAdminIdentity strong {
         color: #101828;
-
         font-size: 13px;
-
         font-weight: 900;
       }
 
-
       .nosAdminIdentity span {
         margin-top: 2px;
-
         color: #667085;
-
         font-size: 10px;
-
         font-weight: 700;
       }
 
-
-      /*
-      ==========================================
-      RIGHT SIDE
-      ==========================================
-      */
-
       .nosAdminDetailRight {
         display: flex;
-
         align-items: center;
-
         gap: 10px;
       }
-
 
       .nosWebsiteButton,
       .nosLogoutButton {
         min-height: 36px;
-
         padding: 0 14px;
-
         display: inline-flex;
-
         align-items: center;
-
         justify-content: center;
-
         border: 1px solid #ccd6e1;
-
         border-radius: 8px;
-
         background: #ffffff;
-
         font-size: 10px;
-
         font-weight: 900;
-
         cursor: pointer;
       }
 
-
       .nosWebsiteButton {
         color: #0b579e;
-
         text-decoration: none;
       }
-
 
       .nosLogoutButton {
         color: #25364a;
       }
-
 
       .nosWebsiteButton:hover,
       .nosLogoutButton:hover {
         background: #f5f7fa;
       }
 
-
-      /*
-      ==========================================
-      LOADING
-      ==========================================
-      */
-
       .nosNavLoading {
         width: 100%;
-
         min-height: 70px;
-
         display: flex;
-
         align-items: center;
-
         justify-content: center;
-
         background: #082f5a;
-
         color: #ffffff;
-
         font-size: 11px;
-
         font-weight: 900;
       }
 
-
-      /*
-      ==========================================
-      TABLET
-      ==========================================
-      */
-
-      @media (max-width: 1000px) {
+      @media (max-width: 1100px) {
 
         .nosBlueMenuLabel {
-          font-size: 8px;
+          font-size: 7px;
         }
 
         .nosBlueMenuIcon {
-          font-size: 14px;
+          font-size: 13px;
         }
 
         .nosAdminDetailInner {
@@ -810,17 +637,6 @@ function Styles() {
         }
 
       }
-
-
-      /*
-      ==========================================
-      MOBILE
-
-      We DO NOT create a horizontal scrollbar.
-
-      Menu wraps to multiple rows instead.
-      ==========================================
-      */
 
       @media (max-width: 750px) {
 
@@ -856,7 +672,6 @@ function Styles() {
 
       }
 
-
       @media (max-width: 450px) {
 
         .nosBlueMenuGrid {
@@ -872,27 +687,16 @@ function Styles() {
 
         .nosAdminIdentity strong {
           max-width: 160px;
-
           overflow: hidden;
-
           text-overflow: ellipsis;
-
           white-space: nowrap;
         }
 
       }
 
-
-      /*
-      ==========================================
-      REMOVE HORIZONTAL SCROLL CAUSED BY HEADER
-      ==========================================
-      */
-
       html,
       body {
         max-width: 100%;
-
         overflow-x: hidden !important;
       }
 
