@@ -12,6 +12,7 @@ export default function HostDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [host, setHost] = useState(null);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState({ properties: 0, activeListings: 0, bookings: 0, pendingRequests: 0 });
 
   useEffect(() => {
     loadHost();
@@ -102,6 +103,40 @@ export default function HostDashboardPage() {
       }
 
       setHost(hostData);
+
+      const { data: propertyRows, error: propertyError } = await supabase
+        .from('properties')
+        .select('id, moderation_status, is_active')
+        .eq('host_id', hostData.id);
+
+      if (propertyError) throw propertyError;
+
+      const propertyIds = (propertyRows || []).map((item) => item.id);
+      let bookingRows = [];
+
+      if (propertyIds.length > 0) {
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select('id, booking_status, host_decision, payment_status')
+          .in('property_id', propertyIds);
+
+        if (bookingError) throw bookingError;
+        bookingRows = bookingData || [];
+      }
+
+      const pendingRequests = bookingRows.filter((booking) => {
+        const status = String(booking.booking_status || '').toLowerCase();
+        const decision = String(booking.host_decision || '').toLowerCase();
+        const payment = String(booking.payment_status || '').toLowerCase();
+        return payment !== 'paid' && !decision && !status.includes('cancel') && !status.includes('declin');
+      }).length;
+
+      setStats({
+        properties: propertyRows?.length || 0,
+        activeListings: (propertyRows || []).filter((item) => item.moderation_status === 'approved' && item.is_active !== false).length,
+        bookings: bookingRows.length,
+        pendingRequests,
+      });
     } catch (err) {
       console.error(err);
 
@@ -153,85 +188,6 @@ export default function HostDashboardPage() {
 
   return (
     <main className="page">
-      <header className="hostHeader">
-        <div className="topRow">
-          <div>
-            <a
-              href="/host"
-              className="brand"
-            >
-              NightOutStays
-            </a>
-
-            <span className="hostBadge">
-              HOST
-            </span>
-          </div>
-
-          <div className="headerRight">
-            <a
-              href="/"
-              className="websiteButton"
-            >
-              View Website
-            </a>
-
-            <button
-              type="button"
-              className="logoutButton"
-              onClick={logout}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-
-        <nav className="hostMenu">
-          <a
-            href="/host"
-            className="active"
-          >
-            Dashboard
-          </a>
-
-          <a href="/host/properties">
-            My Properties
-          </a>
-
-          <a href="/host/bookings">
-            Bookings
-          </a>
-
-          <a href="/host/calendar">
-            Calendar
-          </a>
-
-          <a href="/host/messages">
-            Messages
-          </a>
-
-          <a href="/host/offers">
-            Offers
-          </a>
-
-          <a href="/host/subscription">
-            Subscription
-          </a>
-
-          <a href="/host/promotions">
-            Promotions
-          </a>
-
-          <a href="/host/payouts">
-            Payouts
-          </a>
-
-          <a href="/host/profile">
-            Profile
-          </a>
-        </nav>
-      </header>
-
       <section className="content">
         <div className="welcomeRow">
           <div>
@@ -293,28 +249,28 @@ export default function HostDashboardPage() {
         <section className="summaryGrid">
           <DashboardCard
             title="My Properties"
-            value="0"
+            value={String(stats.properties)}
             text="Properties added"
             href="/host/properties"
           />
 
           <DashboardCard
             title="Active Listings"
-            value="0"
+            value={String(stats.activeListings)}
             text="Properties live"
             href="/host/properties"
           />
 
           <DashboardCard
             title="Bookings"
-            value="0"
+            value={String(stats.bookings)}
             text="Total bookings"
             href="/host/bookings"
           />
 
           <DashboardCard
             title="Pending Requests"
-            value="0"
+            value={String(stats.pendingRequests)}
             text="Awaiting your action"
             href="/host/bookings"
           />

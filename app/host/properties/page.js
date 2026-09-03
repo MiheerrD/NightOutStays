@@ -10,7 +10,6 @@ import {
   createClient,
 } from '@supabase/supabase-js';
 
-import HostNav from '../HostNav';
 
 
 const supabase = createClient(
@@ -415,12 +414,6 @@ export default function HostPropertiesPage() {
 
   return (
     <main className="page">
-
-      <HostNav
-        host={host}
-      />
-
-
       <section className="content">
 
         {/* ====================================================

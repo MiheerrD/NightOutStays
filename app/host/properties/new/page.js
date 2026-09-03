@@ -657,28 +657,6 @@ export default function AddPropertyPage() {
 
   return (
     <main className="nosAddPage">
-      <header className="nosAddHeader">
-        <div className="nosAddBrandArea">
-          <a
-            href="/host"
-            className="nosAddBrand"
-          >
-            NightOutStays
-          </a>
-
-          <span className="nosAddBadge">
-            HOST
-          </span>
-        </div>
-
-        <a
-          href="/host/properties"
-          className="nosAddBack"
-        >
-          Back to My Properties
-        </a>
-      </header>
-
       <div className="nosAddShell">
         <section className="nosAddPageTitle">
           <div>

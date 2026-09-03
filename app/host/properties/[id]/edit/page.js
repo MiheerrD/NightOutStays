@@ -1707,35 +1707,6 @@ export default function EditPropertyPage() {
 
     return (
       <main className="nosEditPage">
-
-        <header className="nosEditHeader">
-
-          <div className="nosEditBrandArea">
-
-            <a
-              href="/host"
-              className="nosEditBrand"
-            >
-              NightOutStays
-            </a>
-
-            <span className="nosEditBadge">
-              HOST
-            </span>
-
-          </div>
-
-
-          <a
-            href="/host/properties"
-            className="nosEditBack"
-          >
-            Back to My Properties
-          </a>
-
-        </header>
-
-
         <div className="nosEditShell">
 
           <div className="nosEditAlert nosEditError">
@@ -1760,35 +1731,6 @@ export default function EditPropertyPage() {
 
   return (
     <main className="nosEditPage">
-
-      <header className="nosEditHeader">
-
-        <div className="nosEditBrandArea">
-
-          <a
-            href="/host"
-            className="nosEditBrand"
-          >
-            NightOutStays
-          </a>
-
-          <span className="nosEditBadge">
-            HOST
-          </span>
-
-        </div>
-
-
-        <a
-          href="/host/properties"
-          className="nosEditBack"
-        >
-          Back to My Properties
-        </a>
-
-      </header>
-
-
       <div className="nosEditShell">
 
         <section className="nosEditPageTitle">
