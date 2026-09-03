@@ -62,9 +62,28 @@ export default function HostMessagesPage() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => loadMessages(false), 10000);
+    const timer = window.setInterval(() => loadMessages(false), 5000);
     return () => window.clearInterval(timer);
   }, [selectedId]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('host-booking-messages-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'booking_messages' },
+        () => loadMessages(false)
+      )
+      .subscribe();
+
+    const onFocus = () => loadMessages(false);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

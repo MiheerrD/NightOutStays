@@ -116,7 +116,7 @@ export default function GuestMessagesPage() {
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
             table:
               'booking_messages',
@@ -139,6 +139,19 @@ export default function GuestMessagesPage() {
     guestProfile,
     selectedBookingId,
   ]);
+
+  useEffect(() => {
+    if (!guestProfile?.id) return;
+    const timer = window.setInterval(() => {
+      loadInbox(guestProfile, selectedBookingId);
+    }, 5000);
+    const onFocus = () => loadInbox(guestProfile, selectedBookingId);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [guestProfile, selectedBookingId]);
 
   async function initialise() {
     setLoading(true);
@@ -597,7 +610,8 @@ export default function GuestMessagesPage() {
 
     if (
       !text ||
-      !selectedThread
+      !selectedThread ||
+      sending
     ) {
       return;
     }

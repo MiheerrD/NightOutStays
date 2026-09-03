@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import GuestNav from "../GuestNav";
 
@@ -35,6 +35,7 @@ export default function GuestHelpPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const selectedIdRef = useRef("");
 
   const selectedTicket = useMemo(
     () => tickets.find((ticket) => ticket.id === selectedId) || null,
@@ -113,11 +114,12 @@ export default function GuestHelpPage() {
 
       const nextSelected =
         preferredTicketId ||
-        (selectedId && nextTickets.some((ticket) => ticket.id === selectedId)
-          ? selectedId
+        (selectedIdRef.current && nextTickets.some((ticket) => ticket.id === selectedIdRef.current)
+          ? selectedIdRef.current
           : nextTickets[0]?.id || "");
 
       setSelectedId(nextSelected);
+      selectedIdRef.current = nextSelected;
     } catch (err) {
       setError(err?.message || "Unable to load support.");
     } finally {
@@ -126,6 +128,8 @@ export default function GuestHelpPage() {
   }
 
   async function submitTicket() {
+    if (submitting) return;
+
     if (!subject.trim()) {
       setError("Please enter a subject.");
       return;
@@ -185,7 +189,7 @@ export default function GuestHelpPage() {
   }
 
   async function sendReply() {
-    if (!selectedTicket || !reply.trim()) return;
+    if (!selectedTicket || !reply.trim() || submitting) return;
 
     try {
       setSubmitting(true);
@@ -230,7 +234,34 @@ export default function GuestHelpPage() {
   }
 
   useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
     load();
+
+    let refreshTimer = null;
+    const refresh = () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => load(selectedIdRef.current), 180);
+    };
+
+    const channel = supabase
+      .channel("guest-support-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_ticket_messages" }, refresh)
+      .subscribe();
+
+    const fallback = window.setInterval(() => load(selectedIdRef.current), 4000);
+    const onFocus = () => load(selectedIdRef.current);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(fallback);
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      window.removeEventListener("focus", onFocus);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
