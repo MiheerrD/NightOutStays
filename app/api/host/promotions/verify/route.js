@@ -25,8 +25,7 @@ export async function POST(request) {
   try {
     const supabase = adminClient();
     const { host } = await requireHost(request, supabase);
-    const body = await request.json();
-    const { promotionId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+    const { promotionId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await request.json();
 
     if (!promotionId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return Response.json({ error: 'Incomplete payment verification data.' }, { status: 400 });
@@ -37,37 +36,33 @@ export async function POST(request) {
     if (!keySecret || !keyId) throw new Error('Razorpay environment variables are not configured.');
 
     const { data: promotion, error: promotionError } = await supabase
-      .from('property_promotions')
-      .select('*')
-      .eq('id', promotionId)
-      .eq('host_id', host.id)
-      .single();
+      .from('property_promotions').select('*').eq('id', promotionId).eq('host_id', host.id).single();
     if (promotionError || !promotion) return Response.json({ error: 'Promotion not found.' }, { status: 404 });
 
     if (promotion.status === 'pending_approval' && promotion.razorpay_payment_id) {
       return Response.json({ success: true, alreadyVerified: true, status: 'pending_approval' });
+    }
+    if (promotion.status !== 'pending_payment') {
+      return Response.json({ error: 'This promotion is not awaiting payment.' }, { status: 400 });
     }
     if (promotion.razorpay_order_id !== razorpay_order_id) {
       return Response.json({ error: 'Order does not match this promotion.' }, { status: 400 });
     }
 
     const expected = crypto.createHmac('sha256', keySecret).update(`${razorpay_order_id}|${razorpay_payment_id}`).digest('hex');
-    const a = Buffer.from(expected, 'utf8');
-    const b = Buffer.from(String(razorpay_signature), 'utf8');
+    const a = Buffer.from(expected, 'utf8'), b = Buffer.from(String(razorpay_signature), 'utf8');
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       return Response.json({ error: 'Payment signature verification failed.' }, { status: 400 });
     }
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(razorpay_payment_id)}`, {
-      headers: { Authorization: `Basic ${auth}` },
-      cache: 'no-store',
+      headers: { Authorization: `Basic ${auth}` }, cache: 'no-store',
     });
     const payment = await paymentResponse.json();
     if (!paymentResponse.ok) {
       return Response.json({ error: payment?.error?.description || 'Unable to verify Razorpay payment.' }, { status: 500 });
     }
-
     if (payment.order_id !== razorpay_order_id || payment.currency !== 'INR' || payment.status !== 'captured') {
       return Response.json({ error: 'Razorpay payment is not valid or captured.' }, { status: 400 });
     }
@@ -75,22 +70,17 @@ export async function POST(request) {
       return Response.json({ error: 'Paid amount does not match the promotion amount.' }, { status: 400 });
     }
 
-    const paidAt = payment.created_at
-      ? new Date(Number(payment.created_at) * 1000).toISOString()
-      : new Date().toISOString();
-
-    const { error: updateError } = await supabase
-      .from('property_promotions')
-      .update({
-        status: 'pending_approval',
-        razorpay_payment_id,
-        razorpay_signature,
-        paid_at: paidAt,
-        requested_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', promotion.id);
+    const paidAt = payment.created_at ? new Date(Number(payment.created_at) * 1000).toISOString() : new Date().toISOString();
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase.from('property_promotions').update({
+      status: 'pending_approval', razorpay_payment_id, razorpay_signature, paid_at: paidAt, requested_at: now, updated_at: now,
+    }).eq('id', promotion.id).eq('status', 'pending_payment');
     if (updateError) throw updateError;
+
+    if (promotion.discount_id) {
+      const { data: d } = await supabase.from('host_promotion_discounts').select('used_count').eq('id', promotion.discount_id).maybeSingle();
+      if (d) await supabase.from('host_promotion_discounts').update({ used_count: Number(d.used_count || 0) + 1, updated_at: now }).eq('id', promotion.discount_id);
+    }
 
     return Response.json({ success: true, status: 'pending_approval' });
   } catch (error) {
