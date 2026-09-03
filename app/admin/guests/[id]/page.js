@@ -319,106 +319,121 @@ export default function AdminGuestDetailPage() {
 
       setBookingGuests(bookingGuestRows);
 
-      const {
-        data: hostReviewRows,
-        error: hostReviewError,
-      } = await supabase
+      const { data: hostReviewRows, error: hostReviewError } = await supabase
         .from('guest_reviews')
         .select(`
-          id,
-          booking_id,
-          property_id,
-          guest_id,
-          host_id,
-          rating,
-          kept_property_clean,
-          nuisance_created,
-          left_property_on_time,
-          recommend_to_hosts,
-          public_review,
-          private_host_remark,
-          created_at,
-          updated_at
+          id, booking_id, property_id, guest_id, host_id,
+          rating, kept_property_clean, nuisance_created,
+          left_property_on_time, recommend_to_hosts,
+          public_review, created_at, updated_at
         `)
         .eq('guest_id', guestId)
-        .order('created_at', {
-          ascending: false,
-        });
+        .order('created_at', { ascending: false });
 
-      if (hostReviewError) {
-        throw hostReviewError;
+      if (hostReviewError) throw hostReviewError;
+
+      const safeHostReviews = hostReviewRows || [];
+      const hostReviewIds = safeHostReviews.map((item) => item.id);
+      let hostPrivateNoteRows = [];
+
+      if (hostReviewIds.length > 0) {
+        const { data, error: hostPrivateNotesError } = await supabase
+          .from('guest_review_private_notes')
+          .select(`id, guest_review_id, private_note, created_at, updated_at`)
+          .in('guest_review_id', hostReviewIds);
+        if (hostPrivateNotesError) throw hostPrivateNotesError;
+        hostPrivateNoteRows = data || [];
       }
 
-      setHostReviews(hostReviewRows || []);
+      const hostPrivateNotesByReview = new Map(
+        hostPrivateNoteRows.map((item) => [item.guest_review_id, item.private_note])
+      );
 
-      const {
-        data: guestReviewRows,
-        error: guestReviewError,
-      } = await supabase
+      setHostReviews(
+        safeHostReviews.map((review) => ({
+          ...review,
+          private_admin_note: hostPrivateNotesByReview.get(review.id) || null,
+        }))
+      );
+
+      const { data: guestReviewRows, error: guestReviewError } = await supabase
         .from('property_guest_reviews')
         .select(`
-          id,
-          booking_id,
-          property_id,
-          guest_id,
-          host_id,
-          overall_rating,
-          information_accurate,
-          location_correct,
-          host_communication_good,
-          cleanliness_good,
-          checkin_process_smooth,
-          recommend_property,
-          public_review,
-          private_guest_remark,
-          created_at,
-          updated_at
+          id, booking_id, property_id, guest_id, host_id,
+          overall_rating, information_accurate, location_correct,
+          host_communication_good, cleanliness_good,
+          checkin_process_smooth, recommend_property,
+          public_review, created_at, updated_at
         `)
         .eq('guest_id', guestId)
-        .order('created_at', {
-          ascending: false,
-        });
+        .order('created_at', { ascending: false });
 
-      if (guestReviewError) {
-        throw guestReviewError;
+      if (guestReviewError) throw guestReviewError;
+
+      const safeGuestReviews = guestReviewRows || [];
+      const guestReviewIds = safeGuestReviews.map((item) => item.id);
+      let guestPrivateNoteRows = [];
+
+      if (guestReviewIds.length > 0) {
+        const { data, error: guestPrivateNotesError } = await supabase
+          .from('property_review_private_notes')
+          .select(`id, property_guest_review_id, private_note, created_at, updated_at`)
+          .in('property_guest_review_id', guestReviewIds);
+        if (guestPrivateNotesError) throw guestPrivateNotesError;
+        guestPrivateNoteRows = data || [];
       }
 
-      setGuestReviews(guestReviewRows || []);
+      const guestPrivateNotesByReview = new Map(
+        guestPrivateNoteRows.map((item) => [item.property_guest_review_id, item.private_note])
+      );
 
-      const {
-        data: misconductRows,
-        error: misconductError,
-      } = await supabase
+      setGuestReviews(
+        safeGuestReviews.map((review) => ({
+          ...review,
+          private_admin_note: guestPrivateNotesByReview.get(review.id) || null,
+        }))
+      );
+
+      const { data: misconductRows, error: misconductError } = await supabase
         .from('misconduct_reports')
         .select(`
-          id,
-          booking_id,
-          property_id,
-          reporter_type,
-          reporter_guest_id,
-          reporter_host_id,
-          reported_type,
-          reported_guest_id,
-          reported_host_id,
-          category,
-          description,
-          status,
-          admin_notes,
-          reviewed_at,
-          created_at
+          id, booking_id, property_id, reporter_type,
+          reporter_guest_id, reporter_host_id, reported_type,
+          reported_guest_id, reported_host_id, category,
+          description, status, reviewed_at, created_at
         `)
-        .or(
-          `reported_guest_id.eq.${guestId},reporter_guest_id.eq.${guestId}`
-        )
-        .order('created_at', {
-          ascending: false,
-        });
+        .or(`reported_guest_id.eq.${guestId},reporter_guest_id.eq.${guestId}`)
+        .order('created_at', { ascending: false });
 
-      if (misconductError) {
-        throw misconductError;
+      if (misconductError) throw misconductError;
+
+      const safeMisconductRows = misconductRows || [];
+      const misconductIds = safeMisconductRows.map((item) => item.id);
+      let misconductAdminNoteRows = [];
+
+      if (misconductIds.length > 0) {
+        const { data, error: misconductNotesError } = await supabase
+          .from('misconduct_admin_notes')
+          .select(`id, misconduct_report_id, admin_user_id, note, created_at, updated_at`)
+          .in('misconduct_report_id', misconductIds)
+          .order('created_at', { ascending: true });
+        if (misconductNotesError) throw misconductNotesError;
+        misconductAdminNoteRows = data || [];
       }
 
-      setMisconductReports(misconductRows || []);
+      const misconductNotesByReport = new Map();
+      misconductAdminNoteRows.forEach((item) => {
+        const current = misconductNotesByReport.get(item.misconduct_report_id) || [];
+        current.push(item);
+        misconductNotesByReport.set(item.misconduct_report_id, current);
+      });
+
+      setMisconductReports(
+        safeMisconductRows.map((report) => ({
+          ...report,
+          admin_private_notes: misconductNotesByReport.get(report.id) || [],
+        }))
+      );
 
       const {
         data: conversationRows,
@@ -1701,11 +1716,11 @@ export default function AdminGuestDetailPage() {
                         />
                       )}
 
-                      {review.private_host_remark && (
+                      {review.private_admin_note && (
                         <Remark
-                          label="Private Host Remark"
+                          label="Private Host Remark — Admin Only"
                           text={
-                            review.private_host_remark
+                            review.private_admin_note
                           }
                           privateRemark
                         />
@@ -1802,11 +1817,11 @@ export default function AdminGuestDetailPage() {
                         />
                       )}
 
-                      {review.private_guest_remark && (
+                      {review.private_admin_note && (
                         <Remark
-                          label="Private Guest Remark"
+                          label="Private Guest Remark — Admin Only"
                           text={
-                            review.private_guest_remark
+                            review.private_admin_note
                           }
                           privateRemark
                         />
@@ -1880,15 +1895,18 @@ export default function AdminGuestDetailPage() {
                         {report.description}
                       </p>
 
-                      {report.admin_notes && (
+                      {report.admin_private_notes?.length > 0 && (
                         <div className="adminNotes">
                           <strong>
-                            Admin Notes
+                            🔒 Admin Notes — Admin Only
                           </strong>
 
-                          <p>
-                            {report.admin_notes}
-                          </p>
+                          {report.admin_private_notes.map((note) => (
+                            <div key={note.id} className="adminNoteItem">
+                              <p>{note.note}</p>
+                              <small>{formatDateTime(note.created_at)}</small>
+                            </div>
+                          ))}
                         </div>
                       )}
 
@@ -2956,6 +2974,21 @@ function Styles() {
         border-radius: 14px;
         background: #ffffff;
         text-align: center;
+      }
+
+      .adminNoteItem {
+        padding-top: 9px;
+        margin-top: 9px;
+        border-top: 1px solid rgba(180, 35, 24, .12);
+      }
+
+      .adminNoteItem p {
+        margin: 0 0 4px;
+      }
+
+      .adminNoteItem small {
+        color: #8b5e57;
+        font-size: 8px;
       }
 
       @media (max-width: 1250px) {
