@@ -56,19 +56,40 @@ export default function HostMessagesPage() {
   const [reply, setReply] = useState('');
   const [error, setError] = useState('');
   const bottomRef = useRef(null);
+  const selectedIdRef = useRef('');
+  const syncInFlightRef = useRef(false);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     loadMessages(true);
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => loadMessages(false), 5000);
-    return () => window.clearInterval(timer);
-  }, [selectedId]);
+    const timer = window.setInterval(() => loadMessages(false), 4000);
+    const onFocus = () => loadMessages(false);
+    const onOnline = () => loadMessages(false);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') loadMessages(false);
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     const channel = supabase
-      .channel('host-booking-messages-live')
+      .channel(`host-booking-messages-live-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'booking_messages' },
@@ -76,11 +97,7 @@ export default function HostMessagesPage() {
       )
       .subscribe();
 
-    const onFocus = () => loadMessages(false);
-    window.addEventListener('focus', onFocus);
-
     return () => {
-      window.removeEventListener('focus', onFocus);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -102,6 +119,8 @@ export default function HostMessagesPage() {
   }
 
   async function loadMessages(firstLoad = false) {
+    if (!firstLoad && syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     if (firstLoad) setLoading(true);
     else setRefreshing(true);
 
@@ -119,9 +138,10 @@ export default function HostMessagesPage() {
         ? new URLSearchParams(window.location.search).get('booking')
         : '';
 
-      const currentStillExists = rows.some((t) => t.booking.id === selectedId);
+      const currentSelectedId = selectedIdRef.current;
+      const currentStillExists = rows.some((t) => t.booking.id === currentSelectedId);
       const requested = rows.find((t) => t.booking.id === urlBooking || t.booking.booking_code === urlBooking);
-      const nextId = requested?.booking?.id || (currentStillExists ? selectedId : rows[0]?.booking?.id || '');
+      const nextId = requested?.booking?.id || (currentStillExists ? currentSelectedId : rows[0]?.booking?.id || '');
 
       setSelectedId(nextId);
       if (nextId) markRead(nextId, headers, false);
@@ -131,6 +151,7 @@ export default function HostMessagesPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      syncInFlightRef.current = false;
     }
   }
 

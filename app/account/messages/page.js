@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -97,6 +98,13 @@ export default function GuestMessagesPage() {
     setErrorMessage,
   ] = useState('');
 
+  const selectedBookingRef = useRef('');
+  const syncInFlightRef = useRef(false);
+
+  useEffect(() => {
+    selectedBookingRef.current = selectedBookingId;
+  }, [selectedBookingId]);
+
   useEffect(() => {
     initialise();
   }, []);
@@ -111,7 +119,7 @@ export default function GuestMessagesPage() {
     const channel =
       supabase
         .channel(
-          `guest-chat-${guestProfile.id}`
+          `guest-chat-${guestProfile.id}-${Date.now()}`
         )
         .on(
           'postgres_changes',
@@ -124,7 +132,7 @@ export default function GuestMessagesPage() {
           () => {
             loadInbox(
               guestProfile,
-              selectedBookingId
+              selectedBookingRef.current
             );
           }
         )
@@ -135,23 +143,28 @@ export default function GuestMessagesPage() {
         channel
       );
     };
-  }, [
-    guestProfile,
-    selectedBookingId,
-  ]);
+  }, [guestProfile]);
 
   useEffect(() => {
     if (!guestProfile?.id) return;
-    const timer = window.setInterval(() => {
-      loadInbox(guestProfile, selectedBookingId);
-    }, 5000);
-    const onFocus = () => loadInbox(guestProfile, selectedBookingId);
-    window.addEventListener('focus', onFocus);
+
+    const sync = () => loadInbox(guestProfile, selectedBookingRef.current);
+    const timer = window.setInterval(sync, 4000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+
+    window.addEventListener('focus', sync);
+    window.addEventListener('online', sync);
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('online', sync);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [guestProfile, selectedBookingId]);
+  }, [guestProfile]);
 
   async function initialise() {
     setLoading(true);
@@ -553,7 +566,7 @@ export default function GuestMessagesPage() {
 
   const threads =
     useMemo(() => {
-      return bookings.map(
+      const rows = bookings.map(
         (booking) => {
           const list =
             messages.filter(
@@ -587,6 +600,14 @@ export default function GuestMessagesPage() {
           };
         }
       );
+
+      rows.sort((a, b) => {
+        const aTime = new Date(a.last?.created_at || a.booking.created_at || 0).getTime();
+        const bTime = new Date(b.last?.created_at || b.booking.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+
+      return rows;
     }, [
       bookings,
       messages,
@@ -657,12 +678,7 @@ export default function GuestMessagesPage() {
         throw error;
       }
 
-      setMessages(
-        (old) => [
-          ...old,
-          data,
-        ]
-      );
+      setMessages((old) => old.some((item) => item.id === data.id) ? old : [...old, data]);
 
       setReply('');
     } catch (error) {
