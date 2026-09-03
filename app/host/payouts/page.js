@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  'https://gxwemplbykjxhezefykh.supabase.co',
+  'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
 const money = (value) =>
