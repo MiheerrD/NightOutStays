@@ -5,8 +5,8 @@ const sb=createClient("https://gxwemplbykjxhezefykh.supabase.co","sb_publishable
 const dt=v=>new Intl.DateTimeFormat("en-IN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(v));
 export default function AdminNotifications(){
  const [data,setData]=useState(null),[filter,setFilter]=useState("unread"),[error,setError]=useState("");
- async function token(){const {data}=await sb.auth.getSession();return data?.session?.access_token}
- async function load(){try{const t=await token();if(!t){location.href="/admin/login";return}const r=await fetch("/api/admin/notifications",{headers:{Authorization:`Bearer ${t}`},cache:"no-store"}),j=await r.json();if(!r.ok)throw new Error(j.error);setData(j)}catch(e){setError(e.message)}}
+ async function token(forceRefresh=false){if(forceRefresh){const {data}=await sb.auth.refreshSession();return data?.session?.access_token||''}const {data}=await sb.auth.getSession();return data?.session?.access_token||''}
+ async function load(){try{setError('');let t=await token();if(!t){location.href="/admin/login";return}let r=await fetch("/api/admin/notifications",{headers:{Authorization:`Bearer ${t}`},cache:"no-store"});if(r.status===401){t=await token(true);if(t)r=await fetch("/api/admin/notifications",{headers:{Authorization:`Bearer ${t}`},cache:"no-store"})}const j=await r.json();if(!r.ok)throw new Error(j.error);setData(j)}catch(e){setError(e.message)}}
  async function act(action,id){const t=await token();await fetch("/api/admin/notifications",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${t}`},body:JSON.stringify({action,id})});load()}
  useEffect(()=>{load();const x=setInterval(load,30000);return()=>clearInterval(x)},[]);
  const rows=useMemo(()=>{let a=data?.notifications||[];if(filter==="unread")a=a.filter(x=>!x.is_read);else if(["urgent","important","normal"].includes(filter))a=a.filter(x=>x.priority===filter);return a},[data,filter]);

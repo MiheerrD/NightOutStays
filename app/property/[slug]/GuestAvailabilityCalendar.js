@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { calculateCalendarDateRate } from '../../lib/pricing';
 
 function dateString(date) {
@@ -114,6 +114,26 @@ export default function GuestAvailabilityCalendar({
       ? 'checkout'
       : 'checkin'
   );
+
+  const [interestByDate, setInterestByDate] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    async function loadInterest() {
+      if (!property?.id) return;
+      const start = dateString(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1));
+      const end = dateString(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 2, 0));
+      try {
+        const response = await fetch(`/api/property/${property.id}/interest?from=${start}&to=${end}`, { cache: 'no-store' });
+        const json = await response.json();
+        if (alive && response.ok) setInterestByDate(json.counts || {});
+      } catch (error) {
+        console.error('Interest calendar load failed:', error);
+      }
+    }
+    loadInterest();
+    return () => { alive = false; };
+  }, [property?.id, visibleMonth]);
 
   const monthLabel =
     visibleMonth.toLocaleDateString(
@@ -628,6 +648,8 @@ export default function GuestAvailabilityCalendar({
                   )
                 : 0;
 
+            const interestCount = Number(interestByDate[value] || 0);
+
             const selectedCheckIn =
               value ===
               checkIn;
@@ -736,6 +758,12 @@ export default function GuestAvailabilityCalendar({
                   </div>
                 )}
 
+                {status === 'available' && interestCount > 0 && (
+                  <div style={styles.interestText}>
+                    {interestCount} interested
+                  </div>
+                )}
+
                 {status ===
                   'booked' && (
                   <div
@@ -794,6 +822,8 @@ export default function GuestAvailabilityCalendar({
         >
           Selected
         </span>
+
+        <span style={styles.interestLegend}>Interest shown</span>
 
         <span
           style={
@@ -947,6 +977,14 @@ const styles = {
       'nowrap',
   },
 
+  interestText: {
+    marginTop: 4,
+    fontSize: 8,
+    fontWeight: 900,
+    color: '#b45309',
+    whiteSpace: 'nowrap',
+  },
+
   statusText: {
     marginTop: 8,
     fontSize: 9,
@@ -1018,6 +1056,15 @@ const styles = {
     background:
       '#eaf8ee',
     color: '#25663a',
+    fontSize: 10,
+    fontWeight: 800,
+  },
+
+  interestLegend: {
+    padding: '6px 9px',
+    borderRadius: 20,
+    background: '#fff7ed',
+    color: '#b45309',
     fontSize: 10,
     fontWeight: 800,
   },

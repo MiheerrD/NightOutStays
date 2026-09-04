@@ -26,8 +26,11 @@ export async function GET(req){
     }
     if(portal==='admin'){
       const {data:a}=await db.from('admin_profiles').select('user_id,is_active').eq('user_id',user.id).maybeSingle(); if(!a?.is_active) return Response.json({success:false,error:'Admin access required.'},{status:403});
-      const {count:notif}=await db.from('notifications').select('id',{count:'exact',head:true}).eq('recipient_type','admin').eq('recipient_user_id',user.id).eq('is_read',false);
-      return Response.json({success:true,messages:0,notifications:notif||0,bookings:0});
+      const [{count:notif},{count:pendingHosts}]=await Promise.all([
+        db.from('notifications').select('id',{count:'exact',head:true}).eq('recipient_type','admin').eq('recipient_user_id',user.id).eq('is_read',false),
+        db.from('host_profiles').select('id',{count:'exact',head:true}).eq('status','pending')
+      ]);
+      return Response.json({success:true,messages:0,notifications:notif||0,hosts:pendingHosts||0,bookings:0});
     }
     return Response.json({success:false,error:'Invalid portal.'},{status:400});
   }catch(err){ return Response.json({success:false,error:err?.message||'Unable to load counts.'},{status:500}); }

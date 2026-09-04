@@ -174,17 +174,6 @@ export default function AddPropertyPage() {
         return;
       }
 
-      const isHost = (roles || []).some(
-        (item) =>
-          item.role === 'host' &&
-          item.is_active === true
-      );
-
-      if (!isHost) {
-        window.location.replace('/account/bookings');
-        return;
-      }
-
       const { data: hostData, error: hostError } =
         await supabase
           .from('host_profiles')
@@ -200,8 +189,8 @@ export default function AddPropertyPage() {
 
       if (hostError) throw hostError;
 
-      if (hostData.status !== 'active') {
-        throw new Error('Your Host account is not active.');
+      if (!['pending','active'].includes(hostData.status)) {
+        throw new Error(`Your Host account is ${hostData.status || 'not available'}.`);
       }
 
       setHost(hostData);
@@ -667,8 +656,7 @@ export default function AddPropertyPage() {
             <h1>Add Property</h1>
 
             <p>
-              Create your listing, save it as Draft,
-              or submit it for Admin review.
+              Create your listing now. Pending Hosts can prepare and submit properties; listings stay hidden until the required approvals are complete.
             </p>
           </div>
 

@@ -9,16 +9,8 @@ const supabase = createClient(
 );
 
 const PORTALS = [
-  {
-    key: 'guest',
-    label: 'Guest',
-    description: 'Book stays and manage your bookings',
-  },
-  {
-    key: 'host',
-    label: 'Host',
-    description: 'Manage your properties and bookings',
-  },
+  { key: 'guest', label: 'Guest', description: 'Book stays and manage your bookings' },
+  { key: 'host', label: 'Host', description: 'Manage your properties and bookings' },
 ];
 
 export default function LoginPage() {
@@ -39,6 +31,8 @@ export default function LoginPage() {
 
   const [confirmPassword, setConfirmPassword] =
     useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [loading, setLoading] =
     useState(false);
@@ -196,44 +190,27 @@ export default function LoginPage() {
           item.is_active === true
       );
 
-    if (selectedPortal === 'admin') {
-      if (!isSuperAdmin) {
-        await supabase.auth.signOut();
-
-        throw new Error(
-          'This account does not have Super Admin access.'
-        );
-      }
-
-      window.location.replace(
-        '/admin'
-      );
-
-      return;
-    }
-
     if (selectedPortal === 'host') {
-      if (!isHost) {
-        await supabase.auth.signOut();
-
-        throw new Error(
-          'This account does not have an active Host profile.'
-        );
+      const { data: hostProfile } = await supabase.from('host_profiles').select('status').eq('user_id', user.id).maybeSingle();
+      if (hostProfile?.status === 'pending') {
+        window.location.replace('/host/properties/new');
+        return;
       }
-
-      window.location.replace(
-        '/host'
-      );
-
+      if (hostProfile?.status === 'suspended' || hostProfile?.status === 'blocked') {
+        await supabase.auth.signOut();
+        throw new Error(`Your Host account is ${hostProfile.status}. Please contact support.`);
+      }
+      if (!isHost || hostProfile?.status !== 'active') {
+        await supabase.auth.signOut();
+        throw new Error('This account does not have a Host profile.');
+      }
+      window.location.replace('/host');
       return;
     }
 
     if (isSuperAdmin) {
-      window.location.replace(
-        '/admin'
-      );
-
-      return;
+      await supabase.auth.signOut();
+      throw new Error('Please use the private Admin login page.');
     }
 
     if (isHost) {
@@ -242,6 +219,11 @@ export default function LoginPage() {
       );
 
       return;
+    }
+
+    if (user?.user_metadata?.account_type === 'host') {
+      await supabase.auth.signOut();
+      throw new Error('This is a Host account. Please choose Host Login.');
     }
 
     await ensureGuestProfile(
@@ -702,8 +684,7 @@ export default function LoginPage() {
             </h1>
 
             <p>
-              Login as Guest or Host and continue to your own NightOutStays dashboard.
-              Super Admin access is available only from the private Admin login page.
+              Login as Guest or Host and continue to your NightOutStays portal.
             </p>
 
             <div className="loginFeatures">
@@ -728,6 +709,7 @@ export default function LoginPage() {
                   calendar and offers.
                 </span>
               </div>
+
 
             </div>
           </div>
@@ -771,7 +753,9 @@ export default function LoginPage() {
 
           <div className="loginHeading">
             <span>
-              {portal === 'guest' ? 'GUEST PORTAL' : 'HOST PORTAL'}
+              {portal === 'guest'
+                ? 'GUEST PORTAL'
+                : portal === 'host' ? 'HOST PORTAL' : 'GUEST PORTAL'}
             </span>
 
             <h2>
@@ -854,7 +838,9 @@ export default function LoginPage() {
 
             <Field
               label="PASSWORD"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
+              toggleLabel={showPassword ? 'Hide' : 'Show'}
+              onToggle={() => setShowPassword((v) => !v)}
               value={password}
               onChange={setPassword}
               placeholder={
@@ -872,7 +858,9 @@ export default function LoginPage() {
             {mode === 'signup' && (
               <Field
                 label="CONFIRM PASSWORD"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                toggleLabel={showConfirmPassword ? 'Hide' : 'Show'}
+                onToggle={() => setShowConfirmPassword((v) => !v)}
                 value={
                   confirmPassword
                 }
@@ -945,14 +933,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {portal === 'admin' && (
-            <div className="adminNote">
-              Super Admin accounts are created
-              internally. Public Super Admin
-              registration is not available.
-            </div>
-          )}
-
           <a
             href="/"
             className="backHome"
@@ -1011,33 +991,29 @@ function Field({
   onChange,
   placeholder,
   autoComplete,
+  toggleLabel,
+  onToggle,
 }) {
-  const [showPassword, setShowPassword] = useState(false);
-  const isPassword = type === 'password';
-
   return (
     <div className="loginField">
-      <label>{label}</label>
+      <label>
+        {label}
+      </label>
 
-      <div className={isPassword ? 'passwordInputWrap' : ''}>
-        <input
-          type={isPassword && showPassword ? 'text' : type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          required
-        />
-        {isPassword && (
-          <button
-            type="button"
-            className="passwordEye"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            {showPassword ? 'Hide' : 'Show'}
-          </button>
-        )}
+      <div className="passwordWrap">
+      <input
+        type={type}
+        value={value}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        required
+      />
+      {onToggle && <button type="button" className="eyeButton" onClick={onToggle}>{toggleLabel}</button>}
       </div>
     </div>
   );
@@ -1428,6 +1404,10 @@ function PageStyles() {
         letter-spacing: 0.9px;
       }
 
+      .passwordWrap { position:relative; }
+      .eyeButton { position:absolute; right:10px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:#0b579e; font-weight:800; cursor:pointer; }
+      .passwordWrap input { width:100%; padding-right:62px!important; }
+
       .loginField input {
         width: 100%;
         min-height: 47px;
@@ -1447,26 +1427,6 @@ function PageStyles() {
         font-size: 15px;
 
         outline: none;
-      }
-
-      .passwordInputWrap {
-        position: relative;
-      }
-
-      .passwordInputWrap input {
-        padding-right: 72px;
-      }
-
-      .passwordEye {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        border: 0;
-        background: transparent;
-        color: #0b4b8c;
-        font-weight: 800;
-        cursor: pointer;
       }
 
       .loginField input:focus {
