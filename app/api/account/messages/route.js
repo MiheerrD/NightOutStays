@@ -66,12 +66,12 @@ export async function POST(req){
     if(action==='offer_decision'){
       const decision=String(body.decision||'').toLowerCase(); if(!['accepted','declined'].includes(decision)) throw Object.assign(new Error('Invalid offer decision.'),{status:400});
       if(String(booking.offer_status||'')!=='host_offered') throw Object.assign(new Error('No active special offer is available.'),{status:400});
-      const update={offer_status:decision,updated_at:new Date().toISOString()};
+      const update=decision==='accepted'?{offer_status:'accepted',host_decision:'approved',booking_status:'confirmed',payment_due_at:booking.payment_due_at||new Date(Date.now()+24*60*60*1000).toISOString(),updated_at:new Date().toISOString()}:{offer_status:'declined',updated_at:new Date().toISOString()};
       const {error:ue}=await db.from('bookings').update(update).eq('id',booking.id); if(ue) throw ue;
       const text=decision==='accepted'?'Guest accepted the special rate.':'Guest declined the special rate.';
       const {data:m,error:me}=await db.from('booking_messages').insert({booking_id:booking.id,sender_type:'guest',sender_name:guest.full_name||'Guest',message:text,message_type:'offer_decision',is_read:false}).select('*').single(); if(me) throw me;
       await notifyHost(db,booking,decision==='accepted'?'Special rate accepted':'Special rate declined',text,'offer_decision');
-      return Response.json({success:true,message:m});
+      return Response.json({success:true,message:m,paymentUrl:decision==='accepted'?`/booking/${booking.booking_code}/pay`:null});
     }
     throw Object.assign(new Error('Invalid action.'),{status:400});
   }catch(e){ return Response.json({success:false,error:e?.message||'Unable to update conversation.'},{status:e?.status||500}); }

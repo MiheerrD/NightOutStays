@@ -248,7 +248,9 @@ export async function POST(request) {
 
     if (
       booking.host_decision !==
-      'approved'
+      'approved' &&
+      booking.offer_status !==
+      'accepted'
     ) {
       return Response.json(
         {

@@ -1,0 +1,31 @@
+NightOutStays Full Combined Realtime Workflow V2
+Date: 2026-09-04
+
+This is a complete project replacement package (not a patch ZIP).
+The matching Supabase migration has already been applied to the live project gxwemplbykjxhezefykh.
+
+Fixed in this release:
+1. Pending Host property photo uploads now pass RLS for own hidden property.
+2. Property review workflow notifications:
+   - Admin asks for changes -> Host notification.
+   - Admin approves/declines -> Host notification.
+   - Host resubmits updated property -> Admin notification.
+3. Supabase Realtime enabled for bookings, notifications, properties, property_photos and host_profiles.
+4. Guest/Host/Admin navigation badges use Realtime as primary refresh with a low-frequency fallback instead of 5-second polling.
+5. Guest/Host/Admin Notifications pages update via Realtime.
+6. Host Bookings updates via Realtime.
+7. Guest/Host Messages updates via Realtime; fallback polling reduced substantially.
+8. Special-rate request control moved to a small neutral corner/details control.
+9. Host sending a special offer now means Host approval is already granted.
+10. Guest acceptance of a Host special offer no longer requires a second Host booking approval.
+11. Pay Now appears directly inside the accepted Special Offer conversation and in the accepted-offer action bar.
+12. Payment page and Razorpay create/verify accept an accepted Host special offer as Host-approved.
+13. Host receives a Payment received notification when Guest payment becomes paid.
+14. Booking chat receives a system Payment received / Booking confirmed message on payment.
+15. Core Guest message/payment visuals aligned to NightOutStays navy/white with pink as CTA accent.
+16. Reduced aggressive 5-second API polling to improve responsiveness and unnecessary network load.
+
+Validation:
+- API route files changed in this release passed Node syntax checks.
+- Full Next build could not be completed in the sandbox because Next.js attempted to download Linux SWC from registry.npmjs.org and sandbox DNS/network access returned EAI_AGAIN.
+- Deploy on Vercel remains the final production build validation.
