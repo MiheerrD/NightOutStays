@@ -32,3 +32,4 @@ export async function GET(req){
     return Response.json({success:false,error:'Invalid portal.'},{status:400});
   }catch(err){ return Response.json({success:false,error:err?.message||'Unable to load counts.'},{status:500}); }
 }
+
