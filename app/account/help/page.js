@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import GuestNav from "../GuestNav";
 
 const supabase = createClient(
   "https://gxwemplbykjxhezefykh.supabase.co",
@@ -266,7 +265,6 @@ export default function GuestHelpPage() {
 
   return (
     <>
-      <GuestNav guest={guest} />
 
       <main style={s.page}>
         <div style={s.heading}>

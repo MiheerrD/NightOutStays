@@ -25,6 +25,8 @@ export default function HostRegisterPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -247,23 +249,25 @@ export default function HostRegisterPage() {
               <label>
                 Password
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={form.password}
                   onChange={updateField}
                   placeholder="Minimum 6 characters"
                 />
+                <button type="button" className="showPass" onClick={() => setShowPassword((v) => !v)}>{showPassword ? 'Hide' : 'Show'} password</button>
               </label>
 
               <label>
                 Confirm Password
                 <input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   value={form.confirmPassword}
                   onChange={updateField}
                   placeholder="Re-enter password"
                 />
+                <button type="button" className="showPass" onClick={() => setShowConfirmPassword((v) => !v)}>{showConfirmPassword ? 'Hide' : 'Show'} password</button>
               </label>
             </div>
           </div>
@@ -374,7 +378,7 @@ export default function HostRegisterPage() {
 
           <div className="loginLink">
             Already registered?{' '}
-            <a href="/login">
+            <a href="/login?portal=host">
               Login here
             </a>
           </div>
@@ -515,6 +519,18 @@ export default function HostRegisterPage() {
 
         textarea {
           resize: vertical;
+        }
+
+
+        .showPass {
+          align-self: flex-start;
+          border: 0;
+          background: transparent;
+          padding: 0;
+          color: #0b4b8c;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
         }
 
         .alert {

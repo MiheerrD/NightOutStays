@@ -19,11 +19,6 @@ const PORTALS = [
     label: 'Host',
     description: 'Manage your properties and bookings',
   },
-  {
-    key: 'admin',
-    label: 'Super Admin',
-    description: 'Manage the complete NightOutStays platform',
-  },
 ];
 
 export default function LoginPage() {
@@ -91,8 +86,7 @@ export default function LoginPage() {
 
         if (
           portalParam === 'guest' ||
-          portalParam === 'host' ||
-          portalParam === 'admin'
+          portalParam === 'host'
         ) {
           requestedPortal =
             portalParam;
@@ -708,9 +702,8 @@ export default function LoginPage() {
             </h1>
 
             <p>
-              Login as Guest, Host or Super Admin
-              and continue to your own NightOutStays
-              dashboard.
+              Login as Guest or Host and continue to your own NightOutStays dashboard.
+              Super Admin access is available only from the private Admin login page.
             </p>
 
             <div className="loginFeatures">
@@ -736,16 +729,6 @@ export default function LoginPage() {
                 </span>
               </div>
 
-              <div>
-                <strong>
-                  Super Admin
-                </strong>
-
-                <span>
-                  Control hosts, properties,
-                  bookings and platform settings.
-                </span>
-              </div>
             </div>
           </div>
         </section>
@@ -788,11 +771,7 @@ export default function LoginPage() {
 
           <div className="loginHeading">
             <span>
-              {portal === 'guest'
-                ? 'GUEST PORTAL'
-                : portal === 'host'
-                  ? 'HOST PORTAL'
-                  : 'SUPER ADMIN PORTAL'}
+              {portal === 'guest' ? 'GUEST PORTAL' : 'HOST PORTAL'}
             </span>
 
             <h2>
@@ -1033,24 +1012,33 @@ function Field({
   placeholder,
   autoComplete,
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+
   return (
     <div className="loginField">
-      <label>
-        {label}
-      </label>
+      <label>{label}</label>
 
-      <input
-        type={type}
-        value={value}
-        onChange={(event) =>
-          onChange(
-            event.target.value
-          )
-        }
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        required
-      />
+      <div className={isPassword ? 'passwordInputWrap' : ''}>
+        <input
+          type={isPassword && showPassword ? 'text' : type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          required
+        />
+        {isPassword && (
+          <button
+            type="button"
+            className="passwordEye"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1459,6 +1447,26 @@ function PageStyles() {
         font-size: 15px;
 
         outline: none;
+      }
+
+      .passwordInputWrap {
+        position: relative;
+      }
+
+      .passwordInputWrap input {
+        padding-right: 72px;
+      }
+
+      .passwordEye {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #0b4b8c;
+        font-weight: 800;
+        cursor: pointer;
       }
 
       .loginField input:focus {
