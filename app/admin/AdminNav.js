@@ -10,6 +10,7 @@ const ITEMS = [
   { label: 'Hosts', href: '/admin/hosts', icon: '♙', module: 'hosts', key: 'hosts' },
   { label: 'Properties', href: '/admin/properties', icon: '▥', module: 'properties' },
   { label: 'Guests', href: '/admin/guests', icon: '♙', module: 'guests' },
+  { label: 'Verifications', href: '/admin/verifications', icon: '✓', module: 'guests', key: 'verifications' },
   { label: 'Bookings', href: '/admin/bookings', icon: '▣', module: 'bookings' },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: '▤', module: 'subscriptions' },
   { label: 'Promotions', href: '/admin/promotions', icon: '◇', module: 'promotions' },

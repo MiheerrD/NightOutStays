@@ -39,3 +39,8 @@ Recommended test order after deployment:
 12. Guest accept
 13. Pay Now / Razorpay
 14. Notification and message badge behavior
+
+V4 IDENTITY / MOBILE UPDATE
+- Live Supabase migration identity_mobile_v4 has already been applied.
+- No manual SQL is required for this release.
+- Automatic external KYC provider credentials are not configured in this release; Admin manual verification is available.

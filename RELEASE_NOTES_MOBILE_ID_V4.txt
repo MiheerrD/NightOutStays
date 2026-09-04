@@ -1,0 +1,35 @@
+NightOutStays Mobile + Identity V4
+Date: 2026-09-04
+
+Guest mobile
+- Rebuilt My Bookings into Request Raised / Request Accepted / Payment Due / Upcoming / Past stages.
+- Only paid bookings appear in Upcoming.
+- Unpaid request/payment stages show a 24-hour countdown and disappear from My Bookings when expired.
+- Replaced the large blue booking artwork with a compact neutral NightOutStays identity panel.
+- Rebuilt Guest Messages for a cleaner mobile conversation layout.
+- Added a 6-month conversation retention notice and API visibility window.
+- Kept special-rate request as a small secondary control.
+- Special offer Pay Now remains inside the offer conversation.
+- Rebuilt public-site mobile navigation as a proper slide-in drawer with backdrop.
+
+Profile photos
+- Guest profile photo upload from Guest Profile.
+- Guest profile photo upload also available during ID verification.
+- Host profile photo upload added to Host Profile.
+- Guest sees Host profile photo in chat.
+- Host sees Guest profile photo in chat.
+
+Identity verification workflow
+- Guest verification page supports PAN, Aadhaar, Passport and Driving Licence.
+- Host verification page supports the same document types.
+- Documents are stored in a private identity-documents bucket.
+- Profile photos are stored separately in a public profile-photos bucket.
+- Admin Verifications page added for approve/reject workflow.
+- Booking verification status updates when Admin verifies/rejects a Guest booking document.
+- Guest/Host account verification status is tracked.
+- Admin gets a pending verification count in navigation.
+
+Important: automated government-document authenticity/name matching is NOT enabled yet.
+The schema is provider-ready (provider, provider_reference, extracted_name, name_match_score,
+authenticity_status). Connect an authorized KYC/DigiLocker/UIDAI-compatible provider before treating
+an uploaded image/PDF as automatically verified.

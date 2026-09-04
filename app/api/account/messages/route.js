@@ -11,7 +11,7 @@ function bearer(req){ return String(req.headers.get('authorization')||'').replac
 async function requireGuest(req,db){
   const token=bearer(req); if(!token) throw Object.assign(new Error('Authentication required.'),{status:401});
   const {data:u,error:e}=await db.auth.getUser(token); if(e||!u?.user) throw Object.assign(new Error('Invalid login session.'),{status:401});
-  const {data:g,error:ge}=await db.from('guests').select('id,user_id,full_name,phone,email,status').eq('user_id',u.user.id).maybeSingle();
+  const {data:g,error:ge}=await db.from('guests').select('id,user_id,full_name,phone,email,status,profile_photo_url').eq('user_id',u.user.id).maybeSingle();
   if(ge||!g) throw Object.assign(new Error('Guest account required.'),{status:403});
   return {user:u.user,guest:g};
 }
@@ -31,7 +31,8 @@ async function notifyHost(db,booking,title,body,type='message'){
 export async function GET(req){
   try{
     const db=dbClient(); const {guest}=await requireGuest(req,db);
-    const {data:bookings,error:be}=await db.from('bookings').select('*').eq('guest_id',guest.id).order('updated_at',{ascending:false});
+    const cutoff=new Date(); cutoff.setMonth(cutoff.getMonth()-6);
+    const {data:bookings,error:be}=await db.from('bookings').select('*').eq('guest_id',guest.id).gte('created_at',cutoff.toISOString()).order('updated_at',{ascending:false});
     if(be) throw be;
     const rows=bookings||[]; const propertyIds=[...new Set(rows.map(x=>x.property_id).filter(Boolean))]; const bookingIds=rows.map(x=>x.id);
     const [{data:properties},{data:messages,error:me}]=await Promise.all([
@@ -39,10 +40,12 @@ export async function GET(req){
       bookingIds.length?db.from('booking_messages').select('id,booking_id,sender_type,sender_name,message,message_type,is_read,created_at').in('booking_id',bookingIds).order('created_at',{ascending:true}):Promise.resolve({data:[]})
     ]);
     if(me) throw me;
-    const pmap=Object.fromEntries((properties||[]).map(p=>[p.id,p])); const mmap={};
+    const hostIds=[...new Set((properties||[]).map(p=>p.host_id).filter(Boolean))];
+    const {data:hosts}=hostIds.length?await db.from('host_profiles').select('id,full_name,business_name,profile_photo_url').in('id',hostIds):{data:[]};
+    const pmap=Object.fromEntries((properties||[]).map(p=>[p.id,p])); const hmap=Object.fromEntries((hosts||[]).map(h=>[h.id,h])); const mmap={};
     (messages||[]).forEach(m=>{(mmap[m.booking_id] ||= []).push(m);});
-    const threads=rows.map(b=>{const list=mmap[b.id]||[]; return {booking:b,property:pmap[b.property_id]||null,messages:list,unread:list.filter(m=>m.sender_type==='host'&&!m.is_read).length,lastMessage:list.at(-1)||null};});
-    return Response.json({success:true,guest,threads});
+    const threads=rows.map(b=>{const list=mmap[b.id]||[]; const property=pmap[b.property_id]||null; return {booking:b,property,host:property?.host_id?hmap[property.host_id]||null:null,guest,messages:list,unread:list.filter(m=>m.sender_type==='host'&&!m.is_read).length,lastMessage:list.at(-1)||null};}).sort((a,b)=>new Date(b.lastMessage?.created_at||b.booking.updated_at||0)-new Date(a.lastMessage?.created_at||a.booking.updated_at||0));
+    return Response.json({success:true,guest,threads,retentionMonths:6});
   }catch(e){ return Response.json({success:false,error:e?.message||'Unable to load messages.'},{status:e?.status||500}); }
 }
 

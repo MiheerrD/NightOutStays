@@ -62,6 +62,7 @@ export default function HostProfilePage() {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const [user, setUser] = useState(null);
   const [host, setHost] = useState(null);
@@ -109,6 +110,35 @@ export default function HostProfilePage() {
       }
     };
   }, [chequePreview]);
+
+  async function uploadProfilePhoto(event) {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+    setPhotoBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Login required.');
+      const formData = new FormData();
+      formData.append('role', 'host');
+      formData.append('file', file);
+      const response = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Unable to upload profile photo.');
+      setHost((current) => ({ ...(current || {}), profile_photo_url: result.profilePhotoUrl }));
+      setMessage('Profile photo updated successfully.');
+    } catch (err) {
+      setError(err?.message || 'Unable to upload profile photo.');
+    } finally {
+      setPhotoBusy(false);
+      event.target.value = '';
+    }
+  }
 
   async function loadPage() {
     setLoading(true);
@@ -656,6 +686,20 @@ export default function HostProfilePage() {
 
         <div className="nosProfileLayout">
           <div className="nosProfileMain">
+            <section className="nosProfileCard nosProfileAvatarCard">
+              <div className="nosProfileAvatar">
+                {host?.profile_photo_url ? <img src={host.profile_photo_url} alt="Host profile" /> : <span>{(host?.full_name || host?.business_name || 'H').slice(0,1).toUpperCase()}</span>}
+              </div>
+              <div className="nosProfileAvatarInfo">
+                <h2>Profile Photo & Identity</h2>
+                <p>Your photo is shown to Guests in booking conversations.</p>
+                <div className="nosProfileAvatarActions">
+                  <label className="nosProfilePhotoButton">{photoBusy ? 'Uploading...' : 'Upload Photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadProfilePhoto} disabled={photoBusy} /></label>
+                  <a href="/host/verification" className="nosProfileVerifyLink">Verify Identity</a>
+                  <span className="nosProfileVerifyStatus">{String(host?.identity_verification_status || 'not submitted').replace('_',' ')}</span>
+                </div>
+              </div>
+            </section>
             <form onSubmit={saveProfile}>
               <section className="nosProfileCard">
                 <div className="nosProfileCardTitle">
@@ -1784,7 +1828,7 @@ export default function HostProfilePage() {
             flex-direction: column;
           }
         }
-      `}</style>
+      .nosProfileAvatarCard{display:flex!important;align-items:center;gap:18px}.nosProfileAvatar{width:84px;height:84px;flex:0 0 84px;border-radius:50%;overflow:hidden;background:#303a44;color:#fff;display:grid;place-items:center;font-size:30px;font-weight:900}.nosProfileAvatar img{width:100%;height:100%;object-fit:cover}.nosProfileAvatarInfo h2{margin:0 0 5px}.nosProfileAvatarInfo p{margin:0 0 10px;color:#667085;font-size:12px}.nosProfileAvatarActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nosProfilePhotoButton,.nosProfileVerifyLink{display:inline-flex;align-items:center;min-height:36px;border-radius:999px;padding:0 12px;font-size:10px;font-weight:900;cursor:pointer;text-decoration:none}.nosProfilePhotoButton{background:#303a44;color:#fff}.nosProfilePhotoButton input{display:none}.nosProfileVerifyLink{background:#f00078;color:#fff}.nosProfileVerifyStatus{text-transform:capitalize;font-size:10px;color:#667085;font-weight:800}@media(max-width:560px){.nosProfileAvatarCard{align-items:flex-start!important}.nosProfileAvatar{width:64px;height:64px;flex-basis:64px}.nosProfileAvatarActions{gap:6px}}`}</style>
     </main>
   );
 }
