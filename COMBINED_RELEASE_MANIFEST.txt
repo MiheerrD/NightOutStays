@@ -1,0 +1,28 @@
+NightOutStays FULL COMBINED RELEASE
+Date: 04 Sep 2026
+Base: NightOutStays(2).zip
+
+MERGED IN THIS FULL PROJECT
+1. Existing complete NightOutStays application from the latest uploaded base.
+2. Current homepage/search/map implementation already in the working project.
+3. Guest calendar interest-count implementation already in the working project.
+4. Guest/Host critical message workflow.
+5. Special-rate request and Host special offer flow.
+6. Guest Pay Now / Razorpay payment page.
+7. Guest Support duplicate navigation/header fix.
+8. Host registration role handling and pending Host flow.
+9. Public Guest/Host login separation from private Admin login.
+10. Password show/hide controls.
+11. Admin Host-request notification handling.
+12. Pending Host count badge on Admin Hosts navigation.
+13. Admin Notifications session authorization refresh handling.
+14. Pending Hosts can create draft properties.
+15. Pending Host properties cannot be public before Host approval.
+16. Current Supabase migrations for the above fixes.
+17. family_friendly property flag required by the current homepage/search.
+
+DATABASE
+The live connected Supabase project already received the database migrations used by this release, including the family_friendly flag. SQL files are retained for source history.
+
+NOT YET CLAIMED AS COMPLETE
+Large later modules such as the full referrals/reports/location-management/bulk-hotel-upload redesign are not marked complete in this release. They should be added to THIS same full project and distributed only as the next full combined version, not as separate patch ZIPs.
