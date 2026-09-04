@@ -713,7 +713,7 @@ const styles = {
 
   uploadButton: {
     padding: '11px 16px',
-    background: '#163c74',
+    background: '#303a44',
     color: '#ffffff',
     borderRadius: '10px',
     fontWeight: '700',
@@ -751,7 +751,7 @@ const styles = {
     position: 'absolute',
     top: '9px',
     left: '9px',
-    background: '#163c74',
+    background: '#303a44',
     color: '#ffffff',
     padding: '6px 9px',
     borderRadius: '8px',
@@ -785,7 +785,7 @@ const styles = {
     padding: '10px',
     border: 0,
     borderRadius: '9px',
-    background: '#163c74',
+    background: '#303a44',
     color: '#ffffff',
     fontWeight: '700',
     cursor: 'pointer',

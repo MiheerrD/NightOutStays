@@ -2345,7 +2345,7 @@ function Styles() {
       }
 
       .backButton {
-        color: #07569f;
+        color: #f00078;
         font-size: 11px;
         font-weight: 900;
         text-decoration: none;
@@ -2391,14 +2391,14 @@ function Styles() {
         justify-content: center;
         border-radius: 16px;
         background: #e8f0f9;
-        color: #07569f;
+        color: #f00078;
         font-size: 27px;
         font-weight: 900;
       }
 
       .guestProfileMain h1 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 28px;
       }
 
@@ -2470,7 +2470,7 @@ function Styles() {
       .statusControlCard h2,
       .sectionTitle h2 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 21px;
       }
 
@@ -2562,7 +2562,7 @@ function Styles() {
       .statCard strong {
         display: block;
         margin-top: 7px;
-        color: #071d38;
+        color: #303a44;
         font-size: 20px;
       }
 
@@ -2612,7 +2612,7 @@ function Styles() {
       .reviewHeader h3,
       .reportTop h3 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 14px;
       }
 
@@ -2628,7 +2628,7 @@ function Styles() {
         padding: 6px 9px;
         border-radius: 999px;
         background: #edf3f8;
-        color: #07569f;
+        color: #f00078;
         font-size: 8px;
         font-weight: 900;
       }
@@ -2650,7 +2650,7 @@ function Styles() {
 
       .miniStat strong {
         display: block;
-        color: #071d38;
+        color: #303a44;
         font-size: 16px;
       }
 
@@ -2702,8 +2702,8 @@ function Styles() {
       }
 
       .filterButton.active {
-        border-color: #082f5a;
-        background: #082f5a;
+        border-color: #303a44;
+        background: #303a44;
         color: #ffffff;
       }
 

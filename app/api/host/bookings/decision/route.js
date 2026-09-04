@@ -1,91 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://gxwemplbykjxhezefykh.supabase.co';
-
-function adminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
-  return createClient(SUPABASE_URL, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
-
-export async function POST(request) {
-  try {
-    const supabase = adminClient();
-    const token = String(request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    if (!token) return Response.json({ success: false, error: 'Authentication required.' }, { status: 401 });
-
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    const user = userData?.user;
-    if (userError || !user) return Response.json({ success: false, error: 'Invalid login session.' }, { status: 401 });
-
-    const body = await request.json();
-    const bookingId = String(body?.bookingId || '').trim();
-    const decision = String(body?.decision || '').trim().toLowerCase();
-    if (!bookingId || !['approved', 'declined'].includes(decision)) {
-      return Response.json({ success: false, error: 'Valid booking and decision are required.' }, { status: 400 });
-    }
-
-    const { data: host, error: hostError } = await supabase
-      .from('host_profiles')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (hostError || !host || host.status !== 'active') {
-      return Response.json({ success: false, error: 'Active Host account required.' }, { status: 403 });
-    }
-
-    const { data: booking, error: bookingError } = await supabase
-      .from('bookings')
-      .select('id, booking_code, property_id, payment_status, booking_status, host_decision, offer_status')
-      .eq('id', bookingId)
-      .maybeSingle();
-
-    if (bookingError || !booking) return Response.json({ success: false, error: 'Booking not found.' }, { status: 404 });
-
-    const { data: property } = await supabase
-      .from('properties')
-      .select('id, host_id')
-      .eq('id', booking.property_id)
-      .maybeSingle();
-
-    if (!property || property.host_id !== host.id) {
-      return Response.json({ success: false, error: 'You cannot manage this booking.' }, { status: 403 });
-    }
-
-    if (String(booking.payment_status || '').toLowerCase() === 'paid') {
-      return Response.json({ success: false, error: 'Paid bookings cannot be approved or declined here.' }, { status: 409 });
-    }
-
-    const now = new Date();
-    const update = decision === 'approved'
-      ? {
-          host_decision: 'approved', host_decision_at: now.toISOString(), host_decision_by: user.id,
-          booking_status: 'confirmed', payment_status: booking.payment_status || 'unpaid',
-          payment_due_at: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), updated_at: now.toISOString(),
-        }
-      : {
-          host_decision: 'declined', host_decision_at: now.toISOString(), host_decision_by: user.id,
-          booking_status: 'cancelled', payment_due_at: null,
-          offer_status: booking.offer_status === 'host_offered' ? 'declined' : booking.offer_status,
-          updated_at: now.toISOString(),
-        };
-
-    const { error: updateError } = await supabase.from('bookings').update(update).eq('id', booking.id);
-    if (updateError) throw updateError;
-
-    await supabase.from('booking_messages').insert({
-      booking_id: booking.id,
-      sender_type: 'system',
-      message: decision === 'approved'
-        ? `Booking ${booking.booking_code} was approved by the host. Payment is due within 24 hours.`
-        : `Booking ${booking.booking_code} was declined by the host.`,
-      message_type: decision === 'approved' ? 'approval' : 'decline',
-    }).then(() => {}).catch(() => {});
-
-    return Response.json({ success: true, decision, paymentDueAt: update.payment_due_at || null });
-  } catch (error) {
-    console.error('Host booking decision error:', error);
-    return Response.json({ success: false, error: error?.message || 'Unable to update booking.' }, { status: 500 });
-  }
-}
+import { sendEmail, bookingUrl, esc, date } from '../../../../lib/serverEmail';
+const SUPABASE_URL='https://gxwemplbykjxhezefykh.supabase.co';
+function adminClient(){const key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!key)throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');return createClient(SUPABASE_URL,key,{auth:{persistSession:false,autoRefreshToken:false}})}
+export async function POST(request){try{const supabase=adminClient();const token=String(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim();if(!token)return Response.json({success:false,error:'Authentication required.'},{status:401});const{data:userData,error:userError}=await supabase.auth.getUser(token),user=userData?.user;if(userError||!user)return Response.json({success:false,error:'Invalid login session.'},{status:401});const body=await request.json(),bookingId=String(body?.bookingId||'').trim(),decision=String(body?.decision||'').trim().toLowerCase();if(!bookingId||!['approved','declined'].includes(decision))return Response.json({success:false,error:'Valid booking and decision are required.'},{status:400});
+const{data:host,error:hostError}=await supabase.from('host_profiles').select('id,status,full_name,business_name,email,phone').eq('user_id',user.id).maybeSingle();if(hostError||!host||host.status!=='active')return Response.json({success:false,error:'Active Host account required.'},{status:403});
+const{data:booking,error:bookingError}=await supabase.from('bookings').select('id,booking_code,property_id,guest_id,check_in,check_out,payment_status,booking_status,host_decision,offer_status').eq('id',bookingId).maybeSingle();if(bookingError||!booking)return Response.json({success:false,error:'Booking not found.'},{status:404});
+const[{data:property},{data:guest}]=await Promise.all([supabase.from('properties').select('id,host_id,name,location_name,area,city').eq('id',booking.property_id).maybeSingle(),supabase.from('guests').select('id,user_id,full_name,email,phone').eq('id',booking.guest_id).maybeSingle()]);if(!property||property.host_id!==host.id)return Response.json({success:false,error:'You cannot manage this booking.'},{status:403});if(String(booking.payment_status||'').toLowerCase()==='paid')return Response.json({success:false,error:'Paid bookings cannot be approved or declined here.'},{status:409});
+const now=new Date(),update=decision==='approved'?{host_decision:'approved',host_decision_at:now.toISOString(),host_decision_by:user.id,booking_status:'confirmed',payment_status:booking.payment_status||'unpaid',payment_due_at:new Date(now.getTime()+24*60*60*1000).toISOString(),updated_at:now.toISOString()}:{host_decision:'declined',host_decision_at:now.toISOString(),host_decision_by:user.id,booking_status:'cancelled',payment_due_at:null,offer_status:booking.offer_status==='host_offered'?'declined':booking.offer_status,updated_at:now.toISOString()};const{error:updateError}=await supabase.from('bookings').update(update).eq('id',booking.id);if(updateError)throw updateError;
+const message=decision==='approved'?`Booking ${booking.booking_code} was approved by the host. Payment is due within 24 hours.`:`Booking ${booking.booking_code} was declined by the host.`;try { await supabase.from('booking_messages').insert({booking_id:booking.id,sender_type:'system',sender_name:'NightOutStays',message,message_type:decision==='approved'?'approval':'decline',is_read:false}); } catch {}
+if(guest?.user_id){ try { await supabase.from('notifications').insert({recipient_type:'guest',recipient_user_id:guest.user_id,recipient_guest_id:guest.id,booking_id:booking.id,property_id:booking.property_id,type:decision==='approved'?'booking_approved':'booking_declined',title:decision==='approved'?'Booking request approved':'Booking request declined',body:decision==='approved'?`Your request for ${property.name} was approved. Complete payment within 24 hours.`:`Your request for ${property.name} was declined.`,priority:'important',action_url:decision==='approved'?`/booking/${booking.booking_code}/pay`:'/account/bookings',email_status:'pending'}); } catch {} }
+if(guest?.email){try{await sendEmail({to:guest.email,subject:decision==='approved'?`Booking approved - ${property.name}`:`Booking request declined - ${property.name}`,title:decision==='approved'?'Your booking request was approved':'Your booking request was declined',preheader:message,bodyHtml:decision==='approved'?`<p style="font-size:14px;line-height:1.65;color:#5d6670">${esc(host.business_name||host.full_name||'The Host')} approved your request for <b>${esc(property.name)}</b>.</p><p style="font-size:14px;color:#5d6670">${date(booking.check_in)} → ${date(booking.check_out)}</p><div style="background:#fff4f9;border:1px solid #ffd0e7;border-radius:12px;padding:13px;font-size:13px"><b>Payment window: 24 hours</b><br/>Complete payment before ${new Date(update.payment_due_at).toLocaleString('en-IN')} to secure the dates.</div>`:`<p style="font-size:14px;line-height:1.65;color:#5d6670">Your request for <b>${esc(property.name)}</b> could not be accepted. You can search another stay or choose different dates.</p>`,ctaLabel:decision==='approved'?'Pay securely now':'Browse other stays',ctaUrl:decision==='approved'?bookingUrl(`/booking/${booking.booking_code}/pay`):bookingUrl('/')})}catch(e){console.warn('Decision email failed',e)}}
+return Response.json({success:true,decision,paymentDueAt:update.payment_due_at||null});}catch(error){console.error('Host booking decision error:',error);return Response.json({success:false,error:error?.message||'Unable to update booking.'},{status:500})}}

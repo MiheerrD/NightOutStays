@@ -1099,7 +1099,7 @@ function Styles() {
 
       .pageHeader h1 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 32px;
       }
 
@@ -1114,7 +1114,7 @@ function Styles() {
         padding: 0 17px;
         border: 0;
         border-radius: 8px;
-        background: #07569f;
+        background: #f00078;
         color: #ffffff;
         font-size: 11px;
         font-weight: 900;
@@ -1155,7 +1155,7 @@ function Styles() {
       .statCard strong {
         display: block;
         margin-top: 10px;
-        color: #071d38;
+        color: #303a44;
         font-size: 27px;
       }
 
@@ -1182,8 +1182,8 @@ function Styles() {
       }
 
       .filterCard.active {
-        border-color: #082f5a;
-        background: #082f5a;
+        border-color: #303a44;
+        background: #303a44;
         color: #ffffff;
       }
 
@@ -1220,7 +1220,7 @@ function Styles() {
 
       .guestToolRow h2 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 24px;
       }
 
@@ -1244,7 +1244,7 @@ function Styles() {
       }
 
       .guestSearch:focus {
-        border-color: #07569f;
+        border-color: #f00078;
       }
 
       .guestGrid {
@@ -1286,14 +1286,14 @@ function Styles() {
         justify-content: center;
         border-radius: 13px;
         background: #e8f0f9;
-        color: #07569f;
+        color: #f00078;
         font-size: 21px;
         font-weight: 900;
       }
 
       .guestIdentity h3 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 17px;
       }
 
@@ -1382,7 +1382,7 @@ function Styles() {
 
       .miniStat strong {
         display: block;
-        color: #071d38;
+        color: #303a44;
         font-size: 18px;
       }
 
@@ -1418,7 +1418,7 @@ function Styles() {
       .guestActivityGrid strong {
         display: block;
         margin-top: 5px;
-        color: #071d38;
+        color: #303a44;
         font-size: 12px;
       }
 
@@ -1469,7 +1469,7 @@ function Styles() {
         justify-content: center;
         padding: 0 15px;
         border-radius: 8px;
-        background: #082f5a;
+        background: #303a44;
         color: #ffffff;
         font-size: 10px;
         font-weight: 900;
@@ -1495,7 +1495,7 @@ function Styles() {
 
       .emptyBox h3 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
       }
 
       .emptyBox p {

@@ -1,0 +1,30 @@
+NightOutStays FULL All-In-One V5 — 04 Sep 2026
+
+Included in this combined release
+- Phase 1 instant identity name matching for Guests and Hosts. The uploaded ID is retained privately, but Phase 1 checks the entered ID-name against the registered account name only. Document authenticity/OCR remains Phase 2.
+- Guest and Host contact details stay private before payment and unlock automatically after successful payment in booking/chat views. Payment confirmation emails include the counterpart's contact details.
+- Resend transactional email engine for new booking requests, Host approval/decline, payment confirmation/contact unlock, booking expiry, check-in reminders and post-checkout review reminders.
+- Daily Vercel lifecycle cron. RESEND_API_KEY and RESEND_FROM_EMAIL must exist in Vercel; nightoutstay.com is expected to be a verified Resend domain.
+- Guest booking buckets and mobile presentation retained from V4. Unpaid accepted/requested bookings do not become Upcoming merely because booking_status is confirmed.
+- Host calendar interest fix: date comparisons now parse booking/check-in/check-out dates correctly, so unpaid Guest requests and payment-pending interests render in the Host calendar while paid stays remain Booked.
+- Host and Guest profile-photo uploads are compressed client-side when needed and handle non-JSON/server-size errors cleanly.
+- Public map property-count badge removed.
+- Referral system UI/API: unique Guest/Host referral codes and share links, automatic code claiming after login/registration, Host-to-Host, Guest-to-Guest and Guest-to-Host rewards, Admin referral report and leaderboard.
+  * Host -> Host: 15 free subscription days after referred Host uploads a property; maximum 10 successful Hosts.
+  * Guest -> Guest: next-booking service-charge waiver after referred Guest successfully pays; maximum 5 successful Guests.
+  * Guest -> Host: 50% off referrer's next booking up to Rs 1,500 after referred Host uploads a property.
+  * Referral rewards are consumed only on successful payment/subscription activation, not merely when an unpaid request is raised.
+  * Current booking rows presently carry service_charge=0; a service-charge-waiver reward therefore remains available until a future booking has a non-zero service charge.
+- Admin Reports & Downloads for Properties, Hosts, Guests, Bookings, Referrals, Payouts and Payment Holds.
+  * Excel button downloads an .xls-compatible table export.
+  * PDF button opens a print-ready report; choose Save as PDF in the browser print dialog.
+- Guest post-stay Reviews page is functional for eligible completed/paid stays.
+- Host and Admin portal palette updated to match NightOutStays charcoal/white/pink design language.
+- Existing realtime booking/messages/notifications, Favorites, payment/special-offer workflow and V4 mobile fixes remain included.
+
+Live Supabase
+- Referral tables/functions/triggers were already applied to the production Supabase project.
+- booking_email_events_v5 migration was applied to production and is included in this source package for version tracking.
+
+Operational note
+- Transactional emails are sent only when the production deployment has valid RESEND_API_KEY and RESEND_FROM_EMAIL environment variables.

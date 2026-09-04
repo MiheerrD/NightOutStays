@@ -33,7 +33,7 @@ export default function HostPortalShell({ children }) {
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      if (alive && data) setHost(data);
+      if (alive && data) setHost(data);const saved=localStorage.getItem('nos_referral_code');if(saved&&session?.access_token){try{const r=await fetch('/api/referrals',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({code:saved})});const j=await r.json();if(r.ok&&j.success)localStorage.removeItem('nos_referral_code')}catch{}}
     }
 
     loadHostIdentity();

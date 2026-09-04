@@ -2836,7 +2836,7 @@ function Styles() {
         padding: 0 16px;
         border: 0;
         border-radius: 8px;
-        background: #07569f;
+        background: #f00078;
         color: #ffffff;
         font-size: 11px;
         font-weight: 900;
@@ -2871,7 +2871,7 @@ function Styles() {
         justify-content: center;
         border-radius: 15px;
         background: #e6eff9;
-        color: #07569f;
+        color: #f00078;
         font-size: 25px;
         font-weight: 900;
       }
@@ -2892,7 +2892,7 @@ function Styles() {
       .nosHostProfileTitle h1,
       .nosSectionHeading h2 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
       }
 
       .nosHostProfileTitle h1 {
@@ -2957,7 +2957,7 @@ function Styles() {
 
       .nosHostControlInfo strong {
         display: block;
-        color: #071d38;
+        color: #303a44;
         font-size: 14px;
       }
 
@@ -3152,8 +3152,8 @@ function Styles() {
 
       .nosHostFilterCard.active,
       .nosBookingFilter.active {
-        border-color: #082f5a;
-        background: #082f5a;
+        border-color: #303a44;
+        background: #303a44;
         color: #ffffff;
       }
 
@@ -3196,7 +3196,7 @@ function Styles() {
 
       .nosSelectorText strong {
         display: block;
-        color: #071d38;
+        color: #303a44;
         font-size: 16px;
       }
 
@@ -3225,7 +3225,7 @@ function Styles() {
       }
 
       .nosBookingPropertySelect:focus {
-        border-color: #07569f;
+        border-color: #f00078;
       }
 
       .nosSelectedPropertyLine {
@@ -3245,7 +3245,7 @@ function Styles() {
       }
 
       .nosSelectedPropertyLine strong {
-        color: #07569f;
+        color: #f00078;
         font-size: 11px;
       }
 
@@ -3327,7 +3327,7 @@ function Styles() {
       .nosPropertyCardTop h3,
       .nosBookingCardHeader h3 {
         margin: 0;
-        color: #071d38;
+        color: #303a44;
         font-size: 18px;
       }
 
@@ -3438,7 +3438,7 @@ function Styles() {
         margin-top: 14px;
         padding: 13px;
         border-radius: 9px;
-        background: #082f5a;
+        background: #303a44;
         color: #ffffff;
       }
 
@@ -3507,13 +3507,13 @@ function Styles() {
 
       .nosOpenBookings,
       .nosManageProperty {
-        background: #082f5a;
+        background: #303a44;
         color: #ffffff;
       }
 
       .nosViewLiveProperty {
         border: 1px solid #ccd6e1;
-        color: #07569f;
+        color: #f00078;
       }
 
       .nosEmpty,

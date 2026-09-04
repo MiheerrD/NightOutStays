@@ -3208,7 +3208,7 @@ function PageStyles() {
 
 
       .nosEditBrand {
-        color: #0b4b8c;
+        color: #f00078;
         font-size: 25px;
         font-weight: 900;
         text-decoration: none;
@@ -3737,9 +3737,9 @@ function PageStyles() {
 
 
       .nosEditReviewCard {
-        background: #eff6ff;
+        background: #fff4f9;
 
-        border-color: #bfdbfe;
+        border-color: #ffd9eb;
       }
 
 

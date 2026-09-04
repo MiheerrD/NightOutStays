@@ -2835,6 +2835,17 @@ export default function PropertyPage() {
         );
       }
 
+      try {
+        const { data: { session: notifySession } } = await supabase.auth.getSession();
+        if (notifySession?.access_token) {
+          await fetch('/api/bookings/notify-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${notifySession.access_token}` },
+            body: JSON.stringify({ bookingId: createdBooking.id }),
+          }).catch(() => {});
+        }
+      } catch {}
+
       const hostDeadline =
         getHostResponseDeadline(
           createdBooking

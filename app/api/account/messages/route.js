@@ -41,10 +41,10 @@ export async function GET(req){
     ]);
     if(me) throw me;
     const hostIds=[...new Set((properties||[]).map(p=>p.host_id).filter(Boolean))];
-    const {data:hosts}=hostIds.length?await db.from('host_profiles').select('id,full_name,business_name,profile_photo_url').in('id',hostIds):{data:[]};
+    const {data:hosts}=hostIds.length?await db.from('host_profiles').select('id,full_name,business_name,profile_photo_url,phone,email').in('id',hostIds):{data:[]};
     const pmap=Object.fromEntries((properties||[]).map(p=>[p.id,p])); const hmap=Object.fromEntries((hosts||[]).map(h=>[h.id,h])); const mmap={};
     (messages||[]).forEach(m=>{(mmap[m.booking_id] ||= []).push(m);});
-    const threads=rows.map(b=>{const list=mmap[b.id]||[]; const property=pmap[b.property_id]||null; return {booking:b,property,host:property?.host_id?hmap[property.host_id]||null:null,guest,messages:list,unread:list.filter(m=>m.sender_type==='host'&&!m.is_read).length,lastMessage:list.at(-1)||null};}).sort((a,b)=>new Date(b.lastMessage?.created_at||b.booking.updated_at||0)-new Date(a.lastMessage?.created_at||a.booking.updated_at||0));
+    const threads=rows.map(b=>{const list=mmap[b.id]||[]; const property=pmap[b.property_id]||null; const rawHost=property?.host_id?hmap[property.host_id]||null:null; const paid=String(b.payment_status||'').toLowerCase()==='paid'; const host=rawHost?{...rawHost,phone:paid?rawHost.phone:null,email:paid?rawHost.email:null}:null; return {booking:b,property,host,guest,messages:list,unread:list.filter(m=>m.sender_type==='host'&&!m.is_read).length,lastMessage:list.at(-1)||null,contactsUnlocked:paid};}).sort((a,b)=>new Date(b.lastMessage?.created_at||b.booking.updated_at||0)-new Date(a.lastMessage?.created_at||a.booking.updated_at||0));
     return Response.json({success:true,guest,threads,retentionMonths:6});
   }catch(e){ return Response.json({success:false,error:e?.message||'Unable to load messages.'},{status:e?.status||500}); }
 }

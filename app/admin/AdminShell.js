@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import AdminNav from './AdminNav';
+import AdminExportTools from './AdminExportTools';
 
 export default function AdminShell({ children }) {
   const pathname = usePathname();
@@ -12,6 +13,7 @@ export default function AdminShell({ children }) {
   return (
     <>
       {!isAdminLogin && <AdminNav />}
+      {!isAdminLogin && <AdminExportTools />}
       {children}
     </>
   );

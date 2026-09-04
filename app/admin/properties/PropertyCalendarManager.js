@@ -1487,7 +1487,7 @@ const styles = {
 
   selectedDay: {
     outline:
-      '3px solid #17457f',
+      '3px solid #f00078',
   },
 
   pendingDay: {
@@ -1508,7 +1508,7 @@ const styles = {
 
   dayRate: {
     marginTop: 10,
-    color: '#17457f',
+    color: '#f00078',
     fontWeight: 900,
     fontSize: 14,
   },
@@ -1560,9 +1560,9 @@ const styles = {
 
   modeButton: {
     border:
-      '1px solid #17457f',
+      '1px solid #f00078',
     background: '#ffffff',
-    color: '#17457f',
+    color: '#f00078',
     padding: '9px 13px',
     borderRadius: 8,
     fontWeight: 800,
@@ -1570,7 +1570,7 @@ const styles = {
   },
 
   activeMode: {
-    background: '#17457f',
+    background: '#f00078',
     color: '#ffffff',
   },
 
@@ -1601,7 +1601,7 @@ const styles = {
 
   saveButton: {
     border: 0,
-    background: '#17457f',
+    background: '#f00078',
     color: '#ffffff',
     padding: 12,
     borderRadius: 9,
@@ -1681,7 +1681,7 @@ const styles = {
 
   editButton: {
     border: 0,
-    background: '#17457f',
+    background: '#f00078',
     color: '#ffffff',
     borderRadius: 7,
     padding: '7px 9px',

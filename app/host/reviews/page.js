@@ -1574,7 +1574,7 @@ function Styles() {
 
       .brand {
 
-        color: #0b4b8c;
+        color: #f00078;
 
         font-size: 25px;
 
@@ -1857,9 +1857,9 @@ function Styles() {
 
       .summaryCard.highlight {
 
-        border-color: #93c5fd;
+        border-color: #ffc3df;
 
-        background: #eff6ff;
+        background: #fff4f9;
       }
 
 
@@ -1887,7 +1887,7 @@ function Styles() {
 
       .summaryCard.highlight strong {
 
-        color: #17457f;
+        color: #f00078;
       }
 
 
@@ -2034,7 +2034,7 @@ function Styles() {
 
       .searchWrap input:focus {
 
-        border-color: #0b4b8c;
+        border-color: #f00078;
       }
 
 
@@ -2141,7 +2141,7 @@ function Styles() {
 
         background: #e8f0f9;
 
-        color: #07569f;
+        color: #f00078;
 
         font-size: 20px;
 
@@ -2543,11 +2543,11 @@ function Styles() {
         padding: 18px;
 
         border:
-          1px solid #bfdbfe;
+          1px solid #ffd9eb;
 
         border-radius: 14px;
 
-        background: #eff6ff;
+        background: #fff4f9;
       }
 
 
@@ -2567,7 +2567,7 @@ function Styles() {
 
         border-radius: 50%;
 
-        background: #17457f;
+        background: #f00078;
 
         color: white;
 

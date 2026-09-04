@@ -1426,7 +1426,7 @@ function PageStyles() {
       }
 
       .nosAddBrand {
-        color: #0b4b8c;
+        color: #f00078;
         font-size: 25px;
         font-weight: 900;
         text-decoration: none;
@@ -1734,8 +1734,8 @@ function PageStyles() {
       }
 
       .nosAddReviewCard {
-        background: #eff6ff;
-        border-color: #bfdbfe;
+        background: #fff4f9;
+        border-color: #ffd9eb;
       }
 
       .nosAddReviewCard p {

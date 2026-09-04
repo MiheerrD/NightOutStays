@@ -413,7 +413,7 @@ export default function HostRegisterPage() {
         }
 
         .brand {
-          color: #0b4b8c;
+          color: #f00078;
           font-size: 24px;
           font-weight: 900;
           text-decoration: none;
@@ -527,7 +527,7 @@ export default function HostRegisterPage() {
           border: 0;
           background: transparent;
           padding: 0;
-          color: #0b4b8c;
+          color: #f00078;
           font-size: 12px;
           font-weight: 800;
           cursor: pointer;
@@ -578,7 +578,7 @@ export default function HostRegisterPage() {
         }
 
         .loginLink a {
-          color: #0b4b8c;
+          color: #f00078;
           font-weight: 800;
         }
 

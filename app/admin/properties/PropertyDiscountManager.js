@@ -1751,13 +1751,13 @@ const styles = {
       '1px solid #d6e2f1',
 
     background:
-      '#eef5ff',
+      '#fff4f9',
 
     borderRadius:
       '12px',
 
     color:
-      '#163c74',
+      '#303a44',
   },
 
   packageRuleGrid: {
@@ -2089,7 +2089,7 @@ const styles = {
       '9px',
 
     background:
-      '#163c74',
+      '#303a44',
 
     color:
       '#ffffff',
@@ -2254,7 +2254,7 @@ const styles = {
       '#eef4fb',
 
     color:
-      '#163c74',
+      '#303a44',
 
     borderRadius:
       '14px',
@@ -2284,7 +2284,7 @@ const styles = {
     border: 0,
 
     background:
-      '#163c74',
+      '#303a44',
 
     color:
       '#ffffff',
@@ -2304,13 +2304,13 @@ const styles = {
 
   statusButton: {
     border:
-      '1px solid #163c74',
+      '1px solid #303a44',
 
     background:
       '#ffffff',
 
     color:
-      '#163c74',
+      '#303a44',
 
     borderRadius:
       '8px',

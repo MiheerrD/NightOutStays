@@ -580,7 +580,7 @@ const styles = {
   brand: {
     fontSize: '24px',
     fontWeight: '800',
-    color: '#163c74',
+    color: '#303a44',
   },
 
   muted: {
@@ -595,7 +595,7 @@ const styles = {
 
   navLink: {
     textDecoration: 'none',
-    color: '#163c74',
+    color: '#303a44',
     padding: '9px 14px',
     borderRadius: '20px',
   },
@@ -603,7 +603,7 @@ const styles = {
   activeNav: {
     textDecoration: 'none',
     color: '#ffffff',
-    background: '#163c74',
+    background: '#303a44',
     padding: '9px 14px',
     borderRadius: '20px',
   },
@@ -674,7 +674,7 @@ const styles = {
     padding: '14px',
     border: 0,
     borderRadius: '10px',
-    background: '#163c74',
+    background: '#303a44',
     color: '#ffffff',
     fontWeight: '800',
     cursor: 'pointer',
@@ -760,9 +760,9 @@ const styles = {
     flex: 1,
     padding: '10px',
     borderRadius: '10px',
-    border: '1px solid #163c74',
+    border: '1px solid #303a44',
     background: '#ffffff',
-    color: '#163c74',
+    color: '#303a44',
     cursor: 'pointer',
     fontWeight: '700',
   },
@@ -790,7 +790,7 @@ const styles = {
     marginTop: '15px',
     padding: '11px 16px',
     borderRadius: '10px',
-    background: '#163c74',
+    background: '#303a44',
     color: '#ffffff',
     textDecoration: 'none',
   },

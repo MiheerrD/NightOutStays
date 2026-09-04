@@ -484,7 +484,7 @@ function Styles() {
       }
 
       .brand {
-        color: #0b4b8c;
+        color: #f00078;
         font-size: 25px;
         font-weight: 900;
         text-decoration: none;
@@ -801,8 +801,8 @@ function Styles() {
       .reviewInfo {
         display: flex;
         gap: 15px;
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
+        background: #fff4f9;
+        border: 1px solid #ffd9eb;
         border-radius: 14px;
         padding: 18px;
       }
@@ -814,7 +814,7 @@ function Styles() {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #17457f;
+        background: #f00078;
         color: white;
         border-radius: 50%;
         font-weight: 900;

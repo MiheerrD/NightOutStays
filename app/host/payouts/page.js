@@ -185,17 +185,17 @@ function Info({ label, value }) {
 }
 function Styles() {
   return <style jsx global>{`
-    .wrap{max-width:1500px;margin:0 auto;padding:30px;background:#f6f8fb;min-height:100vh;color:#17324d;font-family:Arial,sans-serif}
+    .wrap{max-width:1500px;margin:0 auto;padding:30px;background:#f6f8fb;min-height:100vh;color:#303a44;font-family:Arial,sans-serif}
     .hero,.sectionHead,.bank{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
-    h1{font-size:36px;margin:5px 0 8px;color:#082f5a} h2{margin:5px 0 8px;color:#082f5a}
+    h1{font-size:36px;margin:5px 0 8px;color:#303a44} h2{margin:5px 0 8px;color:#303a44}
     p{margin:0;color:#65788a}.eyebrow{font-size:12px;font-weight:800;letter-spacing:1.4px;color:#35618c}
     .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}.card,.panel{background:white;border:1px solid #dde5ed;border-radius:16px}
-    .card{padding:18px}.card span,.info span{display:block;font-size:12px;color:#718396;margin-bottom:8px}.card strong{font-size:22px;color:#082f5a}
+    .card{padding:18px}.card span,.info span{display:block;font-size:12px;color:#718396;margin-bottom:8px}.card strong{font-size:22px;color:#303a44}
     .panel{padding:22px;margin-bottom:20px}.bank{flex-wrap:wrap}.bankGrid{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     .info{background:#f7f9fc;border-radius:12px;padding:13px}.badge{padding:9px 13px;border-radius:999px;font-weight:800}.good{background:#e9f8ef;color:#19733c}.warn{background:#fff4df;color:#9a5b00}
-    .button{display:inline-block;background:#082f5a;color:white;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700}
+    .button{display:inline-block;background:#303a44;color:white;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700}
     .propertyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:15px}.propertyCard{border:1px solid #e0e7ef;border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:7px}
-    .propertyCard span{font-size:13px;color:#718396}.propertyCard b{font-size:20px;color:#082f5a}.filters{display:flex;gap:10px;flex-wrap:wrap}
+    .propertyCard span{font-size:13px;color:#718396}.propertyCard b{font-size:20px;color:#303a44}.filters{display:flex;gap:10px;flex-wrap:wrap}
     input,select{border:1px solid #ccd7e2;border-radius:10px;padding:11px 12px;background:white;min-width:210px}.tableWrap{overflow:auto;margin-top:16px}
     table{width:100%;border-collapse:collapse;min-width:1000px}th,td{text-align:left;padding:13px;border-bottom:1px solid #e7edf3;vertical-align:top}
     th{font-size:12px;color:#607487;background:#f8fafc}td{font-size:14px}td small{display:block;margin-top:5px;color:#7c8d9d}.status{background:#eaf2fb;color:#214e78;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}

@@ -1845,7 +1845,7 @@ const styles = {
   brand: {
     fontSize: 25,
     fontWeight: 900,
-    color: '#17457f',
+    color: '#f00078',
   },
 
   subBrand: {
@@ -1899,7 +1899,7 @@ const styles = {
   },
 
   refresh: {
-    background: '#17457f',
+    background: '#f00078',
     color: '#fff',
     border: 0,
     borderRadius: 10,
@@ -1957,7 +1957,7 @@ const styles = {
   },
 
   bookingCode: {
-    color: '#17457f',
+    color: '#f00078',
     fontSize: 20,
     fontWeight: 900,
   },
@@ -2101,7 +2101,7 @@ const styles = {
   fullChatLink: {
     fontSize: 12,
     fontWeight: 800,
-    color: '#17457f',
+    color: '#f00078',
     textDecoration: 'none',
   },
 
@@ -2150,7 +2150,7 @@ const styles = {
     fontSize: 11,
     fontWeight: 900,
     marginBottom: 5,
-    color: '#17457f',
+    color: '#f00078',
   },
 
   messageTime: {
@@ -2189,7 +2189,7 @@ const styles = {
 
   sendReply: {
     border: 0,
-    background: '#17457f',
+    background: '#f00078',
     color: '#fff',
     borderRadius: 9,
     padding: '12px 16px',
@@ -2217,9 +2217,9 @@ const styles = {
 
   offerButton: {
     border:
-      '1px solid #17457f',
+      '1px solid #f00078',
     background: '#fff',
-    color: '#17457f',
+    color: '#f00078',
     padding: 11,
     borderRadius: 9,
     fontWeight: 800,
@@ -2288,7 +2288,7 @@ const styles = {
   sendOffer: {
     flex: 1,
     border: 0,
-    background: '#17457f',
+    background: '#f00078',
     color: '#fff',
     padding: 11,
     borderRadius: 9,

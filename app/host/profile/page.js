@@ -56,6 +56,23 @@ function maskAccountNumber(number) {
   return `••••••••${value.slice(-4)}`;
 }
 
+async function prepareProfilePhoto(file) {
+  if (!file?.type?.startsWith('image/')) return file;
+  if (file.size <= 2 * 1024 * 1024) return file;
+  const bitmap = await createImageBitmap(file);
+  const max = 1400;
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.84));
+  if (!blob) throw new Error('Unable to prepare profile photo.');
+  return new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' });
+}
+
 export default function HostProfilePage() {
   const router = useRouter();
 
@@ -120,16 +137,19 @@ export default function HostProfilePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Login required.');
+      const preparedFile = await prepareProfilePhoto(file);
       const formData = new FormData();
       formData.append('role', 'host');
-      formData.append('file', file);
+      formData.append('file', preparedFile);
       const response = await fetch('/api/profile/avatar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error || 'Unable to upload profile photo.');
+      const raw = await response.text();
+      let result = {};
+      try { result = raw ? JSON.parse(raw) : {}; } catch { result = {}; }
+      if (!response.ok) throw new Error(result?.error || (response.status === 413 ? 'Photo is too large. Please choose a smaller image.' : 'Unable to upload profile photo.'));
       setHost((current) => ({ ...(current || {}), profile_photo_url: result.profilePhotoUrl }));
       setMessage('Profile photo updated successfully.');
     } catch (err) {
@@ -636,7 +656,7 @@ export default function HostProfilePage() {
             justify-content: center;
             gap: 16px;
             font-family: Arial, sans-serif;
-            color: #17233a;
+            color: #303a44;
             background: #f5f7fa;
           }
 
@@ -644,7 +664,7 @@ export default function HostProfilePage() {
             width: 38px;
             height: 38px;
             border: 4px solid #dfe4eb;
-            border-top-color: #17233a;
+            border-top-color: #303a44;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
           }
@@ -1266,7 +1286,7 @@ export default function HostProfilePage() {
         .nosProfileHeader h1 {
           margin: 5px 0 7px;
           font-size: 34px;
-          color: #17233a;
+          color: #303a44;
         }
 
         .nosProfileHeader p {
@@ -1283,7 +1303,7 @@ export default function HostProfilePage() {
           border: 1px solid #d9dfe8;
           border-radius: 9px;
           background: white;
-          color: #17233a;
+          color: #303a44;
           text-decoration: none;
           font-size: 13px;
           font-weight: 700;
@@ -1354,7 +1374,7 @@ export default function HostProfilePage() {
 
         .nosProfileCardTitle h2 {
           margin: 4px 0 6px;
-          color: #17233a;
+          color: #303a44;
           font-size: 20px;
         }
 
@@ -1460,7 +1480,7 @@ export default function HostProfilePage() {
 
         .nosProfilePrimary {
           border: 0;
-          background: #17233a;
+          background: #303a44;
           color: white;
         }
 
@@ -1488,13 +1508,13 @@ export default function HostProfilePage() {
         }
 
         .nosProfileEditBank {
-          border: 1px solid #17233a;
+          border: 1px solid #303a44;
           background: #fff;
-          color: #17233a;
+          color: #303a44;
         }
 
         .nosProfileEditBank:hover {
-          background: #17233a;
+          background: #303a44;
           color: #fff;
         }
 
@@ -1549,7 +1569,7 @@ export default function HostProfilePage() {
         .nosProfileCheque h3 {
           margin: 0 0 5px;
           font-size: 14px;
-          color: #17233a;
+          color: #303a44;
         }
 
         .nosProfileCheque p {
@@ -1666,7 +1686,7 @@ export default function HostProfilePage() {
           align-items: center;
           justify-content: center;
           border-radius: 50%;
-          background: #17233a;
+          background: #303a44;
           color: #d6b465;
           font-size: 23px;
           font-weight: 800;
@@ -1675,7 +1695,7 @@ export default function HostProfilePage() {
         .nosProfileSideCard h3 {
           margin: 0 0 9px;
           font-size: 15px;
-          color: #17233a;
+          color: #303a44;
         }
 
         .nosProfileSideCard > p {
@@ -1753,8 +1773,8 @@ export default function HostProfilePage() {
         }
 
         .nosProfileSideCard.dark {
-          background: #17233a;
-          border-color: #17233a;
+          background: #303a44;
+          border-color: #303a44;
         }
 
         .nosProfileSideCard.dark h3 {

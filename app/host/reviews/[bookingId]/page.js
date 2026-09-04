@@ -2202,7 +2202,7 @@ function Styles() {
       }
 
       .brand {
-        color: #0b4b8c;
+        color: #f00078;
         font-size: 25px;
         font-weight: 900;
         text-decoration: none;
@@ -2294,7 +2294,7 @@ function Styles() {
       }
 
       .backRow a {
-        color: #0b4b8c;
+        color: #f00078;
         font-size: 12px;
         font-weight: 800;
         text-decoration: none;
@@ -2383,7 +2383,7 @@ function Styles() {
         justify-content: center;
         border-radius: 13px;
         background: #e8f0f9;
-        color: #07569f;
+        color: #f00078;
         font-size: 20px;
         font-weight: 900;
       }
@@ -2602,7 +2602,7 @@ function Styles() {
 
       textarea:focus,
       select:focus {
-        border-color: #0b4b8c;
+        border-color: #f00078;
       }
 
       .fieldBlock small {
@@ -2616,9 +2616,9 @@ function Styles() {
       .privateField {
         padding: 18px;
         margin-top: 18px;
-        border: 1px solid #bfdbfe;
+        border: 1px solid #ffd9eb;
         border-radius: 10px;
-        background: #eff6ff;
+        background: #fff4f9;
       }
 
       .submitRow {
@@ -2685,14 +2685,14 @@ function Styles() {
       }
 
       .privateInfo {
-        border-color: #bfdbfe;
-        background: #eff6ff;
+        border-color: #ffd9eb;
+        background: #fff4f9;
       }
 
       .privateInfo strong {
         display: block;
         margin-bottom: 6px;
-        color: #17457f;
+        color: #f00078;
         font-size: 12px;
       }
 

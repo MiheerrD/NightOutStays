@@ -110,7 +110,11 @@ export async function GET(request) {
       host: auth.host,
       properties: propertyRows,
       property,
-      bookings: bookingResult.data || [],
+      bookings: (bookingResult.data || []).map((b) => {
+        const paid = String(b.payment_status || '').toLowerCase() === 'paid';
+        const guest = b.guests ? { ...b.guests, phone: paid ? b.guests.phone : null, email: paid ? b.guests.email : null } : null;
+        return { ...b, guests: guest, contactsUnlocked: paid };
+      }),
       blockedDates: blockedResult.data || [],
     });
   } catch (error) {

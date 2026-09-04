@@ -916,7 +916,7 @@ function Styles() {
 
         border-radius: 9px;
 
-        background: #07569f;
+        background: #f00078;
 
         color: #ffffff;
 
@@ -979,9 +979,9 @@ function Styles() {
 
 
       .nosHostStatCard.active {
-        border-color: #082f5a;
+        border-color: #303a44;
 
-        background: #082f5a;
+        background: #303a44;
 
         color: #ffffff;
       }
@@ -1061,9 +1061,9 @@ function Styles() {
 
 
       .nosHostFilterButtons button.active {
-        border-color: #082f5a;
+        border-color: #303a44;
 
-        background: #082f5a;
+        background: #303a44;
 
         color: #ffffff;
       }
@@ -1092,7 +1092,7 @@ function Styles() {
 
 
       .nosHostSearch:focus {
-        border-color: #07569f;
+        border-color: #f00078;
       }
 
 
@@ -1179,7 +1179,7 @@ function Styles() {
 
         background: #e7eff8;
 
-        color: #07569f;
+        color: #f00078;
 
         font-size: 20px;
 
@@ -1451,7 +1451,7 @@ function Styles() {
 
         border-radius: 8px;
 
-        background: #082f5a;
+        background: #303a44;
 
         color: #ffffff;
 

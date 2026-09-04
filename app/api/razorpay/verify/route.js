@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import {
   createClient,
 } from '@supabase/supabase-js';
+import { sendEmail, bookingUrl, esc, date, money } from '../../../lib/serverEmail';
 
 const SUPABASE_URL =
   'https://gxwemplbykjxhezefykh.supabase.co';
@@ -165,6 +166,7 @@ export async function POST(request) {
           id,
           booking_code,
           property_id,
+          guest_id,
           check_in,
           check_out,
           total_amount,
@@ -1115,8 +1117,8 @@ export async function POST(request) {
     const paymentMessage =
       paymentType ===
       'special_offer'
-        ? `Payment received for the accepted special offer for booking ${booking.booking_code}. Dates are now reserved. Identity verification is required to complete booking confirmation.`
-        : `Payment received for booking ${booking.booking_code}. Dates are now reserved. Identity verification is required to complete booking confirmation.`;
+        ? `Payment received for the accepted special offer for booking ${booking.booking_code}. Booking is confirmed and contact details are now available to both Guest and Host.`
+        : `Payment received for booking ${booking.booking_code}. Booking is confirmed and contact details are now available to both Guest and Host.`;
 
     const {
       error:
@@ -1153,6 +1155,26 @@ export async function POST(request) {
         'Payment succeeded but message could not be created:',
         messageError
       );
+    }
+
+    /* CONTACT UNLOCK + CONFIRMATION EMAILS */
+    try {
+      const [{ data: guestContact }, { data: propertyContact }] = await Promise.all([
+        supabase.from('guests').select('id,user_id,full_name,email,phone').eq('id', booking.guest_id).maybeSingle(),
+        supabase.from('properties').select('id,name,location_name,area,city,host_id').eq('id', booking.property_id).maybeSingle(),
+      ]);
+      const { data: hostContact } = propertyContact?.host_id
+        ? await supabase.from('host_profiles').select('id,user_id,full_name,business_name,email,phone').eq('id', propertyContact.host_id).maybeSingle()
+        : { data: null };
+      const contactMessage = `Booking confirmed. Contact details are now available to both Guest and Host.${hostContact?.phone ? ` Host: ${hostContact.business_name || hostContact.full_name || 'Host'} - ${hostContact.phone}.` : ''}${guestContact?.phone ? ` Guest: ${guestContact.full_name || 'Guest'} - ${guestContact.phone}.` : ''}`;
+      await supabase.from('booking_messages').insert({ booking_id: booking.id, sender_type: 'system', sender_name: 'NightOutStays', message: contactMessage, message_type: 'confirmation', is_read: false });
+      const common = `<p style="font-size:14px;line-height:1.65;color:#5d6670">Payment is successful for <b>${esc(propertyContact?.name || 'your stay')}</b>.</p><table style="width:100%;border-collapse:collapse;font-size:13px"><tr><td style="padding:7px 0;color:#77808a">Booking</td><td style="text-align:right;font-weight:700">${esc(booking.booking_code)}</td></tr><tr><td style="padding:7px 0;color:#77808a">Stay</td><td style="text-align:right;font-weight:700">${date(booking.check_in)} → ${date(booking.check_out)}</td></tr><tr><td style="padding:7px 0;color:#77808a">Amount paid</td><td style="text-align:right;font-weight:700">${money(expectedPayableAmount)}</td></tr></table>`;
+      if (guestContact?.user_id) await supabase.from('notifications').insert({ recipient_type:'guest',recipient_user_id:guestContact.user_id,recipient_guest_id:guestContact.id,booking_id:booking.id,property_id:booking.property_id,type:'booking_confirmed',title:'Payment successful - booking confirmed',body:`Your booking ${booking.booking_code} is confirmed. Host contact details are now unlocked.`,priority:'important',action_url:'/account/bookings',email_status:'pending' });
+      if (hostContact?.user_id) await supabase.from('notifications').insert({ recipient_type:'host',recipient_user_id:hostContact.user_id,host_id:hostContact.id,booking_id:booking.id,property_id:booking.property_id,type:'payment_received',title:'Guest payment received',body:`Booking ${booking.booking_code} is confirmed. Guest contact details are now unlocked.`,priority:'important',action_url:'/host/bookings',email_status:'pending' });
+      if (guestContact?.email) await sendEmail({ to:guestContact.email,subject:`Booking confirmed - ${propertyContact?.name || booking.booking_code}`,title:'Your booking is confirmed',preheader:'Payment successful. Host contact is unlocked.',bodyHtml:`${common}<div style="margin-top:16px;background:#fff4f9;border:1px solid #ffd0e7;border-radius:12px;padding:13px"><b>Host contact</b><br/>${esc(hostContact?.business_name || hostContact?.full_name || 'Host')}<br/>${esc(hostContact?.phone || 'Contact number unavailable')}</div>`,ctaLabel:'Open My Booking',ctaUrl:bookingUrl('/account/bookings') });
+      if (hostContact?.email) await sendEmail({ to:hostContact.email,subject:`Payment received - ${booking.booking_code}`,title:'Guest payment received',preheader:'Booking is confirmed. Guest contact is unlocked.',bodyHtml:`${common}<div style="margin-top:16px;background:#fff4f9;border:1px solid #ffd0e7;border-radius:12px;padding:13px"><b>Guest contact</b><br/>${esc(guestContact?.full_name || 'Guest')}<br/>${esc(guestContact?.phone || 'Contact number unavailable')}</div>`,ctaLabel:'Open Host Booking',ctaUrl:bookingUrl('/host/bookings') });
+    } catch (contactError) {
+      console.warn('Payment confirmed but contact/email workflow failed:', contactError);
     }
 
     /*
@@ -1316,7 +1338,7 @@ export async function POST(request) {
         true,
 
       identityVerificationRequired:
-        true,
+        false,
 
       settlementCreated,
     });
