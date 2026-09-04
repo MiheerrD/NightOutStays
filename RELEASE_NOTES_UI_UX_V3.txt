@@ -1,0 +1,31 @@
+NightOutStays UI/UX V3 - 2026-09-04
+
+Homepage / public website
+- New charcoal + pink header designed to match the vibrant landing page.
+- Main text changed from hard black/navy to dark charcoal.
+- Search bar narrowed and centered over the hero banner.
+- Full date field is clickable; not only the calendar icon.
+- Expanded city suggestions across major India destinations.
+- Map section uses a fixed contained height so it cannot overlap the next section.
+- Mouse wheel, trackpad, double-click and touch zoom enabled on map.
+- Map no longer invents random locations for properties without coordinates.
+- Colorful destination cards replace the all-blue city strip.
+- Guest property favorites added with heart buttons.
+- Fake hard-coded 4.7 ratings removed; cards now show interest/new status.
+- Footer added.
+- 24/7 support trust badge removed.
+
+Guest portal
+- Guest navigation redesigned to charcoal/pink and matched to the website theme.
+- Favorites page added.
+- Profile page added.
+- Reviews page added.
+- Shared Guest portal color overrides added for Bookings, Messages and Notifications.
+- Support colors aligned to the same palette and high-frequency 4-second fallback polling reduced to 45 seconds; realtime remains primary.
+
+Database
+- guest_favorites table + RLS policies added. Migration already applied to live Supabase.
+
+Validation
+- 105 JS/JSX files parsed with TypeScript transpiler: 0 syntax diagnostics.
+- Full Next production build could not run in this container because Next attempts to download the Linux SWC binary and registry.npmjs.org is unavailable here.

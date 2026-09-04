@@ -251,7 +251,7 @@ export default function GuestHelpPage() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_ticket_messages" }, refresh)
       .subscribe();
 
-    const fallback = window.setInterval(() => load(selectedIdRef.current), 4000);
+    const fallback = window.setInterval(() => load(selectedIdRef.current), 45000);
     const onFocus = () => load(selectedIdRef.current);
     window.addEventListener("focus", onFocus);
 
@@ -385,30 +385,30 @@ export default function GuestHelpPage() {
 }
 
 const s = {
-  page: { maxWidth: 1320, margin: "0 auto", padding: "30px 32px 60px", background: "#f6f8fb", minHeight: "100vh", color: "#17324d", fontFamily: "Arial, sans-serif" },
+  page: { maxWidth: 1320, margin: "0 auto", padding: "30px 32px 60px", background: "#f6f7f9", minHeight: "100vh", color: "#303a44", fontFamily: "Arial, sans-serif" },
   heading: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 },
-  h1: { margin: 0, color: "#082f5a", fontSize: 34 },
-  h2: { margin: "0 0 12px", color: "#082f5a", fontSize: 20 },
+  h1: { margin: 0, color: "#303a44", fontSize: 34 },
+  h2: { margin: "0 0 12px", color: "#303a44", fontSize: 20 },
   sub: { color: "#66788a", marginBottom: 0 },
-  refresh: { border: "1px solid #cbd5e1", background: "#fff", color: "#082f5a", borderRadius: 9, padding: "10px 14px", fontWeight: 800, cursor: "pointer" },
+  refresh: { border: "1px solid #cbd5e1", background: "#fff", color: "#303a44", borderRadius: 9, padding: "10px 14px", fontWeight: 800, cursor: "pointer" },
   panel: { background: "#fff", border: "1px solid #e0e7ef", borderRadius: 14, padding: 20, marginTop: 18 },
   formGrid: { display: "grid", gap: 10 },
   input: { width: "100%", padding: 12, border: "1px solid #ccd6e1", borderRadius: 9, background: "#fff" },
   textarea: { width: "100%", minHeight: 120, padding: 12, border: "1px solid #ccd6e1", borderRadius: 9, resize: "vertical" },
-  primary: { border: 0, borderRadius: 9, background: "#082f5a", color: "#fff", padding: "11px 15px", fontWeight: 800, cursor: "pointer" },
+  primary: { border: 0, borderRadius: 9, background: "#f00078", color: "#fff", padding: "11px 15px", fontWeight: 800, cursor: "pointer" },
   supportGrid: { display: "grid", gridTemplateColumns: "360px minmax(0,1fr)", gap: 16, marginTop: 18 },
   ticketListPanel: { background: "#fff", border: "1px solid #e0e7ef", borderRadius: 14, padding: 14, minHeight: 420 },
   conversationPanel: { background: "#fff", border: "1px solid #e0e7ef", borderRadius: 14, padding: 18, minHeight: 420 },
   ticketList: { display: "grid", gap: 8 },
-  ticketButton: { width: "100%", textAlign: "left", background: "#fff", border: "1px solid #e6ebf1", borderRadius: 10, padding: 12, cursor: "pointer", color: "#17324d" },
-  ticketButtonActive: { background: "#edf5fc", borderColor: "#a9c7e5" },
+  ticketButton: { width: "100%", textAlign: "left", background: "#fff", border: "1px solid #e6ebf1", borderRadius: 10, padding: 12, cursor: "pointer", color: "#303a44" },
+  ticketButtonActive: { background: "#fff4f9", borderColor: "#f5a9ce" },
   ticketTop: { display: "flex", justifyContent: "space-between", gap: 10, textTransform: "capitalize", fontSize: 12 },
   ticketSubject: { fontWeight: 800, margin: "7px 0 5px" },
   conversationHead: { borderBottom: "1px solid #edf1f4", paddingBottom: 12 },
   meta: { color: "#6b7c8e", fontSize: 12, textTransform: "capitalize" },
   messageList: { display: "grid", gap: 10, padding: "16px 0" },
   message: { maxWidth: "88%", borderRadius: 11, padding: 12 },
-  mine: { marginLeft: "12%", background: "#eef5fb" },
+  mine: { marginLeft: "12%", background: "#fff4f9" },
   adminMessage: { marginRight: "12%", background: "#f7f8fa" },
   messageText: { whiteSpace: "pre-wrap", lineHeight: 1.5, margin: "7px 0" },
   replyBox: { display: "grid", gap: 8, borderTop: "1px solid #edf1f4", paddingTop: 14 },

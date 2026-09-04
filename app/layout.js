@@ -1,5 +1,6 @@
 import './globals.css';
 import SiteHeader from './components/SiteHeader';
+import SiteFooter from './components/SiteFooter';
 
 export const metadata = {
   title: 'NightOutStays',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }) {
       <body>
         <SiteHeader />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );
