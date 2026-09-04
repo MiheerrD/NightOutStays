@@ -1,0 +1,1 @@
+export default function Loading(){return <main style={{minHeight:'65vh',display:'grid',placeItems:'center',background:'#f6f7f9',color:'#303a44'}}><div style={{textAlign:'center'}}><b style={{fontSize:24}}>NightOut<span style={{color:'#f00078'}}>Stays</span></b><div style={{marginTop:12,fontSize:12,color:'#74808b'}}>Loading…</div></div></main>}

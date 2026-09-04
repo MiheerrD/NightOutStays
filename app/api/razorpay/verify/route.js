@@ -174,6 +174,11 @@ export async function POST(request) {
           final_payable_amount,
           taxable_amount,
           gst_amount,
+          accommodation_gst,
+          portal_fee,
+          service_charge,
+          nights,
+          nightly_rate,
           security_deposit,
           offer_status,
           razorpay_order_id,
@@ -357,6 +362,12 @@ export async function POST(request) {
       paymentType =
         'normal';
     }
+
+    const nightlyBasis = Number(booking.taxable_amount || booking.nightly_rate || 0) / Math.max(1, Number(booking.nights || 1));
+    const feePerNight = nightlyBasis <= 3999 ? 149 : nightlyBasis <= 7500 ? 299 : nightlyBasis <= 10999 ? 450 : 699;
+    const requiredPortalFee = Math.round(feePerNight * Math.max(1, Number(booking.nights || 1)) * 100) / 100;
+    const storedPortalFee = Number(booking.portal_fee || booking.service_charge || 0);
+    expectedPayableAmount = Math.round((expectedPayableAmount - storedPortalFee + requiredPortalFee) * 100) / 100;
 
     if (
       !Number.isFinite(
@@ -803,6 +814,10 @@ export async function POST(request) {
 
           paid_at:
             paidAt,
+
+          portal_fee: requiredPortalFee,
+          service_charge: requiredPortalFee,
+          final_payable_amount: expectedPayableAmount,
 
           verification_status:
             'pending',

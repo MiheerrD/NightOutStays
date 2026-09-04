@@ -116,6 +116,7 @@ export async function GET(request) {
         return { ...b, guests: guest, contactsUnlocked: paid };
       }),
       blockedDates: blockedResult.data || [],
+      interestDates: (bookingResult.data || []).filter(b=>String(b.payment_status||'').toLowerCase()!=='paid' && !['cancelled','declined','expired'].includes(String(b.booking_status||'').toLowerCase())).map(b=>({booking_id:b.id,booking_code:b.booking_code,check_in:b.check_in,check_out:b.check_out,status:b.host_decision==='approved'?'payment_due':'requested'})),
     });
   } catch (error) {
     console.error('Host calendar load error:', error);

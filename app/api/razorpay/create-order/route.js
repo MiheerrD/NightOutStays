@@ -75,7 +75,14 @@ export async function POST(request) {
           host_decision,
           host_decision_at,
           payment_due_at,
-          razorpay_order_id
+          razorpay_order_id,
+          nights,
+          nightly_rate,
+          taxable_amount,
+          gst_amount,
+          security_deposit,
+          portal_fee,
+          service_charge
         `)
         .eq(
           'booking_code',
@@ -319,6 +326,16 @@ export async function POST(request) {
 
       paymentType =
         'normal';
+    }
+
+    // NightOutStays platform fee is charged to the Guest on every booking and cannot be discounted by the Host.
+    const nightlyBasis = Number(booking.taxable_amount || booking.nightly_rate || 0) / Math.max(1, Number(booking.nights || 1));
+    const platformPerNight = nightlyBasis <= 3999 ? 149 : nightlyBasis <= 7500 ? 299 : nightlyBasis <= 10999 ? 450 : 699;
+    const platformFee = Math.round(platformPerNight * Math.max(1, Number(booking.nights || 1)) * 100) / 100; // GST included
+    const storedFee = Number(booking.portal_fee || booking.service_charge || 0);
+    payableAmount = Math.round((payableAmount - storedFee + platformFee) * 100) / 100;
+    if (Math.abs(storedFee-platformFee) > 0.009) {
+      await supabase.from('bookings').update({portal_fee:platformFee,service_charge:platformFee,final_payable_amount:payableAmount}).eq('id',booking.id);
     }
 
     if (

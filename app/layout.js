@@ -5,6 +5,7 @@ import SiteFooter from './components/SiteFooter';
 export const metadata = {
   title: 'NightOutStays',
   description: 'Book short stays directly with NightOutStays',
+  icons: { icon: '/icon.svg', shortcut: '/icon.svg', apple: '/icon.svg' },
 };
 
 export default function RootLayout({ children }) {

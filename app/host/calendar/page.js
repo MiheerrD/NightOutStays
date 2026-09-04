@@ -62,6 +62,7 @@ export default function HostCalendarPage() {
   const [blockEnd, setBlockEnd] = useState(ymd(new Date()));
   const [blockReason, setBlockReason] = useState('Host blocked');
   const [busy, setBusy] = useState(false);
+  const [feedUrl,setFeedUrl]=useState(''); const [feedSource,setFeedSource]=useState('airbnb'); const [feeds,setFeeds]=useState([]);
 
   useEffect(() => { initialise(); }, []);
   useEffect(() => { if (selectedPropertyId) loadCalendar(selectedPropertyId); }, [selectedPropertyId]);
@@ -105,8 +106,12 @@ export default function HostCalendarPage() {
       setProperties(data.properties || []);
       setBookings((data.bookings || []).filter((b) => !isInactiveBooking(b)));
       setBlockedDates(data.blockedDates || []);
+      try{const f=await api('/api/host/calendar/feeds');setFeeds((f.feeds||[]).filter(x=>x.property_id===propertyId))}catch{}
     } catch (e) { setError(e?.message || 'Unable to load calendar data.'); }
   }
+
+  async function addFeed(){if(!feedUrl.trim())return;setBusy(true);try{await api('/api/host/calendar/feeds',{method:'POST',body:JSON.stringify({propertyId:selectedPropertyId,source:feedSource,feedUrl:feedUrl.trim()})});setFeedUrl('');await loadCalendar(selectedPropertyId);setNotice('External calendar added. Click Sync Now to import blocked dates.')}catch(e){setError(e.message)}finally{setBusy(false)}}
+  async function syncFeeds(){setBusy(true);try{const r=await api('/api/host/calendar/sync',{method:'POST',body:JSON.stringify({propertyId:selectedPropertyId})});await loadCalendar(selectedPropertyId);setNotice(`${r.imported||0} external calendar events synced.`)}catch(e){setError(e.message)}finally{setBusy(false)}}
 
   const selectedProperty = useMemo(() => properties.find((p) => p.id === selectedPropertyId) || null, [properties, selectedPropertyId]);
 
@@ -238,7 +243,7 @@ export default function HostCalendarPage() {
                 </>}
               </section>
 
-              <section className="hc-panel"><h2>Calendar Sync</h2><p>Use this NightOutStays calendar link in Airbnb, Booking.com or another iCal-compatible portal. It exports paid bookings and blocked dates without guest personal details.</p><button className="hc-full" onClick={copyCalendarLink}>Copy Export Calendar Link</button><small className="hc-muted">External calendar imports already stored in blocked dates will appear here automatically. Automated import-feed management can be connected when external feed storage is enabled.</small></section>
+              <section className="hc-panel"><h2>Calendar Sync</h2><p>Export NightOutStays to Airbnb/Booking.com, and paste their iCal link below to import external reservations.</p><button className="hc-full" onClick={copyCalendarLink}>Copy NightOutStays Export Link</button><div className="hc-section"><h3>Import external calendar</h3><select value={feedSource} onChange={e=>setFeedSource(e.target.value)}><option value="airbnb">Airbnb</option><option value="booking.com">Booking.com</option><option value="vrbo">Vrbo</option><option value="external">Other iCal</option></select><input style={{width:'100%',marginTop:8,padding:10,border:'1px solid #cbd5e1',borderRadius:9}} placeholder="Paste iCal / ICS URL" value={feedUrl} onChange={e=>setFeedUrl(e.target.value)}/><button className="hc-full" disabled={busy} onClick={addFeed}>Add Calendar</button><button className="hc-full primary" disabled={busy||!feeds.length} onClick={syncFeeds}>Sync Now</button><small className="hc-muted">{feeds.length} external calendar{feeds.length===1?'':'s'} connected.</small></div></section>
             </aside>
           </div>
         </>}

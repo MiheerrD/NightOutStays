@@ -70,6 +70,7 @@ const EDITABLE_STATUSES = [
   'draft',
   'changes_requested',
   'declined',
+  'approved',
 ];
 
 
@@ -1804,7 +1805,7 @@ export default function EditPropertyPage() {
 
               .
 
-              Draft, Changes Requested and Declined listings can currently be edited.
+              Approved, Draft, Changes Requested and Declined listings can be edited. Changes to an approved listing remain subject to platform moderation rules.
 
             </p>
 
