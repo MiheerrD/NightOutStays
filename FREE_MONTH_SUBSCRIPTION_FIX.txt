@@ -1,0 +1,10 @@
+NightOutStays V7A Free Month Subscription Fix
+
+Property-specific active subscription discounts with discount_type = "free"
+now activate a real property_subscriptions row immediately for the same validity
+period. The subscription amount is Rs 0 and the property becomes eligible for
+public listing (subject to normal approval/host eligibility rules).
+
+Production Supabase was already migrated on 5 Sep 2026.
+Migration file:
+supabase/migrations/20260905_free_month_discount_activates_subscription.sql

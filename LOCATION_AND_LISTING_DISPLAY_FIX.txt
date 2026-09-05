@@ -1,0 +1,6 @@
+NightOutStays V7A listing display/location fix
+
+- Boosted listings receive ranking priority but no public "Boosted" label.
+- Premium and Featured listings display a gold crown badge.
+- Property detail order is Property features -> About this stay -> House rules -> More information. Long content is collapsed into tidy expandable boxes.
+- Host property forms can resolve exact latitude/longitude from Google Maps links. Short links are followed server-side when possible; if Google does not expose coordinates, host is asked for a full Maps browser URL or coordinates instead of saving a guessed location.

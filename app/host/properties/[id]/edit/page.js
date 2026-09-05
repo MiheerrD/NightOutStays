@@ -686,6 +686,20 @@ export default function EditPropertyPage() {
   }
 
 
+  async function resolveGoogleMapsLocation() {
+    const url = String(form.googleMapsUrl || '').trim();
+    if (!url) { alert('Paste the Google Maps link first.'); return; }
+    try {
+      const response = await fetch('/api/maps/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Unable to resolve map location.');
+      setForm((current) => ({ ...current, latitude:String(json.latitude), longitude:String(json.longitude), googleMapsUrl:json.resolvedUrl || current.googleMapsUrl }));
+      alert('Exact map coordinates captured successfully.');
+    } catch (error) {
+      alert(error.message || 'Unable to resolve map location.');
+    }
+  }
+
   function updateField(
     event
   ) {
@@ -1938,6 +1952,10 @@ export default function EditPropertyPage() {
                   disabled={!canEdit}
                   placeholder="Paste Maps link"
                 />
+
+                <div style={{display:'flex',alignItems:'end'}}>
+                  <button type="button" disabled={!canEdit} onClick={resolveGoogleMapsLocation} style={{width:'100%',minHeight:44,border:'1px solid #d8dee4',borderRadius:10,background:canEdit?'#303a44':'#aab1b7',color:'#fff',fontWeight:800,cursor:canEdit?'pointer':'not-allowed'}}>Use exact location from Maps link</button>
+                </div>
 
 
                 <TextArea

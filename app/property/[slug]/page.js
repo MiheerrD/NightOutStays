@@ -29,6 +29,39 @@ const supabase = createClient(
   'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS'
 );
 
+
+function cleanList(value) {
+  if (Array.isArray(value)) return value.map((x) => String(x || '').trim()).filter(Boolean);
+  if (!value) return [];
+  return String(value).split(/\n|•/).map((x) => x.trim()).filter(Boolean);
+}
+
+function stayFeatureItems(property) {
+  const values = [
+    ...cleanList(property?.features),
+    ...cleanList(property?.amenities),
+    ...cleanList(property?.kitchen_features),
+    Number(property?.bedrooms) > 0 ? `${property.bedrooms} Bedroom${Number(property.bedrooms) === 1 ? '' : 's'}` : '',
+    Number(property?.bathrooms) > 0 ? `${property.bathrooms} Bathroom${Number(property.bathrooms) === 1 ? '' : 's'}` : '',
+    Number(property?.max_guests) > 0 ? `Up to ${property.max_guests} Guests` : '',
+    property?.wifi_available ? 'Wi-Fi' : '',
+    property?.ac_available ? 'Air Conditioning' : '',
+    property?.fridge_available ? 'Refrigerator' : '',
+    property?.washing_machine_available ? 'Washing Machine' : '',
+    property?.pets_allowed ? 'Pet Friendly' : '',
+    property?.parties_allowed ? 'Party Friendly' : '',
+    property?.couples_allowed ? 'Couple Friendly' : '',
+    property?.family_friendly ? 'Family Friendly' : '',
+  ].filter(Boolean);
+  return [...new Set(values)];
+}
+
+function previewText(value, limit = 380) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length > limit ? `${text.slice(0, limit).trim()}…` : text;
+}
+
 function money(value) {
   return `₹${Number(
     value || 0
@@ -3213,31 +3246,78 @@ export default function PropertyPage() {
           }
         >
           <div>
-            <Section
-              title="Amenities"
-            >
-              {Array.isArray(
-                property.amenities
-              )
-                ? property.amenities.join(
-                    ' • '
-                  )
-                : property.amenities ||
-                  '—'}
+            <Section title="Property features">
+              <div style={styles.featureChips}>
+                {stayFeatureItems(property).slice(0, 12).map((item) => (
+                  <span key={item} style={styles.featureChip}>{item}</span>
+                ))}
+              </div>
+              {stayFeatureItems(property).length > 12 && (
+                <CompactDetails title={`View all ${stayFeatureItems(property).length} features`}>
+                  <div style={styles.featureChips}>
+                    {stayFeatureItems(property).map((item) => (
+                      <span key={item} style={styles.featureChip}>{item}</span>
+                    ))}
+                  </div>
+                </CompactDetails>
+              )}
             </Section>
 
-            <Section
-              title="House rules"
-            >
-              {Array.isArray(
-                property.house_rules
-              )
-                ? property.house_rules.join(
-                    ' • '
-                  )
-                : property.house_rules ||
-                  '—'}
+            <Section title="About this stay">
+              <p style={styles.readableText}>
+                {previewText(property.description || property.short_description, 420) || 'Property description will appear here.'}
+              </p>
+              {String(property.description || property.short_description || '').trim().length > 420 && (
+                <CompactDetails title="Read full description">
+                  <div style={styles.longCopy}>{property.description || property.short_description}</div>
+                </CompactDetails>
+              )}
             </Section>
+
+            <Section title="House rules">
+              {cleanList(property.house_rules).length ? (
+                <>
+                  <ul style={styles.rulePreview}>
+                    {cleanList(property.house_rules).slice(0, 3).map((rule, index) => (
+                      <li key={`${index}-${rule}`}>{previewText(rule, 180)}</li>
+                    ))}
+                  </ul>
+                  {cleanList(property.house_rules).length > 3 && (
+                    <CompactDetails title={`View all ${cleanList(property.house_rules).length} house rules`}>
+                      <ol style={styles.fullRuleList}>
+                        {cleanList(property.house_rules).map((rule, index) => (
+                          <li key={`${index}-${rule}`}>{rule}</li>
+                        ))}
+                      </ol>
+                    </CompactDetails>
+                  )}
+                </>
+              ) : '—'}
+            </Section>
+
+            {(property.direction_instructions || cleanList(property.kitchen_features).length || property.check_in_time || property.check_out_time) && (
+              <Section title="More property information">
+                <div style={styles.compactInfoGrid}>
+                  {property.direction_instructions && (
+                    <CompactDetails title="Getting there" summary={previewText(property.direction_instructions, 90)}>
+                      <div style={styles.longCopy}>{property.direction_instructions}</div>
+                    </CompactDetails>
+                  )}
+                  {cleanList(property.kitchen_features).length > 0 && (
+                    <CompactDetails title="Kitchen & facilities" summary={cleanList(property.kitchen_features).slice(0, 3).join(' • ')}>
+                      <div style={styles.featureChips}>
+                        {cleanList(property.kitchen_features).map((item) => <span key={item} style={styles.featureChip}>{item}</span>)}
+                      </div>
+                    </CompactDetails>
+                  )}
+                  {(property.check_in_time || property.check_out_time) && (
+                    <CompactDetails title="Check-in & check-out" summary={`${property.check_in_time || '—'} to ${property.check_out_time || '—'}`}>
+                      <div style={styles.longCopy}>Check-in: {property.check_in_time || '—'}<br/>Check-out: {property.check_out_time || '—'}</div>
+                    </CompactDetails>
+                  )}
+                </div>
+              </Section>
+            )}
 
             <Section
               title="Availability"
@@ -4229,6 +4309,18 @@ function Section({
         {children}
       </div>
     </section>
+  );
+}
+
+function CompactDetails({ title, summary = '', children }) {
+  return (
+    <details style={styles.compactDetails}>
+      <summary style={styles.compactSummary}>
+        <span><strong>{title}</strong>{summary ? <small style={styles.compactSummaryText}>{summary}</small> : null}</span>
+        <b style={styles.compactChevron}>+</b>
+      </summary>
+      <div style={styles.compactBody}>{children}</div>
+    </details>
   );
 }
 
@@ -5228,4 +5320,17 @@ const styles = {
     padding:
       24,
   },
+  featureChips: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  featureChip: { background: '#f2f5f7', border: '1px solid #e1e7eb', color: '#36424d', borderRadius: 999, padding: '8px 11px', fontSize: 13, fontWeight: 700 },
+  readableText: { margin: 0, color: '#495762', lineHeight: 1.72, whiteSpace: 'pre-line' },
+  longCopy: { color: '#495762', lineHeight: 1.72, whiteSpace: 'pre-line' },
+  rulePreview: { margin: 0, paddingLeft: 20, color: '#495762', lineHeight: 1.65 },
+  fullRuleList: { margin: 0, paddingLeft: 22, color: '#495762', lineHeight: 1.7 },
+  compactInfoGrid: { display: 'grid', gap: 10 },
+  compactDetails: { border: '1px solid #e1e7eb', borderRadius: 14, background: '#fbfcfd', overflow: 'hidden', marginTop: 12 },
+  compactSummary: { cursor: 'pointer', listStyle: 'none', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, color: '#303a44' },
+  compactSummaryText: { display: 'block', marginTop: 4, color: '#7a858f', fontWeight: 500, fontSize: 12 },
+  compactChevron: { color: '#f00078', fontSize: 20 },
+  compactBody: { padding: '0 16px 16px' },
+
 };

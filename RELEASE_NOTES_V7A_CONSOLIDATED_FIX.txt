@@ -1,0 +1,19 @@
+NightOutStays V7A Consolidated Correction Build
+Base: user's 2026-09-05 uploaded production ZIP
+
+Confirmed code fixes in this replacement:
+- /admin is a real Dashboard again; Support remains /admin/support.
+- Admin Reports crash fixed: reports API no longer shadows the global URL constructor.
+- Report From/To date fields open from the whole field where browser showPicker is supported.
+- System Health admin-profile lookup fixed (admin_profiles uses user_id, not id).
+- Admin Settings page and API added using platform_settings.
+- Public homepage/search eligibility tightened: approved active properties require an active paid subscription OR an already-active paid/granted promotion during legacy migration. Pending promotions/subscriptions are not public.
+- Active Boosted promotion gets ranking priority over Premium/Featured in search/home data.
+- Existing Host calendar already supports range/bulk date blocking (Start Date to End Date) and external iCal feeds; retained.
+- Existing V7A reliability/payment ledger/security code retained.
+
+Important deployment note:
+The production database currently contains one property_subscriptions row and its status is pending. The legacy Cozy2BHK listing has an active Boosted promotion, so this build treats an active promotion as temporary public eligibility while subscription records are normalized. This prevents the site from becoming empty while still hiding the other unsubscribed listings.
+
+Build validation:
+Static Node syntax checks passed for modified server modules. Full local Next build could not run because the uploaded node_modules contains non-executable platform-specific Next binaries; Vercel will run the clean production build.
