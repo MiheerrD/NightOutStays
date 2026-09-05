@@ -1,0 +1,33 @@
+NightOutStays Production Readiness V7A
+======================================
+Focus: reliability, payment recovery, financial integrity, security and disaster recovery foundations.
+
+Added:
+- Razorpay signed webhook inbox at /api/razorpay/webhook.
+- Immutable booking_financial_ledger snapshot when a booking becomes paid.
+- Backfill of financial snapshots for historical paid bookings.
+- Payment webhook event archive for recovery/reconciliation investigations.
+- System audit and email delivery log tables for operational traceability.
+- Public lightweight /api/health endpoint.
+- Admin System Health API/page for recent payment signals, ledger count and payout holds.
+- Security response headers: HSTS, nosniff, frame protection, referrer policy, permissions policy and CSP.
+- Portable production backup export script: scripts/backup-production.mjs.
+
+Required one-time production setting:
+1. In Razorpay Dashboard create a webhook to:
+   https://nightoutstay.com/api/razorpay/webhook
+2. Subscribe at minimum to payment.captured, payment.failed, order.paid and refund.processed.
+3. Generate a strong webhook secret in Razorpay.
+4. Add the SAME value in Vercel as RAZORPAY_WEBHOOK_SECRET (Production).
+5. Redeploy after adding the variable.
+
+Backup policy recommended before public launch:
+- Daily managed database backup/point-in-time recovery on the database provider plan appropriate for production.
+- Weekly independent encrypted export using scripts/backup-production.mjs to a separate controlled location.
+- Source code kept in Git with protected production branch and deployment rollback.
+- Identity documents and property media require separate storage backup/retention policy; database export alone does not copy storage objects.
+
+Important:
+- V7A is deliberately non-destructive. Existing booking/payment flow remains authoritative.
+- Webhooks are stored as durable recovery signals; they do not blindly mark a booking paid.
+- Never commit .env files or service-role/Razorpay/Resend secrets.

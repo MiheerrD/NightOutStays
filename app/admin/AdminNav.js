@@ -21,6 +21,7 @@ const ITEMS = [
   { label: 'Notifications', href: '/admin/notifications', icon: '◆', module: 'messages', key: 'notifications' },
   { label: 'Support', href: '/admin/support', icon: '?', module: 'messages' },
   { label: 'Reports', href: '/admin/reports', icon: '≣', module: 'reports' },
+  { label: 'System Health', href: '/admin/system-health', icon: '♥', module: 'reports' },
   { label: 'Settings', href: '/admin/settings', icon: '⚙', module: 'settings' },
 ];
 export default function AdminNav(){const pathname=usePathname();const router=useRouter();const [profile,setProfile]=useState(null);const [permissions,setPermissions]=useState({});const [loading,setLoading]=useState(true);const [counts,setCounts]=useState({notifications:0,messages:0});
