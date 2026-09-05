@@ -1,11 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import HomeExperience from './components/HomeExperience';
-
-const db = createClient('https://gxwemplbykjxhezefykh.supabase.co','sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS');
-export const revalidate = 60;
-
-export default async function Home(){
-  const {data:rows=[]}=await db.from('properties').select('id,name,slug,location_name,address,latitude,longitude,bedrooms,bathrooms,max_guests,base_price,is_active,city,area,property_type,pets_allowed,parties_allowed,couples_allowed,family_friendly,property_photos(image_url,is_cover,sort_order)').eq('is_active',true).order('created_at',{ascending:false}).limit(80);
-  const initialProperties=(rows||[]).map(p=>{const photos=[...(p.property_photos||[])].sort((a,b)=>Number(b.is_cover)-Number(a.is_cover)||Number(a.sort_order||0)-Number(b.sort_order||0));return {...p,cover_image:photos[0]?.image_url||'',property_photos:undefined,interest_count:0,promotion_type:''}});
-  return <HomeExperience initialProperties={initialProperties}/>;
-}
+export const revalidate=30;
+const U='https://gxwemplbykjxhezefykh.supabase.co';
+function db(){const key=process.env.SUPABASE_SERVICE_ROLE_KEY;return createClient(U,key||'sb_publishable_MOsISosc6eV2rfgn-fUVoA_KmrmYLqS',{auth:{persistSession:false,autoRefreshToken:false}})}
+export default async function Home(){const d=db();const now=new Date().toISOString();const [{data:rows=[]},{data:subs=[]},{data:promos=[]}]=await Promise.all([d.from('properties').select('id,name,slug,location_name,address,latitude,longitude,bedrooms,bathrooms,max_guests,base_price,is_active,moderation_status,city,area,property_type,pets_allowed,parties_allowed,couples_allowed,family_friendly,property_photos(image_url,is_cover,sort_order)').eq('is_active',true).eq('moderation_status','approved').order('created_at',{ascending:false}).limit(100),d.from('property_subscriptions').select('property_id,status,starts_at,expires_at,paid_at'),d.from('property_promotions').select('property_id,promotion_type,status,starts_at,expires_at')]);
+const live=new Set((subs||[]).filter(x=>['active','paid'].includes(String(x.status||'').toLowerCase())&&x.paid_at&&(!x.starts_at||x.starts_at<=now)&&(!x.expires_at||x.expires_at>=now)).map(x=>x.property_id));const rank={boosted:3,premium:2,featured:1};const pm={};for(const x of promos||[]){if(x.status!=='active'||(x.starts_at&&x.starts_at>now)||(x.expires_at&&x.expires_at<now))continue;if(!pm[x.property_id]||(rank[x.promotion_type]||0)>(rank[pm[x.property_id].promotion_type]||0))pm[x.property_id]=x}
+const promotedIds=new Set(Object.keys(pm));const eligible=new Set([...live,...promotedIds]);const initialProperties=(rows||[]).filter(p=>eligible.has(p.id)).map(p=>{const photos=[...(p.property_photos||[])].sort((a,b)=>Number(b.is_cover)-Number(a.is_cover)||Number(a.sort_order||0)-Number(b.sort_order||0));return {...p,cover_image:photos[0]?.image_url||'',property_photos:undefined,interest_count:0,promotion_type:pm[p.id]?.promotion_type||''}}).sort((a,b)=>(rank[b.promotion_type]||0)-(rank[a.promotion_type]||0));return <HomeExperience initialProperties={initialProperties}/>}

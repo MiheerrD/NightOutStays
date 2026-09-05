@@ -34,6 +34,16 @@ export async function GET(req) {
       .order('created_at', { ascending: false });
     if (error) throw error;
 
+    const { data: subscriptionRows, error: subscriptionError } = await database
+      .from('property_subscriptions')
+      .select('property_id,status,starts_at,expires_at,paid_at');
+    if (subscriptionError) throw subscriptionError;
+    const nowIso = new Date().toISOString();
+    const subscribedIds = new Set((subscriptionRows || []).filter((x) =>
+      ['active','paid'].includes(String(x.status || '').toLowerCase()) && x.paid_at &&
+      (!x.starts_at || x.starts_at <= nowIso) && (!x.expires_at || x.expires_at >= nowIso)
+    ).map((x) => x.property_id));
+
     let properties = (rows || []).map((p) => {
       const photos = [...(p.property_photos || [])].sort((a, b) => Number(b.is_cover) - Number(a.is_cover) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
       return { ...p, cover_image: photos[0]?.image_url || '', property_photos: undefined };
@@ -68,6 +78,8 @@ export async function GET(req) {
     }
 
     const now = Date.now();
+    const promotedIds = new Set(promotions.filter((x) => x.status === 'active' && (!x.starts_at || new Date(x.starts_at).getTime() <= now) && (!x.expires_at || new Date(x.expires_at).getTime() >= now)).map((x) => x.property_id));
+    properties = properties.filter((p) => subscribedIds.has(p.id) || promotedIds.has(p.id));
     const rank = { boosted: 3, premium: 2, featured: 1 };
     properties = properties.map((p) => {
       const pBookings = bookings.filter((b) => b.property_id === p.id);

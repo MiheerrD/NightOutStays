@@ -1,6 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
-const URL='https://gxwemplbykjxhezefykh.supabase.co';
-function db(){const k=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!k)throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');return createClient(URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
+const SUPABASE_URL='https://gxwemplbykjxhezefykh.supabase.co';
+function db(){const k=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!k)throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');return createClient(SUPABASE_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
 async function admin(req,d){const t=String(req.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim();const{data:u}=await d.auth.getUser(t);if(!u?.user)throw Object.assign(new Error('Admin login required.'),{status:401});const{data:a}=await d.from('admin_profiles').select('is_active').eq('user_id',u.user.id).maybeSingle();if(!a?.is_active)throw Object.assign(new Error('Admin access required.'),{status:403})}
 const val=v=>v??''; const inRange=(v,from,to)=>{if(!v)return true;const x=String(v).slice(0,10);return(!from||x>=from)&&(!to||x<=to)};
 export async function GET(req){try{const d=db();await admin(req,d);const u=new URL(req.url),dataset=(u.searchParams.get('dataset')||'bookings').toLowerCase(),from=u.searchParams.get('from')||'',to=u.searchParams.get('to')||'',propertyId=u.searchParams.get('propertyId')||'',hostId=u.searchParams.get('hostId')||'';
